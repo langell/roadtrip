@@ -1,0 +1,45 @@
+{
+  "extends": "../../packages/config/tsconfig/base.json",
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@roadtrip/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@roadtrip/types/*": [
+        "../../packages/types/src/*"
+      ],
+      "@roadtrip/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@roadtrip/ui/*": [
+        "../../packages/ui/src/*"
+      ]
+    },
+    "jsx": "preserve",
+    "types": [
+      "node",
+      "next",
+      "next/navigation"
+    ],
+    "incremental": true,
+    "isolatedModules": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

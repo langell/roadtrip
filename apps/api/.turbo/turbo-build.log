@@ -1,0 +1,5 @@
+
+
+> @roadtrip/api@0.0.1 build /Users/lonnyangell/dev/roadtrip/apps/api
+> tsc -p tsconfig.json
+

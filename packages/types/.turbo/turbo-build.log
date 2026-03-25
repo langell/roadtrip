@@ -1,0 +1,5 @@
+
+
+> @roadtrip/types@0.0.1 build /Users/lonnyangell/dev/roadtrip/packages/types
+> tsc -p tsconfig.json
+

@@ -1,0 +1,16 @@
+{
+  "extends": "../../packages/config/tsconfig/base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["react-native"],
+    "baseUrl": "./",
+    "paths": {
+      "@roadtrip/types": ["../../packages/types/src/index.ts"],
+      "@roadtrip/types/*": ["../../packages/types/src/*"],
+      "@roadtrip/ui": ["../../packages/ui/src/index.ts"],
+      "@roadtrip/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["src", "App.tsx"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,12 @@
+node_modules
+.next
+.expo
+.expo-shared
+pnpm-lock.yaml
+.env*
+.DS_Store
+tmp
+coverage
+playwright-report
+artifacts
+.husky/_

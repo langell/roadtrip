@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@roadtrip/types": ["../../types/src/index.ts"],
+      "@roadtrip/types/*": ["../../types/src/*"],
+      "@roadtrip/ui": ["../../ui/src/index.ts"],
+      "@roadtrip/ui/*": ["../../ui/src/*"]
+    }
+  }
+}
