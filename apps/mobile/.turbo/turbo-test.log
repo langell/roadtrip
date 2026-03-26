@@ -1,50 +1,0 @@
-
-
-> @roadtrip/mobile@0.0.1 test /Users/lonnyangell/dev/roadtrip/apps/mobile
-> jest "--coverage"
-
-watchman warning:  Recrawled this watch 1 time, most recently because:
-MustScanSubDirs UserDroppedTo resolve, please review the information on
-https://facebook.github.io/watchman/docs/troubleshooting.html#recrawl
-To clear this warning, run:
-`watchman watch-del '/Users/lonnyangell/dev/roadtrip' ; watchman watch-project '/Users/lonnyangell/dev/roadtrip'`
-
-[1m[2mDetermining test suites to run...[22m[22m[999D[K
-[K[1A[999D[K
-[K[1A
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A[0m[7m[1m[32m PASS [39m[22m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A  PlannerScreen
-
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A    [32m✓[39m [2mupdates radius (291 ms)[22m
-
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A    [32m✓[39m [2mupdates suggestions using the selected theme (15 ms)[22m
-
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A
-
-[0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A[999D[K--------------------|---------|----------|---------|---------|-------------------
-File                | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
---------------------|---------|----------|---------|---------|-------------------
-[32;1mAll files          [0m | [32;1m    100[0m | [32;1m     100[0m | [32;1m    100[0m | [32;1m    100[0m | [33;1m                 [0m 
-[32;1m features/trip     [0m | [32;1m    100[0m | [32;1m     100[0m | [32;1m    100[0m | [32;1m    100[0m | [33;1m                 [0m 
-[32;1m  PlannerScreen.tsx[0m | [32;1m    100[0m | [32;1m     100[0m | [32;1m    100[0m | [32;1m    100[0m | [33;1m                 [0m 
-[32;1m theme             [0m | [32;1m    100[0m | [32;1m     100[0m | [32;1m    100[0m | [32;1m    100[0m | [33;1m                 [0m 
-[32;1m  colors.ts        [0m | [32;1m    100[0m | [32;1m     100[0m | [32;1m    100[0m | [32;1m    100[0m | [33;1m                 [0m 
---------------------|---------|----------|---------|---------|-------------------
-[1mTest Suites: [22m[1m[32m1 passed[39m[22m, 1 total
-[1mTests:       [22m[1m[32m2 passed[39m[22m, 2 total
-[1mSnapshots:   [22m0 total
-[1mTime:[22m        1.629 s
-[2mRan all test suites[22m[2m.[22m

@@ -1,5 +1,0 @@
-
-
-> @roadtrip/ui@0.0.1 build /Users/lonnyangell/dev/roadtrip/packages/ui
-> tsc -p tsconfig.json
-
