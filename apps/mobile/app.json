@@ -16,6 +16,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050914"
       }
-    }
+    },
+    "plugins": ["expo-secure-store"]
   }
 }

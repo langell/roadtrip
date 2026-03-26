@@ -14,7 +14,6 @@ const allowModules = [
 
 module.exports = {
   preset: 'react-native',
-  setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect'],
   collectCoverage: true,
   coverageReporters: ['text', 'lcov'],
   coverageThreshold: {
