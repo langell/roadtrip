@@ -9,8 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src",
     "test": "vitest run",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev"
+    "db:push": "prisma db push --skip-generate",
+    "db:migrate": "prisma migrate dev --skip-generate"
   },
   "dependencies": {
     "@prisma/client": "5.11.0",

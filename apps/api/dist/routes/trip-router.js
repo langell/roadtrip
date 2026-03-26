@@ -58,4 +58,32 @@ export const tripRouter = router({
         .query(async ({ input }) => {
         return googlePlacesService.findStops(input);
     }),
+    sponsoredPlaces: authenticatedProcedure
+        .input(z
+        .object({
+        limit: z.number().int().min(1).max(50).default(10),
+    })
+        .optional())
+        .query(async ({ ctx, input }) => {
+        return ctx.prisma.sponsoredPlace.findMany({
+            where: { active: true },
+            orderBy: { createdAt: 'desc' },
+            take: input?.limit ?? 10,
+        });
+    }),
+    trackEvent: authenticatedProcedure
+        .input(z.object({
+        type: z.string().min(1).max(64),
+        payload: z.record(z.unknown()),
+    }))
+        .mutation(async ({ ctx, input }) => {
+        const event = await ctx.prisma.analyticsEvent.create({
+            data: {
+                userId: ctx.userId,
+                type: input.type,
+                payload: input.payload,
+            },
+        });
+        return { id: event.id, recorded: true };
+    }),
 });

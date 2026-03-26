@@ -98,4 +98,30 @@ export default [
       },
     },
   },
+  {
+    files: ['apps/web/**/*.{ts,tsx,js,jsx}', 'apps/mobile/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@prisma/client',
+              message: 'Database access is restricted to apps/api. Use API/tRPC contracts instead.',
+            },
+            {
+              name: 'prisma',
+              message: 'Database access is restricted to apps/api. Use API/tRPC contracts instead.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/lib/prisma', '**/lib/prisma.*', 'apps/api/**'],
+              message: 'Do not import API database modules into web/mobile/shared packages.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

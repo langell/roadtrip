@@ -8,6 +8,12 @@ const buildPrisma = () => ({
     create: vi.fn(),
     update: vi.fn(),
   },
+  sponsoredPlace: {
+    findMany: vi.fn(),
+  },
+  analyticsEvent: {
+    create: vi.fn(),
+  },
 });
 
 const buildCaller = () => {
@@ -106,5 +112,38 @@ describe('tripRouter', () => {
       include: { stops: { orderBy: { order: 'asc' } } },
     });
     expect(result).toEqual({ id: 'trip-update' });
+  });
+
+  it('lists active sponsored places', async () => {
+    const { prisma, caller } = buildCaller();
+    prisma.sponsoredPlace.findMany.mockResolvedValue([{ id: 'sponsored-1' }]);
+
+    const result = await caller.sponsoredPlaces({ limit: 5 });
+
+    expect(prisma.sponsoredPlace.findMany).toHaveBeenCalledWith({
+      where: { active: true },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+    expect(result).toEqual([{ id: 'sponsored-1' }]);
+  });
+
+  it('tracks analytics events for authenticated users', async () => {
+    const { prisma, caller } = buildCaller();
+    prisma.analyticsEvent.create.mockResolvedValue({ id: 'event-1' });
+
+    const result = await caller.trackEvent({
+      type: 'trip_viewed',
+      payload: { tripId: 'trip-1', source: 'mobile' },
+    });
+
+    expect(prisma.analyticsEvent.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        type: 'trip_viewed',
+        payload: { tripId: 'trip-1', source: 'mobile' },
+      },
+    });
+    expect(result).toEqual({ id: 'event-1', recorded: true });
   });
 });
