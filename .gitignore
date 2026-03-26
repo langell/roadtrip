@@ -3,7 +3,6 @@ node_modules
 .turbo
 .expo
 .expo-shared
-pnpm-lock.yaml
 .env*
 .DS_Store
 tmp
