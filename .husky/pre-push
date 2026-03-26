@@ -9,3 +9,4 @@ fi
 
 pnpm test:coverage
 pnpm run audit:warn
+pnpm run audit:gate

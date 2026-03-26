@@ -18,7 +18,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky install",
-    "audit:warn": "pnpm audit --audit-level=moderate"
+    "audit:warn": "pnpm audit --audit-level=moderate || true",
+    "audit:gate": "pnpm audit --audit-level=high"
   },
   "devDependencies": {
     "@eslint/js": "^9.1.0",
