@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node ../../scripts/kill-port.mjs 3001 && tsx watch src/server.ts",
     "start": "NODE_ENV=production node dist/server.js",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src",
@@ -13,6 +13,14 @@
     "db:migrate": "prisma migrate dev --skip-generate"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.52.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.52.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.52.0",
+    "@opentelemetry/resources": "^1.25.1",
+    "@opentelemetry/sdk-metrics": "^1.25.1",
+    "@opentelemetry/sdk-node": "^0.52.0",
+    "@opentelemetry/semantic-conventions": "^1.25.1",
     "@prisma/client": "5.11.0",
     "@roadtrip/types": "workspace:*",
     "@trpc/server": "11.0.0-rc.419",

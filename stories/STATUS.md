@@ -6,6 +6,8 @@ Tracks completed story work in chronological order.
 
 - 2026-03-26 — RT-002 `2026-03-real-places-integration.md` moved to `stories/Done/`.
 - 2026-03-26 — RT-003 `2026-03-saved-trip-details-mobile.md` moved to `stories/Done/`.
+- 2026-03-26 — RT-009 `2026-03-structured-logging.md` moved to `stories/Done/`.
+- 2026-03-26 — RT-010 `2026-03-observability-baseline.md` moved to `stories/Done/`.
 
 ## In Progress
 

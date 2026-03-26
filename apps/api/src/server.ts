@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { shutdownObservability } from './observability.js';
 import type { Server } from 'node:http';
 import express from 'express';
 import cors from 'cors';
@@ -8,13 +9,36 @@ import { z } from 'zod';
 import { appRouter } from './routes/index.js';
 import { createContext } from './types/context.js';
 import { env } from './config/env.js';
-import { googlePlacesService } from './services/google-places-service.js';
+import { logger, logError } from './lib/logger.js';
+import { getRequestLogger, requestLoggingMiddleware } from './lib/request-logging.js';
+import {
+  googlePlacesService,
+  GooglePlacesUpstreamError,
+} from './services/google-places-service.js';
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
 
 type RateLimitEntry = {
   count: number;
   resetAt: number;
+};
+
+const toPlacesErrorMeta = (error: unknown) => {
+  if (error instanceof GooglePlacesUpstreamError) {
+    return {
+      code: error.message,
+      stage: error.stage,
+      details: error.details,
+    };
+  }
+
+  return {
+    code: 'UNKNOWN_PLACES_ERROR',
+    stage: 'unknown',
+    details: {
+      message: String(error),
+    },
+  };
 };
 
 const withAsyncHandler =
@@ -32,6 +56,15 @@ const getRequesterIp = (req: express.Request) => {
   }
 
   return req.ip ?? req.socket.remoteAddress ?? 'unknown';
+};
+
+const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
+  if (!photoName) {
+    return undefined;
+  }
+
+  const encodedPhotoName = encodeURIComponent(photoName);
+  return `${req.protocol}://${req.get('host')}/places/photo?name=${encodedPhotoName}`;
 };
 
 const createAnonymousSuggestionsRateLimiter = () => {
@@ -65,10 +98,86 @@ export const createApp = () => {
   app.use(cors());
   app.use(helmet());
   app.use(express.json());
+  app.use(requestLoggingMiddleware);
 
   app.get('/health', (_, res) => {
     res.json({ status: 'ok' });
   });
+
+  app.get(
+    '/places/photo',
+    withAsyncHandler(async (req, res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+
+      const photoName = req.query.name;
+      const maxWidthRaw = Number(req.query.maxWidthPx);
+      const maxWidthPx = Number.isFinite(maxWidthRaw)
+        ? Math.max(128, Math.min(Math.round(maxWidthRaw), 1600))
+        : 800;
+
+      if (typeof photoName !== 'string' || !photoName.startsWith('places/')) {
+        res.status(400).json({ error: 'INVALID_PHOTO_NAME' });
+        return;
+      }
+
+      const photoNameMatch = /^places\/([^/]+)\/photos\/(.+)$/.exec(photoName);
+      if (!photoNameMatch) {
+        res.status(400).json({ error: 'INVALID_PHOTO_NAME' });
+        return;
+      }
+
+      const [, placeId, photoReference] = photoNameMatch;
+
+      const photoUrl = new URL(
+        `/v1/places/${encodeURIComponent(placeId)}/photos/${encodeURIComponent(photoReference)}/media`,
+        'https://places.googleapis.com',
+      );
+      photoUrl.searchParams.set('maxWidthPx', String(maxWidthPx));
+
+      try {
+        const requestLogger = getRequestLogger(res);
+        const response = await fetch(photoUrl, {
+          headers: {
+            'X-Goog-Api-Key': env.GOOGLE_MAPS_API_KEY,
+          },
+        });
+
+        if (!response.ok) {
+          const upstreamErrorBody = await response.text();
+          requestLogger.warn(
+            {
+              photoName,
+              maxWidthPx,
+              status: response.status,
+              body: upstreamErrorBody,
+            },
+            'places.photo upstream non-ok response',
+          );
+          res.status(502).json({ error: 'UPSTREAM_PHOTO_ERROR' });
+          return;
+        }
+
+        const contentType = response.headers.get('content-type') ?? 'image/jpeg';
+        const cacheControl = response.headers.get('cache-control');
+        if (cacheControl) {
+          res.setHeader('cache-control', cacheControl);
+        } else {
+          res.setHeader('cache-control', 'public, max-age=3600');
+        }
+
+        const imageBuffer = Buffer.from(await response.arrayBuffer());
+        res.setHeader('content-type', contentType);
+        res.status(200).send(imageBuffer);
+      } catch (error) {
+        const requestLogger = getRequestLogger(res);
+        logError(requestLogger, 'places.photo upstream failure', error, {
+          photoName,
+          maxWidthPx,
+        });
+        res.status(502).json({ error: 'UPSTREAM_PHOTO_ERROR' });
+      }
+    }),
+  );
 
   app.get(
     '/suggestions',
@@ -100,9 +209,34 @@ export const createApp = () => {
           radiusKm,
         });
 
-        res.json(suggestions);
-      } catch {
-        res.status(502).json({ error: 'UPSTREAM_PLACES_ERROR' });
+        res.json(
+          suggestions.map(({ photoName, ...suggestion }) => ({
+            ...suggestion,
+            imageUrl: buildSuggestionImageUrl(req, photoName),
+          })),
+        );
+      } catch (error) {
+        const placesError = toPlacesErrorMeta(error);
+        const requestLogger = getRequestLogger(res);
+        logError(requestLogger, 'places.suggestions upstream failure', error, {
+          ...placesError,
+          input: {
+            location,
+            theme,
+            radiusKm,
+            authenticated: Boolean(userId),
+          },
+        });
+
+        res.status(502).json({
+          error: 'UPSTREAM_PLACES_ERROR',
+          ...(process.env.NODE_ENV !== 'production'
+            ? {
+                diagnosticCode: placesError.code,
+                diagnosticStage: placesError.stage,
+              }
+            : {}),
+        });
       }
     }),
   );
@@ -156,8 +290,28 @@ export const createApp = () => {
           radiusKm: input.radiusKm,
           theme: input.theme,
         });
-      } catch {
-        res.status(502).json({ error: 'UPSTREAM_PLACES_ERROR' });
+      } catch (error) {
+        const placesError = toPlacesErrorMeta(error);
+        const requestLogger = getRequestLogger(res);
+        logError(requestLogger, 'places.save-generated upstream failure', error, {
+          ...placesError,
+          input: {
+            location: input.location,
+            theme: input.theme,
+            radiusKm: input.radiusKm,
+            userId,
+          },
+        });
+
+        res.status(502).json({
+          error: 'UPSTREAM_PLACES_ERROR',
+          ...(process.env.NODE_ENV !== 'production'
+            ? {
+                diagnosticCode: placesError.code,
+                diagnosticStage: placesError.stage,
+              }
+            : {}),
+        });
         return;
       }
 
@@ -202,7 +356,10 @@ export const createApp = () => {
 };
 
 export const registerSignalHandlers = (server: Server) => {
-  const shutdown = () => server.close();
+  const shutdown = () => {
+    void shutdownObservability();
+    server.close();
+  };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 };
@@ -210,7 +367,7 @@ export const registerSignalHandlers = (server: Server) => {
 export const startServer = () => {
   const app = createApp();
   const server = app.listen(env.PORT, () => {
-    console.log(`API ready on http://localhost:${env.PORT}`);
+    logger.info({ port: env.PORT }, 'api.ready');
   });
   registerSignalHandlers(server);
   return server;

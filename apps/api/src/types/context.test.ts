@@ -24,7 +24,12 @@ describe('createContext', () => {
       req: buildReq({ authorization: 'Bearer user-123' }),
     } as unknown as CreateExpressContextOptions);
 
-    expect(ctx).toEqual({ prisma: prismaMock, userId: 'user-123' });
+    expect(ctx).toMatchObject({
+      prisma: prismaMock,
+      userId: 'user-123',
+      requestId: undefined,
+    });
+    expect(ctx.logger).toBeDefined();
   });
 
   it('falls back to x-user-id when authorization is missing', async () => {
@@ -32,7 +37,12 @@ describe('createContext', () => {
       req: buildReq({ 'x-user-id': 'legacy-user' }),
     } as unknown as CreateExpressContextOptions);
 
-    expect(ctx).toEqual({ prisma: prismaMock, userId: 'legacy-user' });
+    expect(ctx).toMatchObject({
+      prisma: prismaMock,
+      userId: 'legacy-user',
+      requestId: undefined,
+    });
+    expect(ctx.logger).toBeDefined();
   });
 
   it('allows anonymous contexts when header missing', async () => {

@@ -1,4 +1,14 @@
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { env } from '../config/env.js';
+const tracer = trace.getTracer('roadtrip-api');
+export class GooglePlacesUpstreamError extends Error {
+    constructor(code, options) {
+        super(code);
+        this.name = 'GooglePlacesUpstreamError';
+        this.stage = options.stage;
+        this.details = options.details ?? {};
+    }
+}
 export class GooglePlacesService {
     constructor(fetchFn = fetch, now = () => Date.now()) {
         this.fetchFn = fetchFn;
@@ -17,42 +27,81 @@ export class GooglePlacesService {
         geocodeUrl.searchParams.set('key', env.GOOGLE_MAPS_API_KEY);
         const geocode = await this.fetchWithRetry(geocodeUrl);
         if (geocode.status !== 'OK' || !geocode.results.length) {
-            throw new Error('GOOGLE_GEOCODE_FAILED');
+            throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_FAILED', {
+                stage: 'geocode',
+                details: {
+                    googleStatus: geocode.status,
+                    googleMessage: geocode.error_message,
+                    location: params.location,
+                },
+            });
         }
         const origin = geocode.results[0].geometry?.location;
         if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
-            throw new Error('GOOGLE_GEOCODE_INVALID_LOCATION');
+            throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_INVALID_LOCATION', {
+                stage: 'geocode',
+                details: {
+                    location: params.location,
+                },
+            });
         }
         const originLat = origin.lat;
         const originLng = origin.lng;
-        const nearbyUrl = new URL('/maps/api/place/nearbysearch/json', env.GOOGLE_MAPS_API_BASE_URL);
-        nearbyUrl.searchParams.set('location', `${originLat},${originLng}`);
-        nearbyUrl.searchParams.set('radius', String(Math.max(1000, Math.min(Math.round(params.radiusKm * 1000), 50000))));
-        nearbyUrl.searchParams.set('keyword', this.toThemeKeyword(params.theme));
-        nearbyUrl.searchParams.set('key', env.GOOGLE_MAPS_API_KEY);
-        const nearby = await this.fetchWithRetry(nearbyUrl);
-        if (!['OK', 'ZERO_RESULTS'].includes(nearby.status)) {
-            throw new Error('GOOGLE_PLACES_FAILED');
+        const nearbyRadiusMeters = Math.max(1000, Math.min(Math.round(params.radiusKm * 1000), 50000));
+        const placesUrl = new URL('/v1/places:searchText', 'https://places.googleapis.com');
+        const placesResponse = await this.fetchWithRetry(placesUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': env.GOOGLE_MAPS_API_KEY,
+                'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.photos',
+            },
+            body: JSON.stringify({
+                textQuery: this.toThemeKeyword(params.theme),
+                maxResultCount: env.GOOGLE_PLACES_RESULT_LIMIT,
+                locationBias: {
+                    circle: {
+                        center: {
+                            latitude: originLat,
+                            longitude: originLng,
+                        },
+                        radius: nearbyRadiusMeters,
+                    },
+                },
+            }),
+        });
+        if (placesResponse.error) {
+            throw new GooglePlacesUpstreamError('GOOGLE_PLACES_FAILED', {
+                stage: 'nearby',
+                details: {
+                    googleStatus: placesResponse.error.status,
+                    googleMessage: placesResponse.error.message,
+                    location: params.location,
+                    theme: params.theme,
+                    radiusKm: params.radiusKm,
+                },
+            });
         }
-        const suggestions = nearby.results
+        const suggestions = (placesResponse.places ?? [])
             .flatMap((result) => {
-            const location = result.geometry?.location;
-            if (!result.place_id ||
-                !result.name ||
+            const location = result.location;
+            if (!result.id ||
+                !result.displayName?.text ||
                 !location ||
-                typeof location.lat !== 'number' ||
-                typeof location.lng !== 'number') {
+                typeof location.latitude !== 'number' ||
+                typeof location.longitude !== 'number') {
                 return [];
             }
             return [
                 {
-                    id: result.place_id,
-                    placeId: result.place_id,
-                    title: result.name,
-                    description: result.vicinity ?? result.formatted_address ?? params.location,
-                    distanceKm: Math.max(1, Math.round(this.haversineKm(originLat, originLng, location.lat, location.lng))),
-                    lat: location.lat,
-                    lng: location.lng,
+                    id: result.id,
+                    placeId: result.id,
+                    title: result.displayName.text,
+                    description: result.shortFormattedAddress ?? result.formattedAddress ?? params.location,
+                    distanceKm: Math.max(1, Math.round(this.haversineKm(originLat, originLng, location.latitude, location.longitude))),
+                    lat: location.latitude,
+                    lng: location.longitude,
+                    photoName: result.photos?.[0]?.name,
                 },
             ];
         })
@@ -64,15 +113,50 @@ export class GooglePlacesService {
         });
         return suggestions;
     }
-    async fetchWithRetry(url) {
+    async fetchWithRetry(url, init) {
+        const sanitizedUrl = this.sanitizeUrl(url);
         let lastError;
         for (let attempt = 0; attempt <= env.GOOGLE_PLACES_RETRY_COUNT; attempt += 1) {
             const abortController = new AbortController();
             const timeout = setTimeout(() => abortController.abort(), env.GOOGLE_PLACES_TIMEOUT_MS);
             try {
-                const response = await this.fetchFn(url, { signal: abortController.signal });
+                const response = await tracer.startActiveSpan('google.places.request', {
+                    attributes: {
+                        'http.method': init?.method ?? 'GET',
+                        'http.url': sanitizedUrl,
+                        'google.places.attempt': attempt + 1,
+                    },
+                }, async (span) => {
+                    try {
+                        const response = await this.fetchFn(url, {
+                            ...init,
+                            signal: abortController.signal,
+                        });
+                        span.setAttribute('http.status_code', response.status);
+                        if (!response.ok) {
+                            span.setStatus({ code: SpanStatusCode.ERROR, message: 'HTTP_ERROR' });
+                        }
+                        return response;
+                    }
+                    catch (error) {
+                        span.recordException(error);
+                        span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+                        throw error;
+                    }
+                    finally {
+                        span.end();
+                    }
+                });
                 if (!response.ok) {
-                    throw new Error(`HTTP_${response.status}`);
+                    throw new GooglePlacesUpstreamError('GOOGLE_REQUEST_HTTP_ERROR', {
+                        stage: 'request',
+                        details: {
+                            httpStatus: response.status,
+                            url: sanitizedUrl,
+                            attempt: attempt + 1,
+                            maxAttempts: env.GOOGLE_PLACES_RETRY_COUNT + 1,
+                        },
+                    });
                 }
                 const payload = (await response.json());
                 clearTimeout(timeout);
@@ -80,10 +164,50 @@ export class GooglePlacesService {
             }
             catch (error) {
                 clearTimeout(timeout);
-                lastError = error;
+                if (error instanceof GooglePlacesUpstreamError) {
+                    lastError = error;
+                    continue;
+                }
+                if (error instanceof Error && error.name === 'AbortError') {
+                    lastError = new GooglePlacesUpstreamError('GOOGLE_REQUEST_TIMEOUT', {
+                        stage: 'request',
+                        details: {
+                            timeoutMs: env.GOOGLE_PLACES_TIMEOUT_MS,
+                            url: sanitizedUrl,
+                            attempt: attempt + 1,
+                            maxAttempts: env.GOOGLE_PLACES_RETRY_COUNT + 1,
+                        },
+                    });
+                    continue;
+                }
+                lastError = new GooglePlacesUpstreamError('GOOGLE_REQUEST_FAILED', {
+                    stage: 'request',
+                    details: {
+                        url: sanitizedUrl,
+                        attempt: attempt + 1,
+                        maxAttempts: env.GOOGLE_PLACES_RETRY_COUNT + 1,
+                        reason: String(error),
+                    },
+                });
             }
         }
-        throw new Error(`GOOGLE_REQUEST_FAILED: ${String(lastError)}`);
+        if (lastError instanceof GooglePlacesUpstreamError) {
+            throw lastError;
+        }
+        throw new GooglePlacesUpstreamError('GOOGLE_REQUEST_FAILED', {
+            stage: 'request',
+            details: {
+                url: sanitizedUrl,
+                reason: String(lastError),
+            },
+        });
+    }
+    sanitizeUrl(url) {
+        const sanitized = new URL(url.toString());
+        if (sanitized.searchParams.has('key')) {
+            sanitized.searchParams.set('key', '[REDACTED]');
+        }
+        return sanitized.toString();
     }
     toThemeKeyword(theme) {
         const normalized = theme.toLowerCase();

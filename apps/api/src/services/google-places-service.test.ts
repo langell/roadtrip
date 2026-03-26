@@ -15,19 +15,19 @@ describe('GooglePlacesService', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          status: 'OK',
-          results: [
+          places: [
             {
-              place_id: 'place-1',
-              name: 'Pike Place Market',
-              vicinity: 'Seattle',
-              geometry: { location: { lat: 47.6094, lng: -122.3422 } },
+              id: 'place-1',
+              displayName: { text: 'Pike Place Market' },
+              shortFormattedAddress: 'Seattle',
+              location: { latitude: 47.6094, longitude: -122.3422 },
+              photos: [{ name: 'places/place-1/photos/photo-1' }],
             },
             {
-              place_id: 'place-2',
-              name: 'Kerry Park',
-              vicinity: 'Queen Anne',
-              geometry: { location: { lat: 47.6295, lng: -122.3599 } },
+              id: 'place-2',
+              displayName: { text: 'Kerry Park' },
+              shortFormattedAddress: 'Queen Anne',
+              location: { latitude: 47.6295, longitude: -122.3599 },
             },
           ],
         }),
@@ -50,6 +50,7 @@ describe('GooglePlacesService', () => {
       description: 'Seattle',
       lat: 47.6094,
       lng: -122.3422,
+      photoName: 'places/place-1/photos/photo-1',
       distanceKm: expect.any(Number),
     });
   });
@@ -67,13 +68,12 @@ describe('GooglePlacesService', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          status: 'OK',
-          results: [
+          places: [
             {
-              place_id: 'place-a',
-              name: 'Stop A',
-              vicinity: 'Austin',
-              geometry: { location: { lat: 30.1, lng: -97.1 } },
+              id: 'place-a',
+              displayName: { text: 'Stop A' },
+              shortFormattedAddress: 'Austin',
+              location: { latitude: 30.1, longitude: -97.1 },
             },
           ],
         }),

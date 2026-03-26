@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import type { Prisma } from '@prisma/client';
 import {
   TripCreateRequestSchema,
   TripUpdateRequestSchema,
@@ -7,8 +8,12 @@ import {
   type TripUpdateRequest,
 } from '@roadtrip/types';
 import { authenticatedProcedure, procedure, router } from '../lib/trpc.js';
-import { googlePlacesService } from '../services/google-places-service.js';
+import {
+  googlePlacesService,
+  GooglePlacesUpstreamError,
+} from '../services/google-places-service.js';
 import type { Context } from '../types/context.js';
+import { logError } from '../lib/logger.js';
 
 export const tripRouter = router({
   list: authenticatedProcedure.query(async ({ ctx }) => {
@@ -20,9 +25,14 @@ export const tripRouter = router({
   create: authenticatedProcedure
     .input(TripCreateRequestSchema)
     .mutation(async ({ ctx, input }: { ctx: Context; input: TripCreateRequest }) => {
+      const userId = ctx.userId;
+      if (!userId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED' });
+      }
+
       return ctx.prisma.trip.create({
         data: {
-          userId: ctx.userId,
+          userId,
           name: input.name,
           originLat: input.origin.lat,
           originLng: input.origin.lng,
@@ -65,10 +75,28 @@ export const tripRouter = router({
         theme: z.string(),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       try {
         return await googlePlacesService.findStops(input);
       } catch (error) {
+        const placesErrorMeta =
+          error instanceof GooglePlacesUpstreamError
+            ? {
+                code: error.message,
+                stage: error.stage,
+                details: error.details,
+              }
+            : {
+                code: 'UNKNOWN_PLACES_ERROR',
+                stage: 'unknown',
+                details: { message: String(error) },
+              };
+
+        logError(ctx.logger, 'trpc.trip.suggestions upstream failure', error, {
+          ...placesErrorMeta,
+          input,
+        });
+
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch places suggestions',
@@ -99,11 +127,16 @@ export const tripRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.userId;
+      if (!userId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED' });
+      }
+
       const event = await ctx.prisma.analyticsEvent.create({
         data: {
-          userId: ctx.userId,
+          userId,
           type: input.type,
-          payload: input.payload,
+          payload: input.payload as Prisma.InputJsonValue,
         },
       });
 

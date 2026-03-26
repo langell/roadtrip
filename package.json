@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "turbo run dev --parallel",
-    "dev:web": "pnpm --filter @roadtrip/web dev",
-    "dev:api": "pnpm --filter @roadtrip/api dev",
+    "dev:web": "node ./scripts/kill-port.mjs 3000 && pnpm --filter @roadtrip/web dev",
+    "dev:api": "node ./scripts/kill-port.mjs 3001 && pnpm --filter @roadtrip/api dev",
     "dev:mobile": "pnpm --filter @roadtrip/mobile start",
     "build": "turbo run build",
     "lint": "turbo run lint",

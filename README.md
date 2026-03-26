@@ -17,6 +17,7 @@ Production-grade Turborepo powering the RoadTrip platform across web, mobile, an
    pnpm install
    ```
 2. **Environment variables**
+
    ```bash
    cp apps/api/.env.example apps/api/.env
    cp apps/web/.env.example apps/web/.env.local
@@ -24,7 +25,12 @@ Production-grade Turborepo powering the RoadTrip platform across web, mobile, an
 
    - Fill in required values:
      - `apps/api/.env`: `DATABASE_URL`, `GOOGLE_MAPS_API_KEY` (optional `PORT`, defaults to `3001`)
-     - `apps/web/.env.local`: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXTAUTH_SECRET` (optional `NEXTAUTH_URL`, defaults to `http://localhost:3000`)
+   - `apps/web/.env.local`: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXTAUTH_SECRET` (optional `NEXTAUTH_URL`, defaults to `http://localhost:3000`)
+   - Google Cloud requirements for `GOOGLE_MAPS_API_KEY`:
+     - Enable `Geocoding API` and `Places API (New)`.
+     - Allow `Places API (New)` method `places:searchText` for this key via API restrictions.
+     - Ensure billing is enabled for the Google Cloud project.
+
 3. **Prisma (API)**
    ```bash
    pnpm --filter @roadtrip/api db:push

@@ -5,6 +5,23 @@ const { findStops } = vi.hoisted(() => ({
   findStops: vi.fn(),
 }));
 vi.mock('../services/google-places-service.js', () => ({
+  GooglePlacesUpstreamError: class GooglePlacesUpstreamError extends Error {
+    constructor(
+      code: string,
+      readonly options: { stage: string; details?: Record<string, unknown> },
+    ) {
+      super(code);
+      this.name = 'GooglePlacesUpstreamError';
+    }
+
+    get stage() {
+      return this.options.stage;
+    }
+
+    get details() {
+      return this.options.details ?? {};
+    }
+  },
   googlePlacesService: {
     findStops,
   },

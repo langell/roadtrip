@@ -122,6 +122,13 @@ const TripPlanner = () => {
               key={idea.id}
               className="rounded-2xl bg-white p-5 shadow-[0_8px_20px_rgba(0,0,0,0.05)]"
             >
+              {idea.imageUrl ? (
+                <img
+                  src={idea.imageUrl}
+                  alt={idea.title}
+                  className="mb-3 h-40 w-full rounded-xl object-cover"
+                />
+              ) : null}
               <h3 className="text-lg font-semibold text-[#1B4332]">{idea.title}</h3>
               <p className="text-sm text-stone-600">{idea.description}</p>
               <p className="text-xs uppercase tracking-[0.12em] text-[#3b6090]">

@@ -6,6 +6,7 @@ export type TripSuggestion = {
   distanceKm: number;
   lat: number;
   lng: number;
+  imageUrl?: string;
 };
 
 export type SavedTrip = {

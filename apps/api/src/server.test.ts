@@ -3,6 +3,7 @@ import request from 'supertest';
 
 vi.mock('./config/env.js', () => ({
   env: {
+    LOG_LEVEL: 'info',
     PORT: 0,
     ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: 60000,
     ANON_SUGGESTIONS_RATE_LIMIT_MAX: 2,
@@ -25,6 +26,23 @@ vi.mock('./lib/prisma.js', () => ({
 
 const findStops = vi.fn();
 vi.mock('./services/google-places-service.js', () => ({
+  GooglePlacesUpstreamError: class GooglePlacesUpstreamError extends Error {
+    constructor(
+      code: string,
+      readonly options: { stage: string; details?: Record<string, unknown> },
+    ) {
+      super(code);
+      this.name = 'GooglePlacesUpstreamError';
+    }
+
+    get stage() {
+      return this.options.stage;
+    }
+
+    get details() {
+      return this.options.details ?? {};
+    }
+  },
   googlePlacesService: {
     findStops,
   },
@@ -94,6 +112,35 @@ describe('HTTP server', () => {
     expect(response.body).toEqual([{ id: 'stop-1' }]);
   });
 
+  it('adds imageUrl when suggestion has a Places photo name', async () => {
+    findStops.mockResolvedValue([
+      {
+        id: 'stop-1',
+        placeId: 'place-1',
+        title: 'Overlook',
+        description: 'Scenic point',
+        distanceKm: 10,
+        lat: 30,
+        lng: -97,
+        photoName: 'places/place-1/photos/photo-1',
+      },
+    ]);
+    const app = createApp();
+
+    const response = await request(app)
+      .get('/suggestions')
+      .query({ location: 'Portland, OR', theme: 'scenic', radiusKm: '150' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0]).toMatchObject({
+      id: 'stop-1',
+      imageUrl: expect.stringContaining(
+        '/places/photo?name=places%2Fplace-1%2Fphotos%2Fphoto-1',
+      ),
+    });
+  });
+
   it('allows unauthenticated suggestions requests within rate limits', async () => {
     findStops.mockResolvedValue([{ id: 'stop-1' }]);
     const app = createApp();
@@ -138,6 +185,31 @@ describe('HTTP server', () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: 'INVALID_QUERY' });
+  });
+
+  it('rejects invalid photo proxy params', async () => {
+    const app = createApp();
+
+    const response = await request(app).get('/places/photo').query({ name: 'invalid' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'INVALID_PHOTO_NAME' });
+  });
+
+  it('includes diagnostics for upstream suggestion failures in non-production', async () => {
+    findStops.mockRejectedValue(new Error('GOOGLE_PLACES_FAILED'));
+    const app = createApp();
+
+    const response = await request(app)
+      .get('/suggestions')
+      .query({ location: 'Portland, OR', theme: 'scenic', radiusKm: '150' });
+
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({
+      error: 'UPSTREAM_PLACES_ERROR',
+      diagnosticCode: 'UNKNOWN_PLACES_ERROR',
+      diagnosticStage: 'unknown',
+    });
   });
 
   it('lists saved trips for authenticated users', async () => {
