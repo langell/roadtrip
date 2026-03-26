@@ -10,6 +10,7 @@ coverage
 playwright-report
 artifacts
 apps/web/reports
+apps/api/dist
 .husky/_
 *.log
 *.LOG
