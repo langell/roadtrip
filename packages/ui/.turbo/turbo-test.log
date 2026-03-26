@@ -7,17 +7,17 @@
 [7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90m/Users/lonnyangell/dev/roadtrip/packages/ui[39m
 [2m      Coverage enabled with [22m[33mv8[39m
 
-[?25l [90m·[39m [2msrc/components/__tests__/[22mSurface[2m.test.tsx[22m[2m (2)[22m
- [90m·[39m [2msrc/components/__tests__/[22mButton[2m.test.tsx[22m[2m (2)[22m
-[?25l[?25l[2K[1A[2K[1A[2K[G [32m✓[39m [2msrc/components/__tests__/[22mSurface[2m.test.tsx[22m[2m (2)[22m
- [32m✓[39m [2msrc/components/__tests__/[22mButton[2m.test.tsx[22m[2m (2)[22m
-[?25l[?25l[2K[1A[2K[1A[2K[G [32m✓[39m [2msrc/components/__tests__/[22mSurface[2m.test.tsx[22m[2m (2)[22m
- [32m✓[39m [2msrc/components/__tests__/[22mButton[2m.test.tsx[22m[2m (2)[22m
+[?25l [90m·[39m [2msrc/components/__tests__/[22mButton[2m.test.tsx[22m[2m (2)[22m
+ [90m·[39m [2msrc/components/__tests__/[22mSurface[2m.test.tsx[22m[2m (2)[22m
+[?25l[?25l[2K[1A[2K[1A[2K[G [32m✓[39m [2msrc/components/__tests__/[22mButton[2m.test.tsx[22m[2m (2)[22m
+ [32m✓[39m [2msrc/components/__tests__/[22mSurface[2m.test.tsx[22m[2m (2)[22m
+[2K[1A[2K[1A[2K[G [32m✓[39m [2msrc/components/__tests__/[22mButton[2m.test.tsx[22m[2m (2)[22m
+ [32m✓[39m [2msrc/components/__tests__/[22mSurface[2m.test.tsx[22m[2m (2)[22m
 
 [2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
 [2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
-[2m   Start at [22m 10:28:53
-[2m   Duration [22m 1.30s[2m (transform 92ms, setup 246ms, collect 361ms, tests 33ms, environment 618ms, prepare 372ms)[22m
+[2m   Start at [22m 10:29:46
+[2m   Duration [22m 1.33s[2m (transform 73ms, setup 160ms, collect 328ms, tests 36ms, environment 833ms, prepare 197ms)[22m
 
 [34m % [39m[2mCoverage report from [22m[33mv8[39m
 ----------------|---------|----------|---------|---------|-------------------

@@ -25,10 +25,10 @@ To clear this warning, run:
 [K[1A[K[1A  PlannerScreen
 
 [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A    [32m✓[39m [2mupdates radius (1889 ms)[22m
+[K[1A[K[1A    [32m✓[39m [2mupdates radius (323 ms)[22m
 
 [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A    [32m✓[39m [2mupdates suggestions using the selected theme (14 ms)[22m
+[K[1A[K[1A    [32m✓[39m [2mupdates suggestions using the selected theme (20 ms)[22m
 
 [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
 [K[1A[K[1A
@@ -46,5 +46,5 @@ File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 [1mTest Suites: [22m[1m[32m1 passed[39m[22m, 1 total
 [1mTests:       [22m[1m[32m2 passed[39m[22m, 2 total
 [1mSnapshots:   [22m0 total
-[1mTime:[22m        [1m[33m4.167 s[39m[22m
+[1mTime:[22m        1.091 s, estimated 4 s
 [2mRan all test suites[22m[2m.[22m
