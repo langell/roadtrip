@@ -15,7 +15,7 @@ const projectConfigs = [
   'apps/mobile/tsconfig.eslint.json',
   'apps/web/tsconfig.eslint.json',
   'packages/ui/tsconfig.eslint.json',
-  'packages/types/tsconfig.eslint.json'
+  'packages/types/tsconfig.eslint.json',
 ].map((relativePath) => fileURLToPath(new URL(relativePath, repoRoot)));
 
 export default [
@@ -27,8 +27,8 @@ export default [
       '**/*.config.mjs',
       '**/*.config.ts',
       'apps/mobile/expo-entry.js',
-      '**/coverage/**'
-    ]
+      '**/coverage/**',
+    ],
   },
   {
     files: ['**/*.{ts,tsx,js,jsx}'],
@@ -39,22 +39,22 @@ export default [
         ecmaFeatures: { jsx: true },
         sourceType: 'module',
         project: projectConfigs,
-        tsconfigRootDir: repoRoot
+        tsconfigRootDir: repoRoot,
       },
       globals: {
         ...globals.browser,
-        ...globals.node
-      }
+        ...globals.node,
+      },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
       react: reactPlugin,
       'react-hooks': reactHooks,
-      import: importPlugin
+      import: importPlugin,
     },
     settings: {
       react: {
-        version: '18.2'
+        version: '18.2',
       },
       'import/resolver': {
         typescript: {
@@ -64,14 +64,14 @@ export default [
             'apps/mobile/tsconfig.json',
             'apps/web/tsconfig.json',
             'packages/ui/tsconfig.json',
-            'packages/types/tsconfig.json'
-          ].map((relativePath) => fileURLToPath(new URL(relativePath, repoRoot)))
+            'packages/types/tsconfig.json',
+          ].map((relativePath) => fileURLToPath(new URL(relativePath, repoRoot))),
         },
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
-          moduleDirectory: ['node_modules', workspaceNodeModules]
-        }
-      }
+          moduleDirectory: ['node_modules', workspaceNodeModules],
+        },
+      },
     },
     rules: {
       ...tsPlugin.configs['recommended-type-checked'].rules,
@@ -87,15 +87,15 @@ export default [
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
-      '@typescript-eslint/require-await': 'off'
-    }
+      '@typescript-eslint/require-await': 'off',
+    },
   },
   {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     languageOptions: {
       globals: {
-        ...globals.jest
-      }
-    }
-  }
+        ...globals.jest,
+      },
+    },
+  },
 ];

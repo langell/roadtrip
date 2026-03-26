@@ -8,7 +8,11 @@ export type PlaceSuggestion = {
 };
 
 export class GooglePlacesService {
-  async findStops(params: { location: string; radiusKm: number; theme: string }): Promise<PlaceSuggestion[]> {
+  async findStops(params: {
+    location: string;
+    radiusKm: number;
+    theme: string;
+  }): Promise<PlaceSuggestion[]> {
     // TODO: Integrate with real Google Places + Directions API.
     const seed = `${params.location}-${params.theme}`;
     return [
@@ -16,8 +20,8 @@ export class GooglePlacesService {
         id: Buffer.from(seed).toString('base64').slice(0, 12),
         title: `${params.theme} waypoint`,
         description: `prototype placeholder near ${params.location}`,
-        distanceKm: Math.round(params.radiusKm * 0.4)
-      }
+        distanceKm: Math.round(params.radiusKm * 0.4),
+      },
     ];
   }
 }

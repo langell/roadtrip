@@ -1,5 +1,4 @@
 
-
 > @roadtrip/web@0.0.1 lint /Users/lonnyangell/dev/roadtrip/apps/web
 > eslint ./app ./components ./lib --ext ts,tsx
 

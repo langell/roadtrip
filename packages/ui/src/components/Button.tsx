@@ -12,7 +12,7 @@ type ButtonProps = PropsWithChildren<{
 const toneClasses: Record<ButtonTone, string> = {
   primary:
     'bg-emerald-500 text-slate-950 hover:bg-emerald-400 focus-visible:ring-emerald-300',
-  ghost: 'bg-transparent text-white ring-1 ring-white/40 hover:bg-white/10'
+  ghost: 'bg-transparent text-white ring-1 ring-white/40 hover:bg-white/10',
 };
 
 export const Button = ({
@@ -27,7 +27,7 @@ export const Button = ({
     className={clsx(
       'inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:opacity-60',
       toneClasses[tone],
-      className
+      className,
     )}
     disabled={disabled || loading}
     {...props}

@@ -3,7 +3,7 @@ import {
   TripCreateRequestSchema,
   TripUpdateRequestSchema,
   type TripCreateRequest,
-  type TripUpdateRequest
+  type TripUpdateRequest,
 } from '@roadtrip/types';
 import { authenticatedProcedure, router } from '../lib/trpc.js';
 import { googlePlacesService } from '../services/google-places-service.js';
@@ -13,7 +13,7 @@ export const tripRouter = router({
   list: authenticatedProcedure.query(async ({ ctx }) => {
     return ctx.prisma.trip.findMany({
       where: { userId: ctx.userId },
-      include: { stops: { orderBy: { order: 'asc' } } }
+      include: { stops: { orderBy: { order: 'asc' } } },
     });
   }),
   create: authenticatedProcedure
@@ -26,18 +26,18 @@ export const tripRouter = router({
           originLat: input.origin.lat,
           originLng: input.origin.lng,
           filters: input.filters,
-            stops: {
-              create: input.stops.map((stop: TripCreateRequest['stops'][number]) => ({
+          stops: {
+            create: input.stops.map((stop: TripCreateRequest['stops'][number]) => ({
               placeId: stop.placeId,
               name: stop.name,
               lat: stop.location.lat,
               lng: stop.location.lng,
               order: stop.order,
-              notes: stop.notes
-            }))
-          }
+              notes: stop.notes,
+            })),
+          },
         },
-        include: { stops: { orderBy: { order: 'asc' } } }
+        include: { stops: { orderBy: { order: 'asc' } } },
       });
     }),
   update: authenticatedProcedure
@@ -49,11 +49,11 @@ export const tripRouter = router({
           ...(input.name && { name: input.name }),
           ...(input.origin && {
             originLat: input.origin.lat,
-            originLng: input.origin.lng
+            originLng: input.origin.lng,
           }),
-          ...(input.filters && { filters: input.filters })
+          ...(input.filters && { filters: input.filters }),
         },
-        include: { stops: { orderBy: { order: 'asc' } } }
+        include: { stops: { orderBy: { order: 'asc' } } },
       });
     }),
   suggestions: authenticatedProcedure
@@ -61,10 +61,10 @@ export const tripRouter = router({
       z.object({
         location: z.string().min(3),
         radiusKm: z.number().positive(),
-        theme: z.string()
-      })
+        theme: z.string(),
+      }),
     )
     .query(async ({ input }) => {
       return googlePlacesService.findStops(input);
-    })
+    }),
 });

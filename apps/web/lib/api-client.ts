@@ -17,7 +17,7 @@ export const fetchTripIdeas = async (params: {
       id: 'sample-1',
       title: `${params.theme} sampler`,
       description: `Curated spots near ${params.location}`,
-      distanceKm: Math.round(params.radiusKm * 0.4)
-    }
+      distanceKm: Math.round(params.radiusKm * 0.4),
+    },
   ];
 };

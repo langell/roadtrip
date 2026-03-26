@@ -1,7 +1,10 @@
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const withBundleAnalyzer = () => (config = {}) => config;
+const withBundleAnalyzer =
+  () =>
+  (config = {}) =>
+    config;
 
 /** @type {import('next').NextConfig} */
 const config = {
@@ -11,7 +14,7 @@ const config = {
   webpack: (cfg) => {
     cfg.resolve.fallback = { ...cfg.resolve.fallback, fs: false };
     return cfg;
-  }
+  },
 };
 
 export default withBundleAnalyzer()(config);

@@ -5,7 +5,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'RoadTrip | Plan unforgettable drives',
   description:
-    'RoadTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.'
+    'RoadTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.',
 };
 
 const RootLayout = ({ children }: { children: ReactNode }) => (

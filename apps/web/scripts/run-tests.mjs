@@ -5,7 +5,7 @@ const filteredArgs = rawArgs.filter((arg) => arg !== '--coverage');
 
 const child = spawn('pnpm', ['exec', 'playwright', 'test', ...filteredArgs], {
   stdio: 'inherit',
-  shell: false
+  shell: false,
 });
 
 child.on('exit', (code) => {

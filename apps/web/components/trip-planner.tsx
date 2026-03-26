@@ -10,7 +10,7 @@ const TripPlanner = () => {
   const [filters, setFilters] = useState<TripFilters>({
     radiusKm: 150,
     theme: 'scenic',
-    maxStops: 6
+    maxStops: 6,
   });
   const [location, setLocation] = useState('Los Angeles, CA');
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ const TripPlanner = () => {
       const data = await fetchTripIdeas({
         location,
         radiusKm: filters.radiusKm,
-        theme: filters.theme
+        theme: filters.theme,
       });
       setIdeas(data);
     } finally {
@@ -51,7 +51,9 @@ const TripPlanner = () => {
         </label>
 
         <label className="space-y-2">
-          <span className="text-sm uppercase tracking-wide text-white/60">Radius (KM)</span>
+          <span className="text-sm uppercase tracking-wide text-white/60">
+            Radius (KM)
+          </span>
           <input
             type="number"
             min={25}
@@ -70,7 +72,10 @@ const TripPlanner = () => {
             className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white focus:border-emerald-400 focus:outline-none"
             value={filters.theme}
             onChange={(event) =>
-              setFilters((prev) => ({ ...prev, theme: event.target.value as TripFilters['theme'] }))
+              setFilters((prev) => ({
+                ...prev,
+                theme: event.target.value as TripFilters['theme'],
+              }))
             }
           >
             {themeOptions.map((theme) => (

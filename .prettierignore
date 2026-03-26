@@ -1,0 +1,19 @@
+node_modules
+.next
+.turbo
+.expo
+.expo-shared
+coverage
+playwright-report
+artifacts
+apps/web/reports
+.husky/_
+pnpm-lock.yaml
+
+# Build outputs
+dist
+**/dist
+
+# Generated caches
+**/.turbo
+*.tsbuildinfo

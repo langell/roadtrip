@@ -12,10 +12,14 @@ const App = () => (
       screenOptions={{
         headerStyle: { backgroundColor: '#050914' },
         headerTintColor: '#ecfdf5',
-        contentStyle: { backgroundColor: '#050914' }
+        contentStyle: { backgroundColor: '#050914' },
       }}
     >
-      <Stack.Screen name="Planner" component={PlannerScreen} options={{ title: 'RoadTrip' }} />
+      <Stack.Screen
+        name="Planner"
+        component={PlannerScreen}
+        options={{ title: 'RoadTrip' }}
+      />
     </Stack.Navigator>
   </NavigationContainer>
 );

@@ -9,11 +9,12 @@ const HomePage = () => (
         RoadTrip Alpha · Production-grade foundations
       </p>
       <h1 className="text-5xl font-semibold leading-tight text-white">
-        Plan soulful drives with <span className="text-emerald-400">signal over noise</span>.
+        Plan soulful drives with{' '}
+        <span className="text-emerald-400">signal over noise</span>.
       </h1>
       <p className="max-w-2xl text-lg text-white/70">
-        Plug in a region, we will stitch local gems, sponsored highlights, and traveler intel
-        into a monetizable itinerary that actually feels curated.
+        Plug in a region, we will stitch local gems, sponsored highlights, and traveler
+        intel into a monetizable itinerary that actually feels curated.
       </p>
     </header>
 
