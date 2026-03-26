@@ -11,6 +11,11 @@ playwright-report
 artifacts
 apps/web/reports
 apps/api/dist
+apps/web/test-results
+packages/types/dist
+packages/ui/dist
+packages/types/tsconfig.tsbuildinfo
+packages/ui/tsconfig.tsbuildinfo
 .husky/_
 *.log
 *.LOG
