@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "group:monorepos",
+    ":semanticCommits",
+    ":separateMajorReleases"
+  ],
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "rangeStrategy": "bump",
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 10,
+  "rebaseWhen": "behind-base-branch",
+  "postUpdateOptions": ["pnpmDedupe"],
+  "ignorePaths": ["**/dist/**", "**/.turbo/**", "**/coverage/**"],
+  "packageRules": [
+    {
+      "description": "Group non-major updates for lint/tooling packages",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "typescript",
+        "eslint",
+        "@eslint/js",
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/parser",
+        "eslint-config-next",
+        "eslint-plugin-import",
+        "eslint-plugin-react",
+        "eslint-plugin-react-hooks"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "linting and typescript tooling"
+    },
+    {
+      "description": "Group non-major test stack updates",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "vitest",
+        "@vitest/coverage-v8",
+        "jest",
+        "@testing-library/react",
+        "@testing-library/jest-dom",
+        "@testing-library/react-native",
+        "@playwright/test"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "testing stack"
+    },
+    {
+      "description": "Tag major updates clearly",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "labels": ["dependencies", "major"]
+    }
+  ]
+}
