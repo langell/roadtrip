@@ -1,7 +1,7 @@
 
 
 > @roadtrip/mobile@0.0.1 test /Users/lonnyangell/dev/roadtrip/apps/mobile
-> jest
+> jest "--coverage"
 
 [1m[2mDetermining test suites to run...[22m[22m[999D[K
 [K[1A[999D[K
@@ -19,7 +19,7 @@
 [K[1A[K[1A  PlannerScreen
 
 [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
-[K[1A[K[1A    [32m✓[39m [2mupdates radius (421 ms)[22m
+[K[1A[K[1A    [32m✓[39m [2mupdates radius (397 ms)[22m
 
 [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2msrc/features/trip/[22m[1mPlannerScreen.test.tsx[22m
 [K[1A[K[1A    [32m✓[39m [2mupdates suggestions using the selected theme (12 ms)[22m
@@ -40,5 +40,5 @@ File                | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 [1mTest Suites: [22m[1m[32m1 passed[39m[22m, 1 total
 [1mTests:       [22m[1m[32m2 passed[39m[22m, 2 total
 [1mSnapshots:   [22m0 total
-[1mTime:[22m        0.848 s, estimated 1 s
+[1mTime:[22m        0.951 s, estimated 1 s
 [2mRan all test suites[22m[2m.[22m
