@@ -10,6 +10,14 @@ import globals from 'globals';
 const repoRoot = new URL('../../..', import.meta.url);
 const workspaceNodeModules = fileURLToPath(new URL('node_modules', repoRoot));
 
+const projectConfigs = [
+  'apps/api/tsconfig.eslint.json',
+  'apps/mobile/tsconfig.eslint.json',
+  'apps/web/tsconfig.eslint.json',
+  'packages/ui/tsconfig.eslint.json',
+  'packages/types/tsconfig.eslint.json'
+].map((relativePath) => fileURLToPath(new URL(relativePath, repoRoot)));
+
 export default [
   js.configs.recommended,
   {
@@ -18,7 +26,8 @@ export default [
       '**/*.config.cjs',
       '**/*.config.mjs',
       '**/*.config.ts',
-      'apps/mobile/expo-entry.js'
+      'apps/mobile/expo-entry.js',
+      '**/coverage/**'
     ]
   },
   {
@@ -29,13 +38,7 @@ export default [
       parserOptions: {
         ecmaFeatures: { jsx: true },
         sourceType: 'module',
-        project: [
-          'tsconfig.json',
-          'apps/*/tsconfig.json',
-          'apps/*/tsconfig.eslint.json',
-          'packages/*/tsconfig.json',
-          'packages/*/tsconfig.eslint.json'
-        ],
+        project: projectConfigs,
         tsconfigRootDir: repoRoot
       },
       globals: {
@@ -57,11 +60,12 @@ export default [
         typescript: {
           project: [
             'tsconfig.json',
-            'apps/*/tsconfig.json',
-            'apps/*/tsconfig.eslint.json',
-            'packages/*/tsconfig.json',
-            'packages/*/tsconfig.eslint.json'
-          ]
+            'apps/api/tsconfig.json',
+            'apps/mobile/tsconfig.json',
+            'apps/web/tsconfig.json',
+            'packages/ui/tsconfig.json',
+            'packages/types/tsconfig.json'
+          ].map((relativePath) => fileURLToPath(new URL(relativePath, repoRoot)))
         },
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],

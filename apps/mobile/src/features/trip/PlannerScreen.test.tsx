@@ -8,4 +8,16 @@ describe('PlannerScreen', () => {
     fireEvent.changeText(input, '120');
     expect(getByDisplayValue('120')).toBeTruthy();
   });
+
+  it('updates suggestions using the selected theme', () => {
+    const { getByText, queryByText } = render(<PlannerScreen />);
+
+    const foodieChip = getByText('foodie');
+    fireEvent.press(foodieChip);
+    expect(queryByText(/curated stops/i)).toBeTruthy();
+
+    fireEvent.press(getByText(/generate trip/i));
+    expect(queryByText(/foodie gem/i)).toBeTruthy();
+    expect(queryByText(/spotlight/i)).toBeTruthy();
+  });
 });

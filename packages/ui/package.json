@@ -8,17 +8,20 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "peerDependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^1.5.0",
     "@testing-library/react": "^15.0.0",
+    "@testing-library/jest-dom": "^6.4.1",
     "@types/jsdom": "^28.0.1",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "happy-dom": "^14.7.1",
     "jsdom": "^29.0.1",
     "vitest": "^1.5.0"
   },

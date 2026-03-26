@@ -8,8 +8,10 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:coverage": "turbo run test -- --coverage",
     "format": "prettier --write .",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "audit:warn": "pnpm audit --audit-level=moderate"
   },
   "devDependencies": {
     "@eslint/js": "^9.1.0",
@@ -22,7 +24,7 @@
     "eslint-import-resolver-typescript": "^3.6.1",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-      "globals": "^15.3.0",
+    "globals": "^15.3.0",
     "husky": "^9.0.11",
     "lint-staged": "^15.2.2",
     "prettier": "^3.2.5",
@@ -31,8 +33,7 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,md}": [
-      "pnpm lint --filter ...",
-      "pnpm format"
+      "prettier --write"
     ]
   }
 }

@@ -2,5 +2,5 @@ import { expect, test } from '@playwright/test';
 
 test('homepage renders hero copy', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Plan soulful drives')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /plan soulful drives/i })).toBeVisible();
 });

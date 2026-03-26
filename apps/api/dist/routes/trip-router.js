@@ -1,0 +1,63 @@
+import { z } from 'zod';
+import { TripCreateRequestSchema, TripUpdateRequestSchema } from '@roadtrip/types';
+import { authenticatedProcedure, router } from '../lib/trpc.js';
+import { googlePlacesService } from '../services/google-places-service.js';
+export const tripRouter = router({
+  list: authenticatedProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.trip.findMany({
+      where: { userId: ctx.userId },
+      include: { stops: { orderBy: { order: 'asc' } } },
+    });
+  }),
+  create: authenticatedProcedure
+    .input(TripCreateRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trip.create({
+        data: {
+          userId: ctx.userId,
+          name: input.name,
+          originLat: input.origin.lat,
+          originLng: input.origin.lng,
+          filters: input.filters,
+          stops: {
+            create: input.stops.map((stop) => ({
+              placeId: stop.placeId,
+              name: stop.name,
+              lat: stop.location.lat,
+              lng: stop.location.lng,
+              order: stop.order,
+              notes: stop.notes,
+            })),
+          },
+        },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+    }),
+  update: authenticatedProcedure
+    .input(TripUpdateRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trip.update({
+        where: { id: input.id, userId: ctx.userId },
+        data: {
+          ...(input.name && { name: input.name }),
+          ...(input.origin && {
+            originLat: input.origin.lat,
+            originLng: input.origin.lng,
+          }),
+          ...(input.filters && { filters: input.filters }),
+        },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+    }),
+  suggestions: authenticatedProcedure
+    .input(
+      z.object({
+        location: z.string().min(3),
+        radiusKm: z.number().positive(),
+        theme: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return googlePlacesService.findStops(input);
+    }),
+});

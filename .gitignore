@@ -1,5 +1,6 @@
 node_modules
 .next
+.turbo
 .expo
 .expo-shared
 pnpm-lock.yaml
@@ -9,4 +10,5 @@ tmp
 coverage
 playwright-report
 artifacts
+apps/web/reports
 .husky/_
