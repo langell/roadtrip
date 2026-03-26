@@ -107,3 +107,7 @@ Before starting a new task in the above plan, update progress in the plan.
 - Work through each checklist item systematically.
 - Keep communication concise and focused.
 - Follow development best practices.
+- Use `docs/design-system.md` as the authoritative style guidance for UI, typography, spacing, and color decisions.
+- If any UI spec conflicts, prefer `docs/design-system.md` unless the user explicitly overrides it.
+- For any new visual component work in `apps/web` or `apps/mobile`, reference the Stitch MCP project/screens first before implementation.
+- Prefer Stitch MCP as the source for layout/component visual direction, then apply `docs/design-system.md` tokens and rules in code.

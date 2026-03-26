@@ -17,17 +17,33 @@ Production-grade Turborepo powering the RoadTrip platform across web, mobile, an
    pnpm install
    ```
 2. **Environment variables**
-   - Duplicate `.env.example` files in `apps/web`, `apps/mobile`, and `apps/api`.
-   - Populate values (Vercel Postgres `DATABASE_URL`, Google Maps API keys, NextAuth secrets, etc.).
-3. **Prisma**
+   ```bash
+   cp apps/api/.env.example apps/api/.env
+   cp apps/web/.env.example apps/web/.env.local
+   ```
+
+   - Fill in required values:
+     - `apps/api/.env`: `DATABASE_URL`, `GOOGLE_MAPS_API_KEY` (optional `PORT`, defaults to `3001`)
+     - `apps/web/.env.local`: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXTAUTH_SECRET` (optional `NEXTAUTH_URL`, defaults to `http://localhost:3000`)
+3. **Prisma (API)**
    ```bash
    pnpm --filter @roadtrip/api db:push
    ```
-4. **Development servers**
+4. **Run backend only (API)**
+   ```bash
+   pnpm --filter @roadtrip/api dev
+   ```
+   API runs at `http://localhost:3001` (or `PORT` from `apps/api/.env`).
+5. **Run frontend only (Web)**
+   ```bash
+   pnpm --filter @roadtrip/web dev
+   ```
+   Web runs at `http://localhost:3000`.
+6. **Run all apps together (optional)**
    ```bash
    pnpm dev
    ```
-   Turborepo runs all `dev` scripts in parallel (`web`, `api`, `mobile`).
+   Turborepo runs `web`, `api`, and `mobile` dev servers in parallel.
 
 ## Testing & Quality
 
@@ -46,9 +62,9 @@ Production-grade Turborepo powering the RoadTrip platform across web, mobile, an
 
 ```
 apps/
-  web/      # Next.js frontend
-  mobile/   # Expo React Native
-  api/      # Express + tRPC + Prisma
+   web/      # Next.js frontend (see `apps/web/README.md`)
+   mobile/   # Expo React Native
+   api/      # Express + tRPC + Prisma (see `apps/api/README.md`)
 packages/
   ui/       # Shared design system
   types/    # Zod schemas & DTOs
