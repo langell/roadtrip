@@ -20,10 +20,10 @@
     "@types/jsdom": "^28.0.1",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "@vitest/coverage-v8": "^4.1.1",
+    "@vitest/coverage-v8": "^1.6.1",
     "happy-dom": "^20.8.8",
     "jsdom": "^29.0.1",
-    "vitest": "^4.1.1"
+    "vitest": "^1.6.1"
   },
   "dependencies": {
     "clsx": "^2.1.0"
