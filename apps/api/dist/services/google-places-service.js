@@ -8,8 +8,8 @@ export class GooglePlacesService {
                 id: Buffer.from(seed).toString('base64').slice(0, 12),
                 title: `${params.theme} waypoint`,
                 description: `prototype placeholder near ${params.location}`,
-                distanceKm: Math.round(params.radiusKm * 0.4)
-            }
+                distanceKm: Math.round(params.radiusKm * 0.4),
+            },
         ];
     }
 }

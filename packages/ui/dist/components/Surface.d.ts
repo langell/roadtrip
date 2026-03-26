@@ -4,5 +4,5 @@ type SurfaceProps = PropsWithChildren<{
     elevation?: 'flat' | 'raised';
     className?: string;
 }>;
-export declare const Surface: ({ children, padding, elevation, className }: SurfaceProps) => import("react/jsx-runtime").JSX.Element;
+export declare const Surface: ({ children, padding, elevation, className, }: SurfaceProps) => import("react/jsx-runtime").JSX.Element;
 export {};
