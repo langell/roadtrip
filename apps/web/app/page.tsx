@@ -12,11 +12,7 @@ const HomePage = () => (
         RoadTrip Alpha · Production-grade foundations
       </p>
       <h1 className="text-4xl font-semibold leading-tight text-[#1B4332] md:text-6xl">
-        Plan soulful drives with{' '}
-        <span className="text-[#3b6090]">
-          <HeroPhrase />
-        </span>
-        .
+        <HeroPhrase />.
       </h1>
       <p className="max-w-3xl text-lg text-stone-600">
         Plug in a region, we will stitch local gems, sponsored highlights, and traveler
