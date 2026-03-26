@@ -21,8 +21,8 @@ export const Surface = ({
   className,
 }: SurfaceProps) => {
   const classes = clsx(
-    'rounded-2xl border border-white/10 bg-slate-900/80 text-white shadow-lg backdrop-blur',
-    elevation === 'raised' && 'shadow-xl shadow-slate-900/40',
+    'rounded-3xl bg-[#f4f4ef] text-stone-900',
+    elevation === 'raised' && 'shadow-[0_12px_28px_rgba(0,0,0,0.08)]',
     paddingMap[padding],
     className,
   );

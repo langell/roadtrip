@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
+import { auth } from '../auth';
+import AuthSessionProvider from '../components/session-provider';
 
 export const metadata: Metadata = {
   title: 'RoadTrip | Plan unforgettable drives',
@@ -8,12 +10,18 @@ export const metadata: Metadata = {
     'RoadTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.',
 };
 
-const RootLayout = ({ children }: { children: ReactNode }) => (
-  <html lang="en">
-    <body>
-      <main>{children}</main>
-    </body>
-  </html>
-);
+const RootLayout = async ({ children }: { children: ReactNode }) => {
+  const session = await auth();
+
+  return (
+    <html lang="en">
+      <body>
+        <AuthSessionProvider session={session}>
+          <main>{children}</main>
+        </AuthSessionProvider>
+      </body>
+    </html>
+  );
+};
 
 export default RootLayout;

@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
-export const createContext = ({ req }) => {
-    const userId = req.header('x-user-id');
+import { getRequestUserId } from '../lib/request-auth.js';
+export const createContext = async ({ req }) => {
+    const userId = await getRequestUserId(req);
     return { prisma, userId };
 };

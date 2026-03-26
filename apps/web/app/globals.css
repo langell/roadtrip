@@ -1,9 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  color-scheme: dark;
-  background-color: #050914;
-  color: #f5f5f0;
+  color-scheme: light;
+  --color-primary: #1B4332;
+  --color-primary-light: #a5d0b9;
+  --color-bg: #fafaf5;
+  --color-surface: #f4f4ef;
+  --color-text-main: #1c1917;
+  --color-text-muted: #78716c;
 }
 
 * {
@@ -12,8 +20,19 @@
 
 body {
   margin: 0;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: 'Manrope', system-ui, sans-serif;
+  color: var(--color-text-main);
   background:
-    radial-gradient(circle at top, rgba(80, 245, 138, 0.1), transparent 60%), #050914;
+    radial-gradient(circle at top, rgba(27, 67, 50, 0.1), transparent 60%),
+    var(--color-bg);
   min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 }

@@ -20,6 +20,7 @@ Required values in `apps/api/.env`:
 
 - `DATABASE_URL`
 - `GOOGLE_MAPS_API_KEY`
+- `AUTH_SECRET` (must match web `AUTH_SECRET` for signed API bearer validation)
 
 Optional values:
 

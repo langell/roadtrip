@@ -19,11 +19,18 @@ cp apps/web/.env.example apps/web/.env.local
 Required values in `apps/web/.env.local`:
 
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
-- `NEXTAUTH_SECRET`
+- `AUTH_SECRET` (preferred)
+- `AUTH_GOOGLE_ID` (Google OAuth client ID)
+- `AUTH_GOOGLE_SECRET` (Google OAuth client secret)
+- `AUTH_APPLE_ID` (Apple Services ID)
+- `AUTH_APPLE_SECRET` (Apple client secret)
 
 Optional values:
 
 - `NEXTAUTH_URL` (defaults to `http://localhost:3000`)
+- `NEXTAUTH_SECRET` (legacy alias for `AUTH_SECRET`)
+- `NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:3001`)
+- `NEXT_PUBLIC_API_USER_ID` (defaults to `demo-user` for local development)
 
 ## Run (development)
 

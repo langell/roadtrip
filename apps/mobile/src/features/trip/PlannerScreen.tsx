@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,12 @@ import {
 import type { TripFilters } from '@roadtrip/types';
 import { TripThemeSchema } from '@roadtrip/types';
 import { colors } from '../../theme/colors';
+import {
+  fetchTripSuggestions,
+  listSavedTrips,
+  saveGeneratedTrip,
+  type SavedTrip,
+} from './api-client';
 
 type Suggestion = {
   id: string;
@@ -24,13 +30,60 @@ const PlannerScreen = () => {
     maxStops: 5,
   });
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleGenerate = () => {
-    // Placeholder logic until API integration lands.
-    setSuggestions([
-      { id: '1', label: `${filters.theme} gem near ${location}` },
-      { id: '2', label: 'Partner spotlight: Electric canyon tour' },
-    ]);
+  const selectedTrip = savedTrips.find((trip) => trip.id === selectedTripId) ?? null;
+
+  useEffect(() => {
+    const loadSavedTrips = async () => {
+      const trips = await listSavedTrips();
+      setSavedTrips(trips);
+    };
+
+    void loadSavedTrips();
+  }, []);
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchTripSuggestions({
+        location,
+        radiusKm: filters.radiusKm,
+        theme: filters.theme,
+      });
+      setSuggestions(
+        data.map((item) => ({
+          id: item.id,
+          label: `${item.title} · ${item.distanceKm}km`,
+        })),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveTrip = async () => {
+    setSaving(true);
+    try {
+      const savedTrip = await saveGeneratedTrip({
+        location,
+        radiusKm: filters.radiusKm,
+        theme: filters.theme,
+        name: `${filters.theme} trip from ${location}`,
+      });
+      if (savedTrip) {
+        setSavedTrips((prev) => [
+          savedTrip,
+          ...prev.filter((trip) => trip.id !== savedTrip.id),
+        ]);
+        setSelectedTripId(savedTrip.id);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -75,8 +128,29 @@ const PlannerScreen = () => {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleGenerate}>
-          <Text style={styles.buttonText}>Generate trip</Text>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={() => {
+            void handleGenerate();
+          }}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Loading...' : 'Generate trip'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.buttonSecondary,
+            (saving || !suggestions.length) && styles.buttonDisabled,
+          ]}
+          onPress={() => {
+            void handleSaveTrip();
+          }}
+          disabled={saving || !suggestions.length}
+        >
+          <Text style={styles.buttonText}>{saving ? 'Saving...' : 'Save trip'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -95,6 +169,51 @@ const PlannerScreen = () => {
         }
         contentContainerStyle={{ gap: 12 }}
       />
+
+      <View style={styles.savedSection}>
+        <Text style={styles.label}>Saved trips</Text>
+        {savedTrips.length ? (
+          savedTrips.map((trip) => (
+            <TouchableOpacity
+              key={trip.id}
+              style={[
+                styles.suggestion,
+                selectedTripId === trip.id && styles.suggestionSelected,
+              ]}
+              onPress={() => setSelectedTripId(trip.id)}
+            >
+              <Text style={styles.suggestionText}>{trip.name}</Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <Text style={styles.placeholder}>No saved trips yet.</Text>
+        )}
+      </View>
+
+      {selectedTrip && (
+        <View style={styles.detailsCard}>
+          <Text style={styles.detailsTitle}>{selectedTrip.name}</Text>
+          <Text style={styles.detailsMeta}>
+            Origin: {selectedTrip.origin.lat.toFixed(3)},{' '}
+            {selectedTrip.origin.lng.toFixed(3)}
+          </Text>
+          <Text style={styles.detailsMeta}>Stops: {selectedTrip.stops.length}</Text>
+
+          <View style={styles.detailsStops}>
+            {selectedTrip.stops.map((stop, index) => (
+              <View key={stop.id} style={styles.detailsStopItem}>
+                <Text style={styles.detailsStopTitle}>
+                  {index + 1}. {stop.name}
+                </Text>
+                <Text style={styles.detailsStopText}>
+                  {stop.lat.toFixed(3)}, {stop.lng.toFixed(3)}
+                </Text>
+                {!!stop.notes && <Text style={styles.detailsStopText}>{stop.notes}</Text>}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -152,9 +271,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   buttonText: {
     textTransform: 'uppercase',
     fontWeight: '600',
+  },
+  buttonSecondary: {
+    marginTop: 4,
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
   suggestion: {
     padding: 18,
@@ -164,10 +295,53 @@ const styles = StyleSheet.create({
   suggestionText: {
     color: colors.text,
   },
+  suggestionSelected: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
   placeholder: {
     color: '#64748b',
     textAlign: 'center',
     marginTop: 24,
+  },
+  savedSection: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  detailsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 18,
+    gap: 8,
+    marginBottom: 24,
+  },
+  detailsTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  detailsMeta: {
+    color: '#94a3b8',
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  detailsStops: {
+    gap: 8,
+    marginTop: 6,
+  },
+  detailsStopItem: {
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    padding: 12,
+    gap: 4,
+  },
+  detailsStopTitle: {
+    color: colors.text,
+    fontWeight: '600',
+  },
+  detailsStopText: {
+    color: '#94a3b8',
+    fontSize: 12,
   },
 });
 

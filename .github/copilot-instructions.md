@@ -111,3 +111,7 @@ Before starting a new task in the above plan, update progress in the plan.
 - If any UI spec conflicts, prefer `docs/design-system.md` unless the user explicitly overrides it.
 - For any new visual component work in `apps/web` or `apps/mobile`, reference the Stitch MCP project/screens first before implementation.
 - Prefer Stitch MCP as the source for layout/component visual direction, then apply `docs/design-system.md` tokens and rules in code.
+- For authentication work, use Auth.js documentation as best-practice guidance, starting with `https://authjs.dev/getting-started` and related Auth.js security/provider docs.
+- Stories are the default source for what to build next: pull work from `stories/Backlog/`.
+- When new work is discovered during implementation, add a new story file under `stories/Backlog/`.
+- After completing a story, move it to `stories/Done/` and add/update an entry in `stories/STATUS.md`.

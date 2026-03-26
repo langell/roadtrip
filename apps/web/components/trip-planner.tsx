@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import type { TripFilters } from '@roadtrip/types';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripIdeas, type TripIdea } from '../lib/api-client';
 
 const TripPlanner = () => {
+  const { data: session } = useSession();
   const [filters, setFilters] = useState<TripFilters>({
     radiusKm: 150,
     theme: 'scenic',
@@ -25,6 +27,7 @@ const TripPlanner = () => {
         location,
         radiusKm: filters.radiusKm,
         theme: filters.theme,
+        userId: session?.user?.id ?? session?.user?.email ?? undefined,
       });
       setIdeas(data);
     } finally {
@@ -33,32 +36,34 @@ const TripPlanner = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 text-stone-900">
       <form
-        className="grid gap-6 md:grid-cols-3"
+        className="grid gap-4 md:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
           void handleGenerate();
         }}
       >
         <label className="space-y-2">
-          <span className="text-sm uppercase tracking-wide text-white/60">Origin</span>
+          <span className="text-xs uppercase tracking-[0.18em] text-stone-500">
+            Origin
+          </span>
           <input
-            className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 focus:border-emerald-400 focus:outline-none"
+            className="w-full rounded-xl bg-white px-4 py-3 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#a5d0b9]"
             value={location}
             onChange={(event) => setLocation(event.target.value)}
           />
         </label>
 
         <label className="space-y-2">
-          <span className="text-sm uppercase tracking-wide text-white/60">
+          <span className="text-xs uppercase tracking-[0.18em] text-stone-500">
             Radius (KM)
           </span>
           <input
             type="number"
             min={25}
             max={500}
-            className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 focus:border-emerald-400 focus:outline-none"
+            className="w-full rounded-xl bg-white px-4 py-3 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#a5d0b9]"
             value={filters.radiusKm}
             onChange={(event) =>
               setFilters((prev) => ({ ...prev, radiusKm: Number(event.target.value) }))
@@ -67,9 +72,11 @@ const TripPlanner = () => {
         </label>
 
         <label className="space-y-2">
-          <span className="text-sm uppercase tracking-wide text-white/60">Theme</span>
+          <span className="text-xs uppercase tracking-[0.18em] text-stone-500">
+            Theme
+          </span>
           <select
-            className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white focus:border-emerald-400 focus:outline-none"
+            className="w-full rounded-xl bg-white px-4 py-3 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#a5d0b9]"
             value={filters.theme}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -87,12 +94,14 @@ const TripPlanner = () => {
         </label>
 
         <label className="space-y-2">
-          <span className="text-sm uppercase tracking-wide text-white/60">Max stops</span>
+          <span className="text-xs uppercase tracking-[0.18em] text-stone-500">
+            Max stops
+          </span>
           <input
             type="number"
             min={1}
             max={12}
-            className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 focus:border-emerald-400 focus:outline-none"
+            className="w-full rounded-xl bg-white px-4 py-3 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#a5d0b9]"
             value={filters.maxStops}
             onChange={(event) =>
               setFilters((prev) => ({ ...prev, maxStops: Number(event.target.value) }))
@@ -107,24 +116,24 @@ const TripPlanner = () => {
       </form>
 
       <section className="space-y-4">
-        <p className="text-sm uppercase tracking-widest text-white/50">
+        <p className="text-xs uppercase tracking-[0.18em] text-stone-500">
           Suggested experiences
         </p>
         <div className="grid gap-4 md:grid-cols-3">
           {ideas.map((idea) => (
             <article
               key={idea.id}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4 text-white"
+              className="rounded-2xl bg-white p-5 shadow-[0_8px_20px_rgba(0,0,0,0.05)]"
             >
-              <h3 className="text-lg font-semibold">{idea.title}</h3>
-              <p className="text-sm text-white/70">{idea.description}</p>
-              <p className="text-xs uppercase text-emerald-300">
+              <h3 className="text-lg font-semibold text-[#1B4332]">{idea.title}</h3>
+              <p className="text-sm text-stone-600">{idea.description}</p>
+              <p className="text-xs uppercase tracking-[0.12em] text-[#3b6090]">
                 {idea.distanceKm}km · curated sample
               </p>
             </article>
           ))}
           {!ideas.length && (
-            <div className="rounded-2xl border border-dashed border-white/10 p-8 text-white/60">
+            <div className="rounded-2xl bg-white/70 p-8 text-stone-500">
               Start by generating a route to see curated stops, sponsors, and detours.
             </div>
           )}

@@ -13,7 +13,7 @@ describe('Surface', () => {
     const surface = screen.getByText('content').closest('section');
     expect(surface).not.toBeNull();
     expect(surface?.className).toContain('p-6');
-    expect(surface?.className).toContain('shadow-xl');
+    expect(surface?.className).toContain('shadow-[0_12px_28px_rgba(0,0,0,0.08)]');
   });
 
   it('allows custom class names to merge', () => {

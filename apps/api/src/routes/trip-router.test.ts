@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TripCreateRequest, TripUpdateRequest } from '@roadtrip/types';
+
+const { findStops } = vi.hoisted(() => ({
+  findStops: vi.fn(),
+}));
+vi.mock('../services/google-places-service.js', () => ({
+  googlePlacesService: {
+    findStops,
+  },
+}));
+
 import { tripRouter } from './trip-router.js';
 
 const buildPrisma = () => ({
@@ -23,14 +33,20 @@ const buildCaller = () => {
 };
 
 describe('tripRouter', () => {
-  it('returns placeholder suggestions', async () => {
+  it('returns suggestions from the places service', async () => {
+    findStops.mockResolvedValue([{ id: 'stop-1', title: 'Food stop' }]);
     const caller = tripRouter.createCaller({ prisma: {} as never, userId: 'user-1' });
     const suggestions = await caller.suggestions({
       location: 'Austin, TX',
       radiusKm: 120,
       theme: 'foodie',
     });
-    expect(suggestions[0].title).toContain('foodie');
+    expect(findStops).toHaveBeenCalledWith({
+      location: 'Austin, TX',
+      radiusKm: 120,
+      theme: 'foodie',
+    });
+    expect(suggestions).toEqual([{ id: 'stop-1', title: 'Food stop' }]);
   });
 
   it('lists trips per user', async () => {

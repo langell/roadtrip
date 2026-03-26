@@ -5,19 +5,74 @@ export type TripIdea = {
   distanceKm: number;
 };
 
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+const apiUserId = process.env.NEXT_PUBLIC_API_USER_ID ?? 'demo-user';
+
+let cachedApiToken: { value: string; expiresAt: number } | null = null;
+
+const getApiToken = async () => {
+  const now = Date.now();
+  if (cachedApiToken && cachedApiToken.expiresAt > now) {
+    return cachedApiToken.value;
+  }
+
+  const response = await fetch('/api/auth/api-token', {
+    cache: 'no-store',
+    credentials: 'same-origin',
+  });
+
+  if (!response.ok) {
+    return undefined;
+  }
+
+  const data = (await response.json()) as { token?: string };
+  if (!data.token) {
+    return undefined;
+  }
+
+  cachedApiToken = {
+    value: data.token,
+    expiresAt: now + 14 * 60 * 1000,
+  };
+
+  return data.token;
+};
+
+const buildAuthHeaders = async (userId?: string) => {
+  const headers: Record<string, string> = {};
+  const apiToken = await getApiToken();
+  if (apiToken) {
+    headers.authorization = `Bearer ${apiToken}`;
+    return headers;
+  }
+
+  const resolvedUserId = userId ?? apiUserId;
+  headers.authorization = `Bearer ${resolvedUserId}`;
+  headers['x-user-id'] = resolvedUserId;
+  return headers;
+};
+
 export const fetchTripIdeas = async (params: {
   location: string;
   radiusKm: number;
   theme: string;
+  userId?: string;
 }): Promise<TripIdea[]> => {
-  // TODO: Replace with real API call once backend routes are ready.
-  await new Promise((resolve) => globalThis.setTimeout(resolve, 400));
-  return [
-    {
-      id: 'sample-1',
-      title: `${params.theme} sampler`,
-      description: `Curated spots near ${params.location}`,
-      distanceKm: Math.round(params.radiusKm * 0.4),
-    },
-  ];
+  const query = new URLSearchParams({
+    location: params.location,
+    radiusKm: String(params.radiusKm),
+    theme: params.theme,
+  });
+
+  const response = await fetch(`${apiBaseUrl}/suggestions?${query.toString()}`, {
+    headers: await buildAuthHeaders(params.userId),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = (await response.json()) as TripIdea[];
+  return data;
 };

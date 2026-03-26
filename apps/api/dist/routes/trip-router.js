@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { TripCreateRequestSchema, TripUpdateRequestSchema, } from '@roadtrip/types';
 import { authenticatedProcedure, router } from '../lib/trpc.js';
 import { googlePlacesService } from '../services/google-places-service.js';
@@ -56,7 +57,16 @@ export const tripRouter = router({
         theme: z.string(),
     }))
         .query(async ({ input }) => {
-        return googlePlacesService.findStops(input);
+        try {
+            return await googlePlacesService.findStops(input);
+        }
+        catch (error) {
+            throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to fetch places suggestions',
+                cause: error,
+            });
+        }
     }),
     sponsoredPlaces: authenticatedProcedure
         .input(z

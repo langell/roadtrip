@@ -86,6 +86,9 @@ importers:
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
+      jose:
+        specifier: ^6.2.2
+        version: 6.2.2
       pino:
         specifier: ^8.19.0
         version: 8.21.0
@@ -202,6 +205,9 @@ importers:
       '@roadtrip/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      jose:
+        specifier: ^6.2.2
+        version: 6.2.2
       next:
         specifier: 15.5.14
         version: 15.5.14(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)

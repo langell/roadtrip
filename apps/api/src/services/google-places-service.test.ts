@@ -1,29 +1,114 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GooglePlacesService } from './google-places-service.js';
 
-const service = new GooglePlacesService();
-
 describe('GooglePlacesService', () => {
-  it('returns deterministic placeholder suggestions', async () => {
+  it('returns normalized real-api style suggestions', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'OK',
+          results: [{ geometry: { location: { lat: 47.6062, lng: -122.3321 } } }],
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'OK',
+          results: [
+            {
+              place_id: 'place-1',
+              name: 'Pike Place Market',
+              vicinity: 'Seattle',
+              geometry: { location: { lat: 47.6094, lng: -122.3422 } },
+            },
+            {
+              place_id: 'place-2',
+              name: 'Kerry Park',
+              vicinity: 'Queen Anne',
+              geometry: { location: { lat: 47.6295, lng: -122.3599 } },
+            },
+          ],
+        }),
+      } as Response);
+
+    const service = new GooglePlacesService(fetchMock, () => 0);
+
     const suggestions = await service.findStops({
       location: 'Seattle, WA',
       radiusKm: 120,
       theme: 'foodie',
     });
 
-    expect(suggestions).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(suggestions).toHaveLength(2);
     expect(suggestions[0]).toMatchObject({
-      title: 'foodie waypoint',
-      description: expect.stringContaining('Seattle'),
-      distanceKm: Math.round(120 * 0.4),
+      id: 'place-1',
+      placeId: 'place-1',
+      title: 'Pike Place Market',
+      description: 'Seattle',
+      lat: 47.6094,
+      lng: -122.3422,
+      distanceKm: expect.any(Number),
+    });
+  });
+
+  it('uses cache for repeat requests within ttl', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'OK',
+          results: [{ geometry: { location: { lat: 30, lng: -97 } } }],
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'OK',
+          results: [
+            {
+              place_id: 'place-a',
+              name: 'Stop A',
+              vicinity: 'Austin',
+              geometry: { location: { lat: 30.1, lng: -97.1 } },
+            },
+          ],
+        }),
+      } as Response);
+
+    const service = new GooglePlacesService(fetchMock, () => 1000);
+
+    const first = await service.findStops({
+      location: 'Austin, TX',
+      radiusKm: 80,
+      theme: 'scenic',
+    });
+    const second = await service.findStops({
+      location: 'Austin, TX',
+      radiusKm: 80,
+      theme: 'scenic',
     });
 
-    const secondCall = await service.findStops({
-      location: 'Seattle, WA',
-      radiusKm: 120,
-      theme: 'foodie',
-    });
+    expect(first).toEqual(second);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 
-    expect(secondCall[0].id).toBe(suggestions[0].id);
+  it('throws normalized error when geocode fails', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'REQUEST_DENIED', results: [] }),
+    } as Response);
+    const service = new GooglePlacesService(fetchMock);
+
+    await expect(
+      service.findStops({
+        location: 'Seattle, WA',
+        radiusKm: 120,
+        theme: 'foodie',
+      }),
+    ).rejects.toThrow(/GOOGLE_GEOCODE_FAILED/);
   });
 });
