@@ -25,6 +25,11 @@ export type SavedTrip = {
   }>;
 };
 
+export type SaveGeneratedTripResult = {
+  trip: SavedTrip | null;
+  requiresAuth: boolean;
+};
+
 type SavedTripApi = {
   id: string;
   name: string;
@@ -88,7 +93,7 @@ export const saveGeneratedTrip = async (params: {
   radiusKm: number;
   theme: string;
   name?: string;
-}): Promise<SavedTrip | null> => {
+}): Promise<SaveGeneratedTripResult> => {
   const response = await fetch(`${apiBaseUrl}/trips/save-generated`, {
     method: 'POST',
     headers: buildAuthHeaders({
@@ -97,12 +102,16 @@ export const saveGeneratedTrip = async (params: {
     body: JSON.stringify(params),
   });
 
+  if (response.status === 401) {
+    return { trip: null, requiresAuth: true };
+  }
+
   if (!response.ok) {
-    return null;
+    return { trip: null, requiresAuth: false };
   }
 
   const data = (await response.json()) as SavedTripApi;
-  return mapSavedTrip(data);
+  return { trip: mapSavedTrip(data), requiresAuth: false };
 };
 
 export const listSavedTrips = async (): Promise<SavedTrip[]> => {

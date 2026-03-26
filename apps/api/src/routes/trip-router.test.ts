@@ -49,6 +49,24 @@ describe('tripRouter', () => {
     expect(suggestions).toEqual([{ id: 'stop-1', title: 'Food stop' }]);
   });
 
+  it('returns suggestions for anonymous caller', async () => {
+    findStops.mockResolvedValue([{ id: 'stop-anon', title: 'Anon stop' }]);
+    const caller = tripRouter.createCaller({ prisma: {} as never, userId: undefined });
+
+    const suggestions = await caller.suggestions({
+      location: 'Seattle, WA',
+      radiusKm: 50,
+      theme: 'scenic',
+    });
+
+    expect(findStops).toHaveBeenCalledWith({
+      location: 'Seattle, WA',
+      radiusKm: 50,
+      theme: 'scenic',
+    });
+    expect(suggestions).toEqual([{ id: 'stop-anon', title: 'Anon stop' }]);
+  });
+
   it('lists trips per user', async () => {
     const { prisma, caller } = buildCaller();
     prisma.trip.findMany.mockResolvedValue([{ id: 'trip-a' }]);

@@ -10,6 +10,8 @@ const baseEnv = {
   GOOGLE_PLACES_CACHE_TTL_SECONDS: '120',
   GOOGLE_PLACES_TIMEOUT_MS: '9000',
   GOOGLE_PLACES_RETRY_COUNT: '1',
+  ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: '60000',
+  ANON_SUGGESTIONS_RATE_LIMIT_MAX: '10',
 };
 
 const loadEnvModule = async (
@@ -49,6 +51,8 @@ describe('env schema', () => {
     expect(env.GOOGLE_PLACES_CACHE_TTL_SECONDS).toBe(120);
     expect(env.GOOGLE_PLACES_TIMEOUT_MS).toBe(9000);
     expect(env.GOOGLE_PLACES_RETRY_COUNT).toBe(1);
+    expect(env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS).toBe(60000);
+    expect(env.ANON_SUGGESTIONS_RATE_LIMIT_MAX).toBe(10);
   });
 
   it('throws when required variables are invalid', async () => {
@@ -64,6 +68,8 @@ describe('env schema', () => {
       GOOGLE_PLACES_CACHE_TTL_SECONDS: undefined,
       GOOGLE_PLACES_TIMEOUT_MS: undefined,
       GOOGLE_PLACES_RETRY_COUNT: undefined,
+      ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: undefined,
+      ANON_SUGGESTIONS_RATE_LIMIT_MAX: undefined,
     });
 
     expect(env.GOOGLE_MAPS_API_BASE_URL).toBe('https://maps.googleapis.com');
@@ -71,5 +77,7 @@ describe('env schema', () => {
     expect(env.GOOGLE_PLACES_CACHE_TTL_SECONDS).toBe(300);
     expect(env.GOOGLE_PLACES_TIMEOUT_MS).toBe(8000);
     expect(env.GOOGLE_PLACES_RETRY_COUNT).toBe(2);
+    expect(env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS).toBe(300000);
+    expect(env.ANON_SUGGESTIONS_RATE_LIMIT_MAX).toBe(60);
   });
 });

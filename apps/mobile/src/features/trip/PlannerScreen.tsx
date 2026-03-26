@@ -34,6 +34,7 @@ const PlannerScreen = () => {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
   const selectedTrip = savedTrips.find((trip) => trip.id === selectedTripId) ?? null;
 
@@ -67,19 +68,29 @@ const PlannerScreen = () => {
 
   const handleSaveTrip = async () => {
     setSaving(true);
+    setSaveFeedback(null);
     try {
-      const savedTrip = await saveGeneratedTrip({
+      const result = await saveGeneratedTrip({
         location,
         radiusKm: filters.radiusKm,
         theme: filters.theme,
         name: `${filters.theme} trip from ${location}`,
       });
-      if (savedTrip) {
+
+      if (result.trip) {
         setSavedTrips((prev) => [
-          savedTrip,
-          ...prev.filter((trip) => trip.id !== savedTrip.id),
+          result.trip,
+          ...prev.filter((trip) => trip.id !== result.trip.id),
         ]);
-        setSelectedTripId(savedTrip.id);
+        setSelectedTripId(result.trip.id);
+        setSaveFeedback('Trip saved.');
+        return;
+      }
+
+      if (result.requiresAuth) {
+        setSaveFeedback('Sign in is required to save trips.');
+      } else {
+        setSaveFeedback('Unable to save this trip right now.');
       }
     } finally {
       setSaving(false);
@@ -152,6 +163,8 @@ const PlannerScreen = () => {
         >
           <Text style={styles.buttonText}>{saving ? 'Saving...' : 'Save trip'}</Text>
         </TouchableOpacity>
+
+        {saveFeedback && <Text style={styles.feedbackText}>{saveFeedback}</Text>}
       </View>
 
       <FlatList
@@ -286,6 +299,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.accent,
+  },
+  feedbackText: {
+    color: '#fbbf24',
+    fontSize: 12,
+    marginTop: 8,
+    textTransform: 'uppercase',
   },
   suggestion: {
     padding: 18,

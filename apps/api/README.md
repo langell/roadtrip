@@ -25,6 +25,8 @@ Required values in `apps/api/.env`:
 Optional values:
 
 - `PORT` (defaults to `3001`)
+- `ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS` (defaults to `300000`)
+- `ANON_SUGGESTIONS_RATE_LIMIT_MAX` (defaults to `60`)
 
 ## Run (development)
 

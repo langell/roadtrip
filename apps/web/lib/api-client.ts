@@ -6,7 +6,6 @@ export type TripIdea = {
 };
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
-const apiUserId = process.env.NEXT_PUBLIC_API_USER_ID ?? 'demo-user';
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
 
@@ -38,17 +37,12 @@ const getApiToken = async () => {
   return data.token;
 };
 
-const buildAuthHeaders = async (userId?: string) => {
+const buildAuthHeaders = async () => {
   const headers: Record<string, string> = {};
   const apiToken = await getApiToken();
   if (apiToken) {
     headers.authorization = `Bearer ${apiToken}`;
-    return headers;
   }
-
-  const resolvedUserId = userId ?? apiUserId;
-  headers.authorization = `Bearer ${resolvedUserId}`;
-  headers['x-user-id'] = resolvedUserId;
   return headers;
 };
 
@@ -56,7 +50,6 @@ export const fetchTripIdeas = async (params: {
   location: string;
   radiusKm: number;
   theme: string;
-  userId?: string;
 }): Promise<TripIdea[]> => {
   const query = new URLSearchParams({
     location: params.location,
@@ -65,7 +58,7 @@ export const fetchTripIdeas = async (params: {
   });
 
   const response = await fetch(`${apiBaseUrl}/suggestions?${query.toString()}`, {
-    headers: await buildAuthHeaders(params.userId),
+    headers: await buildAuthHeaders(),
     cache: 'no-store',
   });
 

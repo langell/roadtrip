@@ -33,19 +33,22 @@ describe('PlannerScreen', () => {
       },
     ]);
     mockedSaveGeneratedTrip.mockResolvedValue({
-      id: 'trip-1',
-      name: 'foodie trip from Portland, OR',
-      origin: { lat: 30, lng: -97 },
-      stops: [
-        {
-          id: 'stop-1',
-          name: 'Pike Place',
-          order: 0,
-          lat: 30.1,
-          lng: -97.1,
-          notes: 'Great food hall',
-        },
-      ],
+      trip: {
+        id: 'trip-1',
+        name: 'foodie trip from Portland, OR',
+        origin: { lat: 30, lng: -97 },
+        stops: [
+          {
+            id: 'stop-1',
+            name: 'Pike Place',
+            order: 0,
+            lat: 30.1,
+            lng: -97.1,
+            notes: 'Great food hall',
+          },
+        ],
+      },
+      requiresAuth: false,
     });
     mockedListSavedTrips.mockResolvedValue([]);
   });
@@ -138,5 +141,25 @@ describe('PlannerScreen', () => {
     expect(getByText(/Origin:/i)).toBeTruthy();
     expect(getByText(/1\. Vista House/i)).toBeTruthy();
     expect(getByText(/Iconic viewpoint/i)).toBeTruthy();
+  });
+
+  it('shows auth message when anonymous user tries to save', async () => {
+    mockedSaveGeneratedTrip.mockResolvedValue({ trip: null, requiresAuth: true });
+    const { getByText } = render(<PlannerScreen />);
+
+    await waitFor(() => {
+      expect(mockedListSavedTrips).toHaveBeenCalled();
+    });
+
+    fireEvent.press(getByText(/generate trip/i));
+    await waitFor(() => {
+      expect(mockedFetchTripSuggestions).toHaveBeenCalled();
+    });
+
+    fireEvent.press(getByText(/save trip/i));
+
+    await waitFor(() => {
+      expect(getByText(/Sign in is required to save trips./i)).toBeTruthy();
+    });
   });
 });

@@ -4,6 +4,8 @@ import request from 'supertest';
 vi.mock('./config/env.js', () => ({
   env: {
     PORT: 0,
+    ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: 60000,
+    ANON_SUGGESTIONS_RATE_LIMIT_MAX: 2,
   },
 }));
 
@@ -92,15 +94,38 @@ describe('HTTP server', () => {
     expect(response.body).toEqual([{ id: 'stop-1' }]);
   });
 
-  it('rejects unauthenticated suggestions requests', async () => {
+  it('allows unauthenticated suggestions requests within rate limits', async () => {
+    findStops.mockResolvedValue([{ id: 'stop-1' }]);
     const app = createApp();
 
     const response = await request(app)
       .get('/suggestions')
       .query({ location: 'Portland, OR', theme: 'scenic', radiusKm: '150' });
 
-    expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: 'UNAUTHORIZED' });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([{ id: 'stop-1' }]);
+  });
+
+  it('rate limits unauthenticated suggestions requests by ip', async () => {
+    findStops.mockResolvedValue([{ id: 'stop-1' }]);
+    const app = createApp();
+
+    await request(app)
+      .get('/suggestions')
+      .set('x-forwarded-for', '1.2.3.4')
+      .query({ location: 'Portland, OR', theme: 'scenic', radiusKm: '150' });
+    await request(app)
+      .get('/suggestions')
+      .set('x-forwarded-for', '1.2.3.4')
+      .query({ location: 'Portland, OR', theme: 'scenic', radiusKm: '150' });
+
+    const response = await request(app)
+      .get('/suggestions')
+      .set('x-forwarded-for', '1.2.3.4')
+      .query({ location: 'Portland, OR', theme: 'scenic', radiusKm: '150' });
+
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({ error: 'RATE_LIMITED' });
   });
 
   it('rejects invalid suggestions query params', async () => {

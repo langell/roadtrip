@@ -12,6 +12,11 @@ import { googlePlacesService } from './services/google-places-service.js';
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
 
+type RateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
 const withAsyncHandler =
   <TReq extends express.Request, TRes extends express.Response>(
     handler: (req: TReq, res: TRes) => Promise<void>,
@@ -20,8 +25,43 @@ const withAsyncHandler =
     void handler(req, res);
   };
 
+const getRequesterIp = (req: express.Request) => {
+  const forwardedFor = req.header('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim() ?? 'unknown';
+  }
+
+  return req.ip ?? req.socket.remoteAddress ?? 'unknown';
+};
+
+const createAnonymousSuggestionsRateLimiter = () => {
+  const hitsByIp = new Map<string, RateLimitEntry>();
+
+  return (ipAddress: string) => {
+    const now = Date.now();
+    const existing = hitsByIp.get(ipAddress);
+
+    if (!existing || existing.resetAt <= now) {
+      hitsByIp.set(ipAddress, {
+        count: 1,
+        resetAt: now + env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS,
+      });
+      return true;
+    }
+
+    if (existing.count >= env.ANON_SUGGESTIONS_RATE_LIMIT_MAX) {
+      return false;
+    }
+
+    existing.count += 1;
+    hitsByIp.set(ipAddress, existing);
+    return true;
+  };
+};
+
 export const createApp = () => {
   const app = express();
+  const allowAnonymousSuggestionRequest = createAnonymousSuggestionsRateLimiter();
   app.use(cors());
   app.use(helmet());
   app.use(express.json());
@@ -34,8 +74,9 @@ export const createApp = () => {
     '/suggestions',
     withAsyncHandler(async (req, res) => {
       const userId = await getRequestUserId(req);
-      if (!userId) {
-        res.status(401).json({ error: 'UNAUTHORIZED' });
+
+      if (!userId && !allowAnonymousSuggestionRequest(getRequesterIp(req))) {
+        res.status(429).json({ error: 'RATE_LIMITED' });
         return;
       }
 

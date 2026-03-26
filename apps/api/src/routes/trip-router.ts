@@ -6,7 +6,7 @@ import {
   type TripCreateRequest,
   type TripUpdateRequest,
 } from '@roadtrip/types';
-import { authenticatedProcedure, router } from '../lib/trpc.js';
+import { authenticatedProcedure, procedure, router } from '../lib/trpc.js';
 import { googlePlacesService } from '../services/google-places-service.js';
 import type { Context } from '../types/context.js';
 
@@ -57,7 +57,7 @@ export const tripRouter = router({
         include: { stops: { orderBy: { order: 'asc' } } },
       });
     }),
-  suggestions: authenticatedProcedure
+  suggestions: procedure
     .input(
       z.object({
         location: z.string().min(3),

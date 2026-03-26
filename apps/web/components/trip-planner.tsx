@@ -1,14 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import type { TripFilters } from '@roadtrip/types';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripIdeas, type TripIdea } from '../lib/api-client';
 
 const TripPlanner = () => {
-  const { data: session } = useSession();
   const [filters, setFilters] = useState<TripFilters>({
     radiusKm: 150,
     theme: 'scenic',
@@ -27,7 +25,6 @@ const TripPlanner = () => {
         location,
         radiusKm: filters.radiusKm,
         theme: filters.theme,
-        userId: session?.user?.id ?? session?.user?.email ?? undefined,
       });
       setIdeas(data);
     } finally {

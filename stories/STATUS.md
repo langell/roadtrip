@@ -18,4 +18,5 @@ Tracks completed story work in chronological order.
 - RT-005 `2026-03-sponsored-places-ranking.md`
 - RT-006 `2026-03-analytics-funnel-events.md`
 - RT-007 `2026-03-reliability-deploy-hardening.md`
+- RT-008 `2026-03-anonymous-trip-search-gated-save.md`
 - `2026-03-mobile-trip-builder.md`
