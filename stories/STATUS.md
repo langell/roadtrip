@@ -10,6 +10,9 @@ Tracks completed story work in chronological order.
 - 2026-03-26 — RT-010 `2026-03-observability-baseline.md` moved to `stories/Done/`.
 - 2026-03-27 — RT-008 `2026-03-web-stitch-audit-and-gap-map.md` moved to `stories/Done/`.
 - 2026-03-27 — RT-009 `2026-03-web-stitch-design-token-alignment.md` moved to `stories/Done/`.
+- 2026-03-27 — RT-011 `2026-03-footer-company-pages.md` moved to `stories/Done/`.
+- 2026-03-27 — RT-012 `2026-03-footer-product-pages.md` moved to `stories/Done/`.
+- 2026-03-27 — RT-013 `2026-03-footer-legal-pages.md` moved to `stories/Done/`.
 
 ## In Progress
 
