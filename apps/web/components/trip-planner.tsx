@@ -40,7 +40,7 @@ const formatNearestCity = (components: GeocodeComponent[] | undefined): string |
   return region ? `${city}, ${region}` : city;
 };
 
-const reverseGeocodeLocation = async (
+const reverseGeocodeWithGoogle = async (
   latitude: number,
   longitude: number,
 ): Promise<string | null> => {
@@ -69,10 +69,65 @@ const reverseGeocodeLocation = async (
       return null;
     }
 
-    return formatNearestCity(data.results?.[0]?.address_components);
+    for (const result of data.results ?? []) {
+      const nearestCity = formatNearestCity(result.address_components);
+      if (nearestCity) {
+        return nearestCity;
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
+};
+
+const reverseGeocodeWithFallback = async (
+  latitude: number,
+  longitude: number,
+): Promise<string | null> => {
+  try {
+    const url = new URL('https://api.bigdatacloud.net/data/reverse-geocode-client');
+    url.searchParams.set('latitude', String(latitude));
+    url.searchParams.set('longitude', String(longitude));
+    url.searchParams.set('localityLanguage', 'en');
+
+    const response = await fetch(url.toString(), { cache: 'no-store' });
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      city?: string;
+      locality?: string;
+      principalSubdivisionCode?: string;
+      principalSubdivision?: string;
+      countryCode?: string;
+    };
+
+    const city = data.city ?? data.locality;
+    if (!city) {
+      return null;
+    }
+
+    const region =
+      data.principalSubdivisionCode ?? data.principalSubdivision ?? data.countryCode;
+    return region ? `${city}, ${region}` : city;
+  } catch {
+    return null;
+  }
+};
+
+const reverseGeocodeLocation = async (
+  latitude: number,
+  longitude: number,
+): Promise<string | null> => {
+  const googleNearestCity = await reverseGeocodeWithGoogle(latitude, longitude);
+  if (googleNearestCity) {
+    return googleNearestCity;
+  }
+
+  return reverseGeocodeWithFallback(latitude, longitude);
 };
 
 const TripPlanner = () => {
