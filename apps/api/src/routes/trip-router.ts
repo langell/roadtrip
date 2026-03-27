@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import type { Prisma } from '@prisma/client';
 import {
   TripCreateRequestSchema,
   TripUpdateRequestSchema,
@@ -132,12 +131,19 @@ export const tripRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
 
-      type PrismaJsonNonNull = Exclude<Prisma.JsonValue, null>;
+      type JsonPrimitive = string | number | boolean | null;
+      type InputJsonValue =
+        | JsonPrimitive
+        | { [key: string]: InputJsonValue }
+        | InputJsonValue[]
+        | {
+            toJSON(): unknown;
+          };
       const event = await ctx.prisma.analyticsEvent.create({
         data: {
           userId,
           type: input.type,
-          payload: input.payload as PrismaJsonNonNull,
+          payload: input.payload as InputJsonValue,
         },
       });
 
