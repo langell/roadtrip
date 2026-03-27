@@ -25,6 +25,7 @@ vi.mock('./lib/prisma.js', () => ({
 }));
 
 const findStops = vi.fn();
+const resolvePlannedStops = vi.fn();
 vi.mock('./services/google-places-service.js', () => ({
   GooglePlacesUpstreamError: class GooglePlacesUpstreamError extends Error {
     constructor(
@@ -45,6 +46,24 @@ vi.mock('./services/google-places-service.js', () => ({
   },
   googlePlacesService: {
     findStops,
+    resolvePlannedStops,
+  },
+}));
+
+const generatePlans = vi.fn();
+vi.mock('./services/ai-trip-planner-service.js', () => ({
+  AiTripPlannerError: class AiTripPlannerError extends Error {
+    constructor(
+      code: string,
+      readonly stage: string,
+      readonly details: Record<string, unknown> = {},
+    ) {
+      super(code);
+      this.name = 'AiTripPlannerError';
+    }
+  },
+  aiTripPlannerService: {
+    generatePlans,
   },
 }));
 
@@ -310,6 +329,98 @@ describe('HTTP server', () => {
       include: { stops: { orderBy: { order: 'asc' } } },
     });
     expect(response.body).toEqual({ id: 'trip-new' });
+  });
+
+  it('returns AI trip plan options with enriched stops', async () => {
+    generatePlans.mockResolvedValue({
+      options: [
+        {
+          title: 'Coastal Highlights',
+          rationale: 'Great ocean views and local culture.',
+          stops: ['Bixby Bridge', 'Monterey Bay Aquarium'],
+        },
+        {
+          title: 'Scenic Food Loop',
+          rationale: 'Mix of food and viewpoints.',
+          stops: ['Carmel Mission', 'Point Lobos'],
+        },
+      ],
+    });
+
+    resolvePlannedStops
+      .mockResolvedValueOnce([
+        {
+          query: 'Bixby Bridge',
+          suggestion: {
+            id: 'stop-a',
+            placeId: 'place-a',
+            title: 'Bixby Bridge',
+            description: 'Big Sur, CA',
+            distanceKm: 12,
+            lat: 36.3715,
+            lng: -121.9013,
+            photoName: 'places/place-a/photos/photo-a',
+          },
+        },
+        { query: 'Monterey Bay Aquarium', errorCode: 'NOT_FOUND' },
+      ])
+      .mockResolvedValueOnce([
+        {
+          query: 'Carmel Mission',
+          suggestion: {
+            id: 'stop-b',
+            placeId: 'place-b',
+            title: 'Carmel Mission',
+            description: 'Carmel, CA',
+            distanceKm: 5,
+            lat: 36.5397,
+            lng: -121.9249,
+          },
+        },
+      ]);
+
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(generatePlans).toHaveBeenCalledWith({
+      location: 'Carmel By The Sea, CA',
+      radiusKm: 120,
+      themes: ['scenic', 'culture'],
+      maxOptions: 2,
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.options).toHaveLength(2);
+    expect(response.body.options[0].stops[0]).toMatchObject({
+      query: 'Bixby Bridge',
+      status: 'resolved',
+      suggestion: {
+        title: 'Bixby Bridge',
+      },
+    });
+    expect(response.body.options[0].stops[1]).toMatchObject({
+      query: 'Monterey Bay Aquarium',
+      status: 'unresolved',
+      errorCode: 'NOT_FOUND',
+    });
+  });
+
+  it('rejects invalid trip plan payloads', async () => {
+    const app = createApp();
+    const response = await request(app).post('/trips/plan').send({
+      location: 'Carmel By The Sea, CA',
+      radiusKm: 120,
+      themes: [],
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'INVALID_BODY' });
   });
 
   it('uses authorization header over x-user-id fallback', async () => {

@@ -49,6 +49,28 @@ type PlacesNearbySearchResponse = {
   };
 };
 
+type PlacesTextSearchResponse = {
+  places?: Array<{
+    id?: string;
+    displayName?: {
+      text?: string;
+    };
+    formattedAddress?: string;
+    shortFormattedAddress?: string;
+    location?: {
+      latitude?: number;
+      longitude?: number;
+    };
+    photos?: Array<{
+      name?: string;
+    }>;
+  }>;
+  error?: {
+    status?: string;
+    message?: string;
+  };
+};
+
 type CachedEntry = {
   expiresAt: number;
   data: PlaceSuggestion[];
@@ -234,6 +256,135 @@ export class GooglePlacesService {
     });
 
     return suggestions;
+  }
+
+  async resolvePlannedStops(params: {
+    location: string;
+    radiusKm: number;
+    stopQueries: string[];
+  }): Promise<
+    Array<{
+      query: string;
+      suggestion?: PlaceSuggestion;
+      errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+    }>
+  > {
+    const geocodeUrl = new URL('/maps/api/geocode/json', env.GOOGLE_MAPS_API_BASE_URL);
+    geocodeUrl.searchParams.set('address', params.location);
+    geocodeUrl.searchParams.set('key', env.GOOGLE_MAPS_API_KEY);
+
+    const geocode = await this.fetchWithRetry<GeocodeResponse>(geocodeUrl);
+    if (geocode.status !== 'OK' || !geocode.results.length) {
+      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_FAILED', {
+        stage: 'geocode',
+        details: {
+          googleStatus: geocode.status,
+          googleMessage: geocode.error_message,
+          location: params.location,
+        },
+      });
+    }
+
+    const origin = geocode.results[0].geometry?.location;
+    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
+      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_INVALID_LOCATION', {
+        stage: 'geocode',
+        details: {
+          location: params.location,
+        },
+      });
+    }
+
+    const originLat = origin.lat;
+    const originLng = origin.lng;
+    const nearbyRadiusMeters = Math.max(
+      1000,
+      Math.min(Math.round(params.radiusKm * 1000), 50000),
+    );
+
+    const results: Array<{
+      query: string;
+      suggestion?: PlaceSuggestion;
+      errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+    }> = [];
+
+    for (const query of params.stopQueries) {
+      const placesUrl = new URL('/v1/places:searchText', 'https://places.googleapis.com');
+      try {
+        const placesResponse = await this.fetchWithRetry<PlacesTextSearchResponse>(
+          placesUrl,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': env.GOOGLE_MAPS_API_KEY,
+              'X-Goog-FieldMask':
+                'places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.photos',
+            },
+            body: JSON.stringify({
+              textQuery: `${query} near ${params.location}`,
+              maxResultCount: 1,
+              locationBias: {
+                circle: {
+                  center: {
+                    latitude: originLat,
+                    longitude: originLng,
+                  },
+                  radius: nearbyRadiusMeters,
+                },
+              },
+            }),
+          },
+        );
+
+        if (placesResponse.error) {
+          results.push({ query, errorCode: 'UPSTREAM_ERROR' });
+          continue;
+        }
+
+        const place = placesResponse.places?.[0];
+        const location = place?.location;
+        if (
+          !place?.id ||
+          !place.displayName?.text ||
+          !location ||
+          typeof location.latitude !== 'number' ||
+          typeof location.longitude !== 'number'
+        ) {
+          results.push({ query, errorCode: 'NOT_FOUND' });
+          continue;
+        }
+
+        results.push({
+          query,
+          suggestion: {
+            id: place.id,
+            placeId: place.id,
+            title: place.displayName.text,
+            description:
+              place.shortFormattedAddress ?? place.formattedAddress ?? params.location,
+            distanceKm: Math.max(
+              1,
+              Math.round(
+                this.haversineKm(
+                  originLat,
+                  originLng,
+                  location.latitude,
+                  location.longitude,
+                ),
+              ),
+            ),
+            lat: location.latitude,
+            lng: location.longitude,
+            photoName: place.photos?.[0]?.name,
+          },
+        });
+      } catch {
+        results.push({ query, errorCode: 'UPSTREAM_ERROR' });
+      }
+    }
+
+    return results;
   }
 
   private async fetchWithRetry<T>(url: URL, init?: RequestInit): Promise<T> {

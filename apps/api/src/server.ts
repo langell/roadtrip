@@ -16,6 +16,10 @@ import {
   googlePlacesService,
   GooglePlacesUpstreamError,
 } from './services/google-places-service.js';
+import {
+  aiTripPlannerService,
+  AiTripPlannerError,
+} from './services/ai-trip-planner-service.js';
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
 
@@ -35,6 +39,24 @@ const toPlacesErrorMeta = (error: unknown) => {
 
   return {
     code: 'UNKNOWN_PLACES_ERROR',
+    stage: 'unknown',
+    details: {
+      message: String(error),
+    },
+  };
+};
+
+const toAiPlannerErrorMeta = (error: unknown) => {
+  if (error instanceof AiTripPlannerError) {
+    return {
+      code: error.message,
+      stage: error.stage,
+      details: error.details,
+    };
+  }
+
+  return {
+    code: 'UNKNOWN_AI_PLANNER_ERROR',
     stage: 'unknown',
     details: {
       message: String(error),
@@ -275,6 +297,107 @@ export const createApp = () => {
     theme: z.string().min(1),
     name: z.string().min(1).optional(),
   });
+
+  app.post(
+    '/trips/plan',
+    withAsyncHandler(async (req, res) => {
+      const userId = await getRequestUserId(req);
+
+      if (!userId && !allowAnonymousSuggestionRequest(getRequesterIp(req))) {
+        res.status(429).json({ error: 'RATE_LIMITED' });
+        return;
+      }
+
+      const planTripSchema = z.object({
+        location: z.string().min(3),
+        radiusKm: z.number().positive().max(500),
+        themes: z.array(TripThemeSchema).min(1),
+        maxOptions: z.union([z.literal(2), z.literal(3)]).default(3),
+      });
+
+      const parsed = planTripSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_BODY' });
+        return;
+      }
+
+      const input = parsed.data;
+
+      let plans;
+      try {
+        plans = await aiTripPlannerService.generatePlans({
+          location: input.location,
+          radiusKm: input.radiusKm,
+          themes: input.themes,
+          maxOptions: input.maxOptions,
+        });
+      } catch (error) {
+        const aiError = toAiPlannerErrorMeta(error);
+        const requestLogger = getRequestLogger(res);
+        logError(requestLogger, 'ai.trip-planner failure', error, {
+          ...aiError,
+          input: {
+            location: input.location,
+            radiusKm: input.radiusKm,
+            themes: input.themes,
+            maxOptions: input.maxOptions,
+          },
+        });
+
+        res.status(502).json({
+          error: 'AI_PLANNER_ERROR',
+          ...(process.env.NODE_ENV !== 'production'
+            ? {
+                diagnosticCode: aiError.code,
+                diagnosticStage: aiError.stage,
+              }
+            : {}),
+        });
+        return;
+      }
+
+      const options = await Promise.all(
+        plans.options.map(async (option) => {
+          const stopResults = await googlePlacesService.resolvePlannedStops({
+            location: input.location,
+            radiusKm: input.radiusKm,
+            stopQueries: option.stops,
+          });
+
+          return {
+            title: option.title,
+            rationale: option.rationale,
+            stops: stopResults.map((stopResult) => {
+              if (!stopResult.suggestion) {
+                return {
+                  query: stopResult.query,
+                  status: 'unresolved' as const,
+                  errorCode: stopResult.errorCode ?? 'NOT_FOUND',
+                };
+              }
+
+              const { photoName, ...suggestion } = stopResult.suggestion;
+              return {
+                query: stopResult.query,
+                status: 'resolved' as const,
+                suggestion: {
+                  ...suggestion,
+                  imageUrl: buildSuggestionImageUrl(req, photoName),
+                },
+              };
+            }),
+          };
+        }),
+      );
+
+      res.status(200).json({
+        location: input.location,
+        radiusKm: input.radiusKm,
+        themes: input.themes,
+        options,
+      });
+    }),
+  );
 
   app.post(
     '/trips/save-generated',

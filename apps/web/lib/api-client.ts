@@ -6,6 +6,42 @@ export type TripIdea = {
   imageUrl?: string;
 };
 
+export type PlannedStopResolved = {
+  query: string;
+  status: 'resolved';
+  suggestion: {
+    id: string;
+    placeId: string;
+    title: string;
+    description: string;
+    distanceKm: number;
+    lat: number;
+    lng: number;
+    imageUrl?: string;
+  };
+};
+
+export type PlannedStopUnresolved = {
+  query: string;
+  status: 'unresolved';
+  errorCode: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+};
+
+export type PlannedStop = PlannedStopResolved | PlannedStopUnresolved;
+
+export type TripPlanOption = {
+  title: string;
+  rationale: string;
+  stops: PlannedStop[];
+};
+
+export type TripPlanResponse = {
+  location: string;
+  radiusKm: number;
+  themes: string[];
+  options: TripPlanOption[];
+};
+
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
@@ -94,5 +130,33 @@ export const fetchTripIdeas = async (params: {
     return data;
   } catch {
     return [];
+  }
+};
+
+export const fetchTripPlans = async (params: {
+  location: string;
+  radiusKm: number;
+  themes: string[];
+  maxOptions: 2 | 3;
+}): Promise<TripPlanResponse | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/plan`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(await buildAuthHeaders()),
+      },
+      cache: 'no-store',
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as TripPlanResponse;
+    return data;
+  } catch {
+    return null;
   }
 };

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
-import { fetchTripIdeas, type TripIdea } from '../lib/api-client';
+import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
 const KM_PER_MILE = 1.60934;
@@ -144,7 +144,8 @@ const TripPlanner = () => {
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
-  const [ideas, setIdeas] = useState<TripIdea[]>([]);
+  const [planOptions, setPlanOptions] = useState<TripPlanOption[]>([]);
+  const [planError, setPlanError] = useState<string | null>(null);
   const hasRequestedInitialLocation = useRef(false);
 
   const themeOptions = useMemo(() => TripThemeSchema.options, []);
@@ -158,13 +159,22 @@ const TripPlanner = () => {
 
   const handleGenerate = async () => {
     setLoading(true);
+    setPlanError(null);
     try {
-      const data = await fetchTripIdeas({
+      const data = await fetchTripPlans({
         location,
         radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
         themes: selectedThemes,
+        maxOptions: 3,
       });
-      setIdeas(data);
+
+      if (!data) {
+        setPlanOptions([]);
+        setPlanError('We could not generate plans right now. Please try again.');
+        return;
+      }
+
+      setPlanOptions(data.options);
     } finally {
       setLoading(false);
     }
@@ -369,9 +379,15 @@ const TripPlanner = () => {
 
       <section className="space-y-4">
         <p className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
-          Suggested experiences
+          AI itinerary options
         </p>
-        <div className="grid gap-4 md:grid-cols-3">
+        {planError ? (
+          <div className="rounded-card bg-white/80 p-6 font-body text-sm text-wayfarer-secondary">
+            {planError}
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
           {loading
             ? Array.from({ length: 3 }).map((_, index) => (
                 <article
@@ -379,44 +395,88 @@ const TripPlanner = () => {
                   className="animate-pulse rounded-card bg-white p-5 shadow-wayfarer-soft"
                 >
                   <div className="mb-3 h-3 w-1/3 rounded bg-wayfarer-surface" />
-                  <div className="mb-3 h-40 w-full rounded-xl bg-wayfarer-surface" />
+                  <div className="mb-3 h-5 w-2/3 rounded bg-wayfarer-surface" />
                   <div className="mb-2 h-5 w-3/4 rounded bg-wayfarer-surface" />
                   <div className="mb-2 h-4 w-full rounded bg-wayfarer-surface" />
-                  <div className="h-3 w-1/2 rounded bg-wayfarer-surface" />
+                  <div className="h-3 w-2/3 rounded bg-wayfarer-surface" />
                 </article>
               ))
             : null}
 
-          {ideas.map((idea) => (
+          {planOptions.map((option, index) => (
             <article
-              key={idea.id}
+              key={`${option.title}-${index}`}
               className="rounded-card bg-white p-5 shadow-wayfarer-soft"
             >
-              {idea.imageUrl ? (
-                <img
-                  src={idea.imageUrl}
-                  alt={idea.title}
-                  className="mb-3 h-40 w-full rounded-xl object-cover"
-                />
-              ) : null}
               <p className="mb-2 font-body text-[11px] uppercase tracking-[0.14em] text-wayfarer-secondary">
-                Suggested stop
+                Option {index + 1}
               </p>
               <h3 className="font-display text-lg font-semibold text-wayfarer-primary">
-                {idea.title}
+                {option.title}
               </h3>
               <p className="font-body text-sm leading-relaxed text-wayfarer-text-muted">
-                {idea.description}
+                {option.rationale}
               </p>
-              <p className="mt-2 font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
-                {Math.max(1, Math.round(idea.distanceKm / KM_PER_MILE))}mi · curated
-                sample
-              </p>
+
+              <ul className="mt-4 space-y-3">
+                {option.stops.map((stop, stopIndex) => (
+                  <li
+                    key={`${stop.query}-${stopIndex}`}
+                    className="rounded-xl border border-wayfarer-surface p-3"
+                  >
+                    <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
+                      Stop {stopIndex + 1}
+                    </p>
+
+                    {stop.status === 'resolved' ? (
+                      <div className="space-y-1">
+                        {stop.suggestion.imageUrl ? (
+                          <img
+                            src={stop.suggestion.imageUrl}
+                            alt={stop.suggestion.title}
+                            className="mb-2 h-28 w-full rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
+                            No image available
+                          </div>
+                        )}
+                        <p className="font-body text-sm font-semibold text-wayfarer-primary">
+                          {stop.suggestion.title}
+                        </p>
+                        <p className="font-body text-sm text-wayfarer-text-muted">
+                          {stop.suggestion.description}
+                        </p>
+                        <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
+                          {Math.max(
+                            1,
+                            Math.round(stop.suggestion.distanceKm / KM_PER_MILE),
+                          )}
+                          mi away
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
+                          Stop details pending
+                        </div>
+                        <p className="font-body text-sm font-semibold text-wayfarer-primary">
+                          {stop.query}
+                        </p>
+                        <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
+                          Details unavailable ({stop.errorCode})
+                        </p>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </article>
           ))}
-          {!loading && !ideas.length && (
+          {!loading && !planOptions.length && !planError && (
             <div className="rounded-card bg-white/70 p-8 font-body text-wayfarer-text-muted">
-              Start by generating a route to see curated stops, sponsors, and detours.
+              Start by generating a route to see AI itinerary options.
             </div>
           )}
         </div>

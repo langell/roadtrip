@@ -29,3 +29,6 @@ Tracks completed story work in chronological order.
 - RT-008 `2026-03-anonymous-trip-search-gated-save.md`
 - `2026-03-mobile-trip-builder.md`
 - `2026-03-web-stitch-home-and-planner-parity.md`
+- RT-014 `2026-03-ai-trip-planning-and-stop-details.md`
+- RT-015 `2026-03-ai-trip-planner-api-orchestration.md`
+- RT-016 `2026-03-ai-trip-planner-web-experience.md`

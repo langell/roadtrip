@@ -26,6 +26,12 @@ Production-grade Turborepo powering the RoadTrip platform across web, mobile, an
    - Fill in required values:
      - `apps/api/.env`: `DATABASE_URL`, `GOOGLE_MAPS_API_KEY` (optional `PORT`, defaults to `3001`)
    - `apps/web/.env.local`: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXTAUTH_SECRET` (optional `NEXTAUTH_URL`, defaults to `http://localhost:3000`)
+   - AI trip planner (`POST /trips/plan`) variables in `apps/api/.env`:
+     - `GOOGLE_AI_API_KEY` or `AI_GATEWAY_API_KEY` (either is accepted)
+     - `GOOGLE_AI_MODEL` (recommended: `gemini-3-flash`)
+   - Model compatibility notes:
+     - Some older model aliases may return `404 NOT_FOUND` for new users.
+     - If your configured model is unavailable, the API falls back to `gemini-3-flash`.
    - Google Cloud requirements for `GOOGLE_MAPS_API_KEY`:
      - Enable `Geocoding API` and `Places API (New)`.
        - Allow `Places API (New)` method `places:searchNearby` for this key via API restrictions.
