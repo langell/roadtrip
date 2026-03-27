@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node ../../scripts/kill-port.mjs 3001 && tsx watch src/server.ts",
     "start": "NODE_ENV=production node dist/server.js",
-    "build": "pnpm --filter @roadtrip/types build && tsc -p tsconfig.json",
+    "build": "pnpm --filter @roadtrip/types build && mkdir -p prisma && cp ../../prisma/schema.prisma ./prisma/schema.prisma && PRISMA_GENERATE_SKIP_AUTOINSTALL=1 prisma generate --schema ./prisma/schema.prisma && tsc -p tsconfig.json",
     "lint": "eslint src",
     "test": "vitest run",
     "db:push": "prisma db push --skip-generate",

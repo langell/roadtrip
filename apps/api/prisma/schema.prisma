@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  name            String?
+  image           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  trips           Trip[]
+  analyticsEvents AnalyticsEvent[]
+}
+
+model Trip {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  name      String
+  originLat Float
+  originLng Float
+  filters   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  stops     TripStop[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model TripStop {
+  id        String   @id @default(uuid())
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tripId    String
+  placeId   String
+  name      String
+  order     Int
+  lat       Float
+  lng       Float
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripId])
+  @@index([placeId])
+  @@unique([tripId, order])
+}
+
+model SponsoredPlace {
+  id          String   @id @default(uuid())
+  placeId     String   @unique
+  title       String
+  description String
+  url         String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+  @@index([title])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
