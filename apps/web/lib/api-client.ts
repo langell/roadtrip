@@ -69,12 +69,15 @@ const buildAuthHeaders = async () => {
 export const fetchTripIdeas = async (params: {
   location: string;
   radiusKm: number;
-  theme: string;
+  themes: string[];
 }): Promise<TripIdea[]> => {
   const query = new URLSearchParams({
     location: params.location,
     radiusKm: String(params.radiusKm),
-    theme: params.theme,
+  });
+
+  params.themes.forEach((theme) => {
+    query.append('theme', theme);
   });
 
   try {

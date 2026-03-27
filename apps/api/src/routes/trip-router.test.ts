@@ -61,7 +61,7 @@ describe('tripRouter', () => {
     expect(findStops).toHaveBeenCalledWith({
       location: 'Austin, TX',
       radiusKm: 120,
-      theme: 'foodie',
+      themes: ['foodie'],
     });
     expect(suggestions).toEqual([{ id: 'stop-1', title: 'Food stop' }]);
   });
@@ -79,7 +79,7 @@ describe('tripRouter', () => {
     expect(findStops).toHaveBeenCalledWith({
       location: 'Seattle, WA',
       radiusKm: 50,
-      theme: 'scenic',
+      themes: ['scenic'],
     });
     expect(suggestions).toEqual([{ id: 'stop-anon', title: 'Anon stop' }]);
   });

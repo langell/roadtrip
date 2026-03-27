@@ -27,7 +27,7 @@ type GeocodeResponse = {
   }>;
 };
 
-type PlacesTextSearchResponse = {
+type PlacesNearbySearchResponse = {
   places?: Array<{
     id?: string;
     displayName?: {
@@ -84,10 +84,27 @@ export class GooglePlacesService {
   async findStops(params: {
     location: string;
     radiusKm: number;
-    theme: string;
+    themes: string[];
   }): Promise<PlaceSuggestion[]> {
+    const normalizedThemes = Array.from(
+      new Set(
+        params.themes
+          .map((theme) => theme.trim().toLowerCase())
+          .filter((theme) => theme.length > 0),
+      ),
+    );
+
+    if (!normalizedThemes.length) {
+      return [];
+    }
+
+    const includedTypes = this.toIncludedTypes(normalizedThemes);
+    if (!includedTypes.length) {
+      return [];
+    }
+
     const cacheKey =
-      `${params.location}:${params.radiusKm}:${params.theme}`.toLowerCase();
+      `${params.location}:${params.radiusKm}:${includedTypes.join(',')}`.toLowerCase();
     const cached = this.cache.get(cacheKey);
     const now = this.now();
     if (cached && cached.expiresAt > now) {
@@ -126,8 +143,8 @@ export class GooglePlacesService {
       1000,
       Math.min(Math.round(params.radiusKm * 1000), 50000),
     );
-    const placesUrl = new URL('/v1/places:searchText', 'https://places.googleapis.com');
-    const placesResponse = await this.fetchWithRetry<PlacesTextSearchResponse>(
+    const placesUrl = new URL('/v1/places:searchNearby', 'https://places.googleapis.com');
+    const placesResponse = await this.fetchWithRetry<PlacesNearbySearchResponse>(
       placesUrl,
       {
         method: 'POST',
@@ -138,9 +155,13 @@ export class GooglePlacesService {
             'places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.photos',
         },
         body: JSON.stringify({
-          textQuery: this.toThemeKeyword(params.theme),
-          maxResultCount: env.GOOGLE_PLACES_RESULT_LIMIT,
-          locationBias: {
+          includedTypes,
+          maxResultCount: Math.max(
+            1,
+            Math.min(Math.round(env.GOOGLE_PLACES_RESULT_LIMIT), 20),
+          ),
+          rankPreference: 'DISTANCE',
+          locationRestriction: {
             circle: {
               center: {
                 latitude: originLat,
@@ -160,49 +181,50 @@ export class GooglePlacesService {
           googleStatus: placesResponse.error.status,
           googleMessage: placesResponse.error.message,
           location: params.location,
-          theme: params.theme,
+          themes: normalizedThemes,
+          includedTypes,
           radiusKm: params.radiusKm,
         },
       });
     }
 
-    const suggestions = (placesResponse.places ?? [])
-      .flatMap((result): PlaceSuggestion[] => {
-        const location = result.location;
-        if (
-          !result.id ||
-          !result.displayName?.text ||
-          !location ||
-          typeof location.latitude !== 'number' ||
-          typeof location.longitude !== 'number'
-        ) {
-          return [];
-        }
+    const suggestionsByPlaceId = new Map<string, PlaceSuggestion>();
 
-        return [
-          {
-            id: result.id,
-            placeId: result.id,
-            title: result.displayName.text,
-            description:
-              result.shortFormattedAddress ?? result.formattedAddress ?? params.location,
-            distanceKm: Math.max(
-              1,
-              Math.round(
-                this.haversineKm(
-                  originLat,
-                  originLng,
-                  location.latitude,
-                  location.longitude,
-                ),
-              ),
-            ),
-            lat: location.latitude,
-            lng: location.longitude,
-            photoName: result.photos?.[0]?.name,
-          },
-        ];
-      })
+    for (const result of placesResponse.places ?? []) {
+      const location = result.location;
+      if (
+        !result.id ||
+        !result.displayName?.text ||
+        !location ||
+        typeof location.latitude !== 'number' ||
+        typeof location.longitude !== 'number'
+      ) {
+        continue;
+      }
+
+      if (suggestionsByPlaceId.has(result.id)) {
+        continue;
+      }
+
+      suggestionsByPlaceId.set(result.id, {
+        id: result.id,
+        placeId: result.id,
+        title: result.displayName.text,
+        description:
+          result.shortFormattedAddress ?? result.formattedAddress ?? params.location,
+        distanceKm: Math.max(
+          1,
+          Math.round(
+            this.haversineKm(originLat, originLng, location.latitude, location.longitude),
+          ),
+        ),
+        lat: location.latitude,
+        lng: location.longitude,
+        photoName: result.photos?.[0]?.name,
+      });
+    }
+
+    const suggestions = Array.from(suggestionsByPlaceId.values())
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, env.GOOGLE_PLACES_RESULT_LIMIT);
 
@@ -324,14 +346,31 @@ export class GooglePlacesService {
     return sanitized.toString();
   }
 
-  private toThemeKeyword(theme: string) {
-    const normalized = theme.toLowerCase();
-    if (normalized === 'scenic') return 'scenic viewpoint';
-    if (normalized === 'foodie') return 'local food';
-    if (normalized === 'culture') return 'museum local culture';
-    if (normalized === 'adventure') return 'outdoor adventure';
-    if (normalized === 'family') return 'family friendly';
-    return normalized;
+  private toIncludedTypes(themes: string[]) {
+    const byTheme: Record<string, string[]> = {
+      scenic: ['scenic_spot', 'tourist_attraction', 'park', 'national_park'],
+      foodie: ['restaurant', 'cafe', 'bakery', 'bar', 'meal_takeaway'],
+      culture: [
+        'museum',
+        'art_gallery',
+        'performing_arts_theater',
+        'cultural_landmark',
+        'historical_place',
+      ],
+      adventure: [
+        'adventure_sports_center',
+        'hiking_area',
+        'campground',
+        'state_park',
+        'national_park',
+      ],
+      family: ['amusement_park', 'aquarium', 'zoo', 'movie_theater', 'playground'],
+    };
+
+    return Array.from(new Set(themes.flatMap((theme) => byTheme[theme] ?? []))).slice(
+      0,
+      50,
+    );
   }
 
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {

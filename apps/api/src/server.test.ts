@@ -105,7 +105,7 @@ describe('HTTP server', () => {
 
     expect(findStops).toHaveBeenCalledWith({
       location: 'Portland, OR',
-      theme: 'scenic',
+      themes: ['scenic'],
       radiusKm: 150,
     });
     expect(response.status).toBe(200);
@@ -185,6 +185,22 @@ describe('HTTP server', () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: 'INVALID_QUERY' });
+  });
+
+  it('accepts repeated theme query params', async () => {
+    findStops.mockResolvedValue([{ id: 'stop-1' }]);
+    const app = createApp();
+
+    const response = await request(app)
+      .get('/suggestions')
+      .query({ location: 'Portland, OR', radiusKm: '150', theme: ['scenic', 'foodie'] });
+
+    expect(findStops).toHaveBeenCalledWith({
+      location: 'Portland, OR',
+      themes: ['scenic', 'foodie'],
+      radiusKm: 150,
+    });
+    expect(response.status).toBe(200);
   });
 
   it('rejects invalid photo proxy params', async () => {

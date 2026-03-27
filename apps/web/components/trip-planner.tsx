@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { TripFilters } from '@roadtrip/types';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripIdeas, type TripIdea } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
+const KM_PER_MILE = 1.60934;
+const MIN_RADIUS_MILES = 16;
+const MAX_RADIUS_MILES = 311;
 
 type GeocodeComponent = {
   long_name: string;
@@ -131,11 +133,13 @@ const reverseGeocodeLocation = async (
 };
 
 const TripPlanner = () => {
-  const [filters, setFilters] = useState<TripFilters>({
-    radiusKm: 150,
-    theme: 'scenic',
+  const [filters, setFilters] = useState({
+    radiusMiles: 93,
     maxStops: 6,
   });
+  const [selectedThemes, setSelectedThemes] = useState<
+    Array<(typeof TripThemeSchema.options)[number]>
+  >(['scenic']);
   const [location, setLocation] = useState('Carmel By The Sea, CA');
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -144,14 +148,21 @@ const TripPlanner = () => {
   const hasRequestedInitialLocation = useRef(false);
 
   const themeOptions = useMemo(() => TripThemeSchema.options, []);
+  const themeLabelMap: Record<(typeof TripThemeSchema.options)[number], string> = {
+    scenic: 'Hidden Gems',
+    foodie: 'Foodie',
+    culture: 'Cultural',
+    adventure: 'Adventure',
+    family: 'Family Fun',
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
       const data = await fetchTripIdeas({
         location,
-        radiusKm: filters.radiusKm,
-        theme: filters.theme,
+        radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
+        themes: selectedThemes,
       });
       setIdeas(data);
     } finally {
@@ -226,23 +237,43 @@ const TripPlanner = () => {
 
   return (
     <div className="space-y-8 text-wayfarer-text-main">
+      <section className="space-y-3">
+        <h3 className="font-display text-4xl font-extrabold leading-tight tracking-tight text-wayfarer-primary">
+          Map your next
+          <br />
+          unseen path.
+        </h3>
+        <p className="max-w-md font-body text-lg text-wayfarer-text-muted">
+          Tell us where you&apos;re starting, and we&apos;ll reveal hidden gems within
+          reach.
+        </p>
+      </section>
+
       <form
-        className="grid gap-4 rounded-3xl bg-wayfarer-bg p-5 md:grid-cols-6 md:gap-5 md:p-6"
+        className="space-y-9 rounded-3xl bg-wayfarer-bg p-5 md:p-6"
         onSubmit={(event) => {
           event.preventDefault();
           void handleGenerate();
         }}
       >
-        <label className="space-y-2 md:col-span-2">
-          <span className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
-            Origin
+        <label className="block space-y-3">
+          <span className="block px-1 font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-primary">
+            Where are you starting?
           </span>
-          <input
-            className="w-full rounded-xl bg-white px-4 py-3 font-body text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
-            placeholder="Carmel By The Sea, CA"
-            value={location}
-            onChange={(event) => setLocation(event.target.value)}
-          />
+          <div className="group relative">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl text-wayfarer-primary/50 transition-colors group-focus-within:text-wayfarer-primary"
+            >
+              ⌖
+            </span>
+            <input
+              className="h-16 w-full rounded-xl border-none bg-white pl-12 pr-6 font-body font-medium text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
+              placeholder="Carmel By The Sea, CA"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+            />
+          </div>
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
               type="button"
@@ -260,62 +291,78 @@ const TripPlanner = () => {
           </div>
         </label>
 
-        <label className="space-y-2 md:col-span-2">
-          <span className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
-            Radius (KM)
-          </span>
+        <section className="space-y-3">
+          <div className="flex items-end justify-between px-1">
+            <span className="font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-primary">
+              Search Radius
+            </span>
+            <p className="font-display text-2xl font-bold text-wayfarer-primary">
+              {filters.radiusMiles}{' '}
+              <span className="font-body text-sm font-medium text-wayfarer-text-muted">
+                mi
+              </span>
+            </p>
+          </div>
           <input
-            type="number"
-            min={25}
-            max={500}
-            className="w-full rounded-xl bg-white px-4 py-3 font-body text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
-            value={filters.radiusKm}
+            type="range"
+            min={MIN_RADIUS_MILES}
+            max={MAX_RADIUS_MILES}
+            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-wayfarer-surface-deep accent-wayfarer-primary"
+            value={filters.radiusMiles}
             onChange={(event) =>
-              setFilters((prev) => ({ ...prev, radiusKm: Number(event.target.value) }))
+              setFilters((prev) => ({ ...prev, radiusMiles: Number(event.target.value) }))
             }
           />
-        </label>
+          <div className="flex justify-between px-1 font-body text-[10px] font-bold uppercase tracking-tight text-wayfarer-text-muted">
+            <span>{MIN_RADIUS_MILES} mi</span>
+            <span>{MAX_RADIUS_MILES} mi</span>
+          </div>
+        </section>
 
-        <label className="space-y-2 md:col-span-2">
-          <span className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
-            Theme
+        <section className="space-y-4">
+          <span className="block px-1 font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-primary">
+            Select Journey Theme
           </span>
-          <select
-            className="w-full rounded-xl bg-white px-4 py-3 font-body text-wayfarer-text-main focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
-            value={filters.theme}
-            onChange={(event) =>
-              setFilters((prev) => ({
-                ...prev,
-                theme: event.target.value as TripFilters['theme'],
-              }))
-            }
+          <div className="flex flex-wrap gap-3">
+            {themeOptions.map((theme) => {
+              const selected = selectedThemes.includes(theme);
+
+              return (
+                <button
+                  key={theme}
+                  type="button"
+                  className={
+                    selected
+                      ? 'rounded-full bg-wayfarer-secondary px-5 py-3 font-body text-sm font-semibold text-white shadow-wayfarer-soft transition-all hover:brightness-110 active:scale-95'
+                      : 'rounded-full bg-wayfarer-surface-deep px-5 py-3 font-body text-sm font-semibold text-wayfarer-text-muted transition-all hover:bg-wayfarer-surface active:scale-95'
+                  }
+                  onClick={() => {
+                    setSelectedThemes((prev) => {
+                      if (prev.includes(theme)) {
+                        return prev.length === 1
+                          ? prev
+                          : prev.filter((value) => value !== theme);
+                      }
+
+                      return [...prev, theme];
+                    });
+                  }}
+                >
+                  {themeLabelMap[theme]}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="pt-2">
+          <Button
+            tone="primary"
+            loading={loading}
+            type="submit"
+            className="h-16 w-full rounded-xl bg-gradient-to-br from-wayfarer-primary to-wayfarer-secondary text-lg font-bold shadow-wayfarer-ambient"
           >
-            {themeOptions.map((theme) => (
-              <option key={theme} value={theme} className="text-wayfarer-text-main">
-                {theme}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="space-y-2 md:col-span-3">
-          <span className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
-            Max stops
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={12}
-            className="w-full rounded-xl bg-white px-4 py-3 font-body text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
-            value={filters.maxStops}
-            onChange={(event) =>
-              setFilters((prev) => ({ ...prev, maxStops: Number(event.target.value) }))
-            }
-          />
-        </label>
-        <div className="flex items-end md:col-span-3">
-          <Button tone="primary" loading={loading} type="submit" className="w-full">
-            Generate trip
+            Generate Ideas
           </Button>
         </div>
       </form>
@@ -362,7 +409,8 @@ const TripPlanner = () => {
                 {idea.description}
               </p>
               <p className="mt-2 font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
-                {idea.distanceKm}km · curated sample
+                {Math.max(1, Math.round(idea.distanceKm / KM_PER_MILE))}mi · curated
+                sample
               </p>
             </article>
           ))}

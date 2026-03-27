@@ -76,7 +76,11 @@ export const tripRouter = router({
     )
     .query(async ({ input, ctx }) => {
       try {
-        return await googlePlacesService.findStops(input);
+        return await googlePlacesService.findStops({
+          location: input.location,
+          radiusKm: input.radiusKm,
+          themes: [input.theme],
+        });
       } catch (error) {
         const placesErrorMeta =
           error instanceof GooglePlacesUpstreamError

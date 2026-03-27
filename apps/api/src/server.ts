@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { z } from 'zod';
+import { TripThemeSchema } from '@roadtrip/types';
 import { appRouter } from './routes/index.js';
 import { createContext } from './types/context.js';
 import { env } from './config/env.js';
@@ -190,22 +191,30 @@ export const createApp = () => {
       }
 
       const location = req.query.location;
-      const theme = req.query.theme;
+      const themeQuery = req.query.theme;
       const radiusKm = Number(req.query.radiusKm);
+      const themeValues = Array.isArray(themeQuery)
+        ? themeQuery
+        : typeof themeQuery === 'string'
+          ? [themeQuery]
+          : [];
+      const parsedThemes = z.array(TripThemeSchema).nonempty().safeParse(themeValues);
 
       if (
         typeof location !== 'string' ||
-        typeof theme !== 'string' ||
-        Number.isNaN(radiusKm)
+        Number.isNaN(radiusKm) ||
+        !parsedThemes.success
       ) {
         res.status(400).json({ error: 'INVALID_QUERY' });
         return;
       }
 
+      const themes = parsedThemes.data;
+
       try {
         const suggestions = await googlePlacesService.findStops({
           location,
-          theme,
+          themes,
           radiusKm,
         });
 
@@ -222,7 +231,7 @@ export const createApp = () => {
           ...placesError,
           input: {
             location,
-            theme,
+            themes,
             radiusKm,
             authenticated: Boolean(userId),
           },
@@ -288,7 +297,7 @@ export const createApp = () => {
         suggestions = await googlePlacesService.findStops({
           location: input.location,
           radiusKm: input.radiusKm,
-          theme: input.theme,
+          themes: [input.theme],
         });
       } catch (error) {
         const placesError = toPlacesErrorMeta(error);

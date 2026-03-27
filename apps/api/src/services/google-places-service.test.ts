@@ -38,7 +38,7 @@ describe('GooglePlacesService', () => {
     const suggestions = await service.findStops({
       location: 'Seattle, WA',
       radiusKm: 120,
-      theme: 'foodie',
+      themes: ['foodie'],
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -84,12 +84,12 @@ describe('GooglePlacesService', () => {
     const first = await service.findStops({
       location: 'Austin, TX',
       radiusKm: 80,
-      theme: 'scenic',
+      themes: ['scenic'],
     });
     const second = await service.findStops({
       location: 'Austin, TX',
       radiusKm: 80,
-      theme: 'scenic',
+      themes: ['scenic'],
     });
 
     expect(first).toEqual(second);
@@ -107,8 +107,73 @@ describe('GooglePlacesService', () => {
       service.findStops({
         location: 'Seattle, WA',
         radiusKm: 120,
-        theme: 'foodie',
+        themes: ['foodie'],
       }),
     ).rejects.toThrow(/GOOGLE_GEOCODE_FAILED/);
+  });
+
+  it('aggregates and de-duplicates suggestions across multiple themes', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'OK',
+          results: [{ geometry: { location: { lat: 47.6062, lng: -122.3321 } } }],
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          places: [
+            {
+              id: 'place-1',
+              displayName: { text: 'Pike Place Market' },
+              shortFormattedAddress: 'Seattle',
+              location: { latitude: 47.6094, longitude: -122.3422 },
+            },
+            {
+              id: 'place-1',
+              displayName: { text: 'Pike Place Market' },
+              shortFormattedAddress: 'Seattle',
+              location: { latitude: 47.6094, longitude: -122.3422 },
+            },
+            {
+              id: 'place-2',
+              displayName: { text: 'Kerry Park' },
+              shortFormattedAddress: 'Queen Anne',
+              location: { latitude: 47.6295, longitude: -122.3599 },
+            },
+          ],
+        }),
+      } as Response);
+
+    const service = new GooglePlacesService(fetchMock, () => 0);
+
+    const suggestions = await service.findStops({
+      location: 'Seattle, WA',
+      radiusKm: 120,
+      themes: ['foodie', 'culture'],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(suggestions).toHaveLength(2);
+    expect(suggestions.map((suggestion) => suggestion.placeId)).toEqual([
+      'place-1',
+      'place-2',
+    ]);
+
+    const nearbyCall = fetchMock.mock.calls[1];
+    const body = JSON.parse(String(nearbyCall?.[1]?.body)) as {
+      includedTypes?: string[];
+      locationRestriction?: { circle?: { radius?: number } };
+      rankPreference?: string;
+    };
+
+    expect(body.rankPreference).toBe('DISTANCE');
+    expect(body.locationRestriction?.circle?.radius).toBe(50000);
+    expect(body.includedTypes).toEqual(
+      expect.arrayContaining(['restaurant', 'cafe', 'museum', 'art_gallery']),
+    );
   });
 });

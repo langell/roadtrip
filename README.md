@@ -28,8 +28,9 @@ Production-grade Turborepo powering the RoadTrip platform across web, mobile, an
    - `apps/web/.env.local`: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXTAUTH_SECRET` (optional `NEXTAUTH_URL`, defaults to `http://localhost:3000`)
    - Google Cloud requirements for `GOOGLE_MAPS_API_KEY`:
      - Enable `Geocoding API` and `Places API (New)`.
-     - Allow `Places API (New)` method `places:searchText` for this key via API restrictions.
+       - Allow `Places API (New)` method `places:searchNearby` for this key via API restrictions.
      - Ensure billing is enabled for the Google Cloud project.
+   - API implementation reference: `docs/google-places-api-reference.md`
 
 3. **Prisma (API)**
    ```bash

@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: 'RoadTrip | Plan unforgettable drives',
   description:
     'RoadTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
