@@ -153,7 +153,7 @@ describe('GooglePlacesService', () => {
     const suggestions = await service.findStops({
       location: 'Seattle, WA',
       radiusKm: 120,
-      themes: ['foodie', 'culture'],
+      themes: ['foodie', 'culture', 'sports'],
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -173,7 +173,14 @@ describe('GooglePlacesService', () => {
     expect(body.rankPreference).toBe('DISTANCE');
     expect(body.locationRestriction?.circle?.radius).toBe(50000);
     expect(body.includedTypes).toEqual(
-      expect.arrayContaining(['restaurant', 'cafe', 'museum', 'art_gallery']),
+      expect.arrayContaining([
+        'restaurant',
+        'cafe',
+        'museum',
+        'art_gallery',
+        'stadium',
+        'sports_activity_location',
+      ]),
     );
   });
 });

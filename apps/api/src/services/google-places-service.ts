@@ -516,6 +516,7 @@ export class GooglePlacesService {
         'national_park',
       ],
       family: ['amusement_park', 'aquarium', 'zoo', 'movie_theater', 'playground'],
+      sports: ['stadium', 'arena', 'athletic_field', 'sports_activity_location', 'gym'],
     };
 
     return Array.from(new Set(themes.flatMap((theme) => byTheme[theme] ?? []))).slice(

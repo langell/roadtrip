@@ -20,6 +20,7 @@ export const TripThemeSchema = z.enum([
   'culture',
   'adventure',
   'family',
+  'sports',
 ]);
 
 export const TripFiltersSchema = z.object({

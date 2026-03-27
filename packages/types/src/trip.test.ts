@@ -53,6 +53,7 @@ describe('Trip Schemas', () => {
 
   it('enumerates the supported trip themes', () => {
     expect(TripThemeSchema.options).toContain('scenic');
+    expect(TripThemeSchema.options).toContain('sports');
     expect(() => TripThemeSchema.parse('antarctic')).toThrowError();
   });
 });

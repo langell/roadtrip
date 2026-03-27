@@ -30,6 +30,41 @@ export class AiTripPlannerError extends Error {
 export class AiTripPlannerService {
   constructor(private readonly fetchFn: typeof fetch = fetch) {}
 
+  private readonly themeKeywords: Record<string, string[]> = {
+    scenic: ['viewpoint', 'overlook', 'waterfront', 'coast', 'scenic', 'lake', 'trail'],
+    foodie: ['restaurant', 'food', 'market', 'brewery', 'cafe', 'bakery', 'diner'],
+    culture: ['museum', 'history', 'historic', 'gallery', 'landmark', 'arts', 'cultural'],
+    adventure: ['hike', 'kayak', 'climb', 'outdoor', 'adventure', 'park', 'trail'],
+    family: ['family', 'kids', 'playground', 'zoo', 'aquarium', 'all-ages'],
+    sports: ['stadium', 'arena', 'sports', 'game', 'match', 'athletic', 'field'],
+  };
+
+  private buildThemePrompt(themes: string[]) {
+    const themeGuidance: Record<string, string> = {
+      scenic:
+        'Include dramatic viewpoints, waterfronts, bluffs, overlooks, and photogenic routes.',
+      foodie:
+        'Include memorable local food experiences: iconic restaurants, bakeries, markets, or regional specialties.',
+      culture:
+        'Include cultural depth: museums, landmarks, local history, arts districts, or architecture.',
+      adventure:
+        'Include active outdoor experiences: hikes, paddling spots, climbing areas, parks, or trail towns.',
+      family:
+        'Include family-friendly pacing and activities suitable for mixed ages with easy logistics.',
+      sports:
+        'Include sports-centric experiences: stadium districts, game-day venues, training hubs, or iconic athletic sites.',
+    };
+
+    return themes
+      .map((theme) => {
+        const guidance =
+          themeGuidance[theme] ??
+          `Include meaningful experiences aligned to the "${theme}" theme.`;
+        return `- ${theme}: ${guidance}`;
+      })
+      .join('\n');
+  }
+
   private normalizeAiResponse(value: unknown): unknown {
     if (!value || typeof value !== 'object') {
       return value;
@@ -71,6 +106,165 @@ export class AiTripPlannerService {
     };
   }
 
+  private extractJsonText(rawText: string) {
+    const trimmed = rawText.trim();
+
+    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (fencedMatch?.[1]) {
+      return fencedMatch[1].trim();
+    }
+
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return trimmed.slice(firstBrace, lastBrace + 1).trim();
+    }
+
+    return trimmed;
+  }
+
+  private parsePlansFromResponseBody(responseBodyText: string): AiTripPlans {
+    let payload: {
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            text?: string;
+          }>;
+        };
+      }>;
+    };
+
+    try {
+      payload = JSON.parse(responseBodyText) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{
+              text?: string;
+            }>;
+          };
+        }>;
+      };
+    } catch (error) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: String(error),
+      });
+    }
+
+    const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: 'missing_candidates',
+      });
+    }
+
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(this.extractJsonText(rawText));
+    } catch (error) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: String(error),
+      });
+    }
+
+    const normalizedJson = this.normalizeAiResponse(parsedJson);
+    const parsed = AiTripPlansSchema.safeParse(normalizedJson);
+    if (!parsed.success) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        issues: parsed.error.issues,
+      });
+    }
+
+    return parsed.data;
+  }
+
+  private evaluateThemeCoverage(plans: AiTripPlans, themes: string[]) {
+    const normalizedThemes = Array.from(
+      new Set(themes.map((theme) => theme.trim().toLowerCase()).filter(Boolean)),
+    );
+
+    const missingByOption = plans.options.map((option, index) => {
+      const corpus = [option.title, option.rationale, ...option.stops]
+        .join(' ')
+        .toLowerCase();
+      const missingThemes = normalizedThemes.filter((theme) => {
+        const keywords = this.themeKeywords[theme] ?? [theme];
+        return !keywords.some((keyword) => corpus.includes(keyword.toLowerCase()));
+      });
+
+      return {
+        optionIndex: index,
+        missingThemes,
+      };
+    });
+
+    const hasMissing = missingByOption.some((entry) => entry.missingThemes.length > 0);
+    return {
+      isCovered: !hasMissing,
+      missingByOption,
+    };
+  }
+
+  private async requestWithModelFallback(params: {
+    prompt: string;
+    apiKey: string;
+    model: string;
+    fallbackModel: string;
+  }): Promise<{
+    responseBodyText: string;
+    attemptLabel: string;
+    status: number | undefined;
+  }> {
+    const attempts: Array<{ model: string; apiVersion: 'v1' | 'v1beta' }> = [
+      { model: params.model, apiVersion: 'v1' },
+      { model: params.model, apiVersion: 'v1beta' },
+    ];
+
+    if (params.model !== params.fallbackModel) {
+      attempts.push({ model: params.fallbackModel, apiVersion: 'v1' });
+      attempts.push({ model: params.fallbackModel, apiVersion: 'v1beta' });
+    }
+
+    let response: Response | null = null;
+    let responseBodyText = '';
+    let attemptLabel = '';
+    let lastAttemptedStatus = 0;
+
+    for (const attempt of attempts) {
+      attemptLabel = `${attempt.model}@${attempt.apiVersion}`;
+      const attempted = await this.requestModel(
+        attempt.model,
+        attempt.apiVersion,
+        params.apiKey,
+        params.prompt,
+      );
+      response = attempted.response;
+      responseBodyText = attempted.bodyText;
+      lastAttemptedStatus = response.status;
+
+      if (response.ok) {
+        return {
+          responseBodyText,
+          attemptLabel,
+          status: response.status,
+        };
+      }
+
+      if (response.status !== 404) {
+        break;
+      }
+    }
+
+    if (lastAttemptedStatus === 0) {
+      throw new Error('NO_MODEL_ATTEMPTS');
+    }
+
+    throw new AiTripPlannerError('AI_REQUEST_FAILED', 'request', {
+      status: response?.status,
+      body: responseBodyText,
+      attempted: attemptLabel,
+    });
+  }
+
   private async requestModel(
     model: string,
     apiVersion: 'v1' | 'v1beta',
@@ -110,132 +304,92 @@ export class AiTripPlannerService {
     const model = env.GOOGLE_AI_MODEL;
     const fallbackModel = 'gemini-2.5-flash';
 
+    const themePrompt = this.buildThemePrompt(input.themes);
     const prompt = [
-      'Create a road trip plan JSON response only.',
-      `Origin: ${input.location}`,
-      `Search radius (km): ${input.radiusKm}`,
-      `Themes: ${input.themes.join(', ')}`,
-      `Return exactly ${input.maxOptions} itinerary options.`,
-      'Each option must include: title, rationale, and stops (2-8 stop names).',
-      'Do not include markdown. Return strict JSON in this shape:',
-      '{"options":[{"title":"...","rationale":"...","stops":["..."]}]}.',
+      'You are an expert regional road-trip designer.',
+      'Create distinctly lovable itinerary options that feel surprising, local, and memorable.',
+      '',
+      'Trip request:',
+      `- Origin: ${input.location}`,
+      `- Max search radius: ${input.radiusKm} km`,
+      `- Selected themes: ${input.themes.join(', ')}`,
+      `- Required options: exactly ${input.maxOptions}`,
+      '',
+      'Theme direction (apply all selected themes):',
+      themePrompt,
+      '',
+      'Hard requirements:',
+      '- Every itinerary option must include all selected themes (no theme may be omitted).',
+      '- Ensure each option mixes themes naturally across the full stop sequence.',
+      '- Make each option feel different in vibe, pacing, and stop composition.',
+      '- Stops must be realistic place names the Places API can resolve (avoid generic placeholders).',
+      '- Use 3-6 stops per option unless location density is low.',
+      '- Keep rationale concise (1-2 sentences) and explicitly reference how all selected themes are satisfied.',
+      '',
+      'Output rules:',
+      '- Return JSON only (no markdown, no prose, no code fences).',
+      '- Use this exact schema:',
+      '{"options":[{"title":"...","rationale":"...","stops":["Stop 1","Stop 2"]}]}',
+      '- `options` length must equal requested option count.',
+      '- Each `stops` array must contain 2-8 stop names.',
+      '- All fields are required and must be non-empty strings.',
     ].join('\n');
 
-    let response: Response | null = null;
     let responseBodyText = '';
     let attemptLabel = '';
     try {
-      const attempts: Array<{ model: string; apiVersion: 'v1' | 'v1beta' }> = [
-        { model, apiVersion: 'v1' },
-        { model, apiVersion: 'v1beta' },
-      ];
+      const primaryAttempt = await this.requestWithModelFallback({
+        prompt,
+        apiKey,
+        model,
+        fallbackModel,
+      });
+      responseBodyText = primaryAttempt.responseBodyText;
+      attemptLabel = primaryAttempt.attemptLabel;
 
-      if (model !== fallbackModel) {
-        attempts.push({ model: fallbackModel, apiVersion: 'v1' });
-        attempts.push({ model: fallbackModel, apiVersion: 'v1beta' });
+      const primaryPlans = this.parsePlansFromResponseBody(responseBodyText);
+      const primaryCoverage = this.evaluateThemeCoverage(primaryPlans, input.themes);
+      if (primaryCoverage.isCovered) {
+        return primaryPlans;
       }
 
-      let lastAttemptedStatus = 0;
-      for (const attempt of attempts) {
-        attemptLabel = `${attempt.model}@${attempt.apiVersion}`;
-        const attempted = await this.requestModel(
-          attempt.model,
-          attempt.apiVersion,
-          apiKey,
-          prompt,
-        );
-        response = attempted.response;
-        responseBodyText = attempted.bodyText;
-        lastAttemptedStatus = response.status;
+      const retryPrompt = [
+        prompt,
+        '',
+        'Correction required: the prior result did not satisfy all selected themes in every option.',
+        `Missing theme coverage by option: ${JSON.stringify(primaryCoverage.missingByOption)}.`,
+        'Regenerate from scratch and ensure each option explicitly includes all selected themes.',
+      ].join('\n');
 
-        if (response.ok) {
-          break;
-        }
+      const retryAttempt = await this.requestWithModelFallback({
+        prompt: retryPrompt,
+        apiKey,
+        model,
+        fallbackModel,
+      });
+      responseBodyText = retryAttempt.responseBodyText;
+      attemptLabel = retryAttempt.attemptLabel;
 
-        if (response.status !== 404) {
-          break;
-        }
+      const retryPlans = this.parsePlansFromResponseBody(responseBodyText);
+      const retryCoverage = this.evaluateThemeCoverage(retryPlans, input.themes);
+      if (!retryCoverage.isCovered) {
+        throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+          reason: 'theme_coverage_failed',
+          missingByOption: retryCoverage.missingByOption,
+        });
       }
 
-      if (lastAttemptedStatus === 0) {
-        throw new Error('NO_MODEL_ATTEMPTS');
-      }
+      return retryPlans;
     } catch (error) {
+      if (error instanceof AiTripPlannerError) {
+        throw error;
+      }
+
       throw new AiTripPlannerError('AI_REQUEST_FAILED', 'request', {
         reason: String(error),
         attempted: attemptLabel,
       });
     }
-
-    if (!response || !response.ok) {
-      throw new AiTripPlannerError('AI_REQUEST_FAILED', 'request', {
-        status: response?.status,
-        body: responseBodyText,
-        attempted: attemptLabel,
-      });
-    }
-
-    let payload: {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{
-            text?: string;
-          }>;
-        };
-      }>;
-    };
-
-    try {
-      payload = JSON.parse(responseBodyText) as {
-        candidates?: Array<{
-          content?: {
-            parts?: Array<{
-              text?: string;
-            }>;
-          };
-        }>;
-      };
-    } catch (error) {
-      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
-        reason: String(error),
-      });
-    }
-
-    const typedPayload = payload as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{
-            text?: string;
-          }>;
-        };
-      }>;
-    };
-
-    const rawText = typedPayload.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) {
-      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
-        reason: 'missing_candidates',
-      });
-    }
-
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(rawText);
-    } catch (error) {
-      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
-        reason: String(error),
-      });
-    }
-
-    const normalizedJson = this.normalizeAiResponse(parsedJson);
-    const parsed = AiTripPlansSchema.safeParse(normalizedJson);
-    if (!parsed.success) {
-      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
-        issues: parsed.error.issues,
-      });
-    }
-
-    return parsed.data;
   }
 }
 

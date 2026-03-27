@@ -9,6 +9,11 @@ const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
 const KM_PER_MILE = 1.60934;
 const MIN_RADIUS_MILES = 16;
 const MAX_RADIUS_MILES = 311;
+const LOADING_MESSAGES = [
+  'Scanning local standouts and hidden gems…',
+  'Balancing your selected themes into unique route options…',
+  'Resolving places and enriching each stop with details…',
+];
 
 type GeocodeComponent = {
   long_name: string;
@@ -142,6 +147,7 @@ const TripPlanner = () => {
   >(['scenic']);
   const [location, setLocation] = useState('Carmel By The Sea, CA');
   const [loading, setLoading] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [planOptions, setPlanOptions] = useState<TripPlanOption[]>([]);
@@ -155,6 +161,7 @@ const TripPlanner = () => {
     culture: 'Cultural',
     adventure: 'Adventure',
     family: 'Family Fun',
+    sports: 'Sports',
   };
 
   const handleGenerate = async () => {
@@ -179,6 +186,21 @@ const TripPlanner = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMessageIndex(0);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setLoadingMessageIndex((current) => (current + 1) % LOADING_MESSAGES.length);
+    }, 1800);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [loading]);
 
   const requestCurrentLocation = (mode: 'auto' | 'manual') => {
     if (!navigator.geolocation) {
@@ -389,18 +411,57 @@ const TripPlanner = () => {
 
         <div className="grid gap-4 md:grid-cols-2">
           {loading
-            ? Array.from({ length: 3 }).map((_, index) => (
+            ? [
                 <article
-                  key={`loading-${index}`}
-                  className="animate-pulse rounded-card bg-white p-5 shadow-wayfarer-soft"
+                  key="loading-hero"
+                  className="md:col-span-2 rounded-card bg-white p-6 shadow-wayfarer-soft"
                 >
-                  <div className="mb-3 h-3 w-1/3 rounded bg-wayfarer-surface" />
-                  <div className="mb-3 h-5 w-2/3 rounded bg-wayfarer-surface" />
-                  <div className="mb-2 h-5 w-3/4 rounded bg-wayfarer-surface" />
-                  <div className="mb-2 h-4 w-full rounded bg-wayfarer-surface" />
-                  <div className="h-3 w-2/3 rounded bg-wayfarer-surface" />
-                </article>
-              ))
+                  <p className="mb-2 font-body text-[11px] uppercase tracking-[0.14em] text-wayfarer-secondary">
+                    Building your journey
+                  </p>
+                  <h3 className="font-display text-xl font-semibold text-wayfarer-primary">
+                    Crafting something special for you
+                  </h3>
+                  <p className="mt-2 font-body text-sm text-wayfarer-text-muted">
+                    {LOADING_MESSAGES[loadingMessageIndex]}
+                  </p>
+
+                  <div className="mt-4 flex items-center gap-2" aria-hidden>
+                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-wayfarer-primary" />
+                    <span
+                      className="h-2.5 w-2.5 animate-bounce rounded-full bg-wayfarer-secondary"
+                      style={{ animationDelay: '120ms' }}
+                    />
+                    <span
+                      className="h-2.5 w-2.5 animate-bounce rounded-full bg-wayfarer-primary-light"
+                      style={{ animationDelay: '240ms' }}
+                    />
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {selectedThemes.map((theme) => (
+                      <span
+                        key={`loading-theme-${theme}`}
+                        className="rounded-full bg-wayfarer-surface px-3 py-1 font-body text-xs font-semibold text-wayfarer-secondary"
+                      >
+                        {themeLabelMap[theme]}
+                      </span>
+                    ))}
+                  </div>
+                </article>,
+                ...Array.from({ length: 2 }).map((_, index) => (
+                  <article
+                    key={`loading-skeleton-${index}`}
+                    className="animate-pulse rounded-card bg-white p-5 shadow-wayfarer-soft"
+                  >
+                    <div className="mb-3 h-3 w-1/3 rounded bg-wayfarer-surface" />
+                    <div className="mb-3 h-5 w-2/3 rounded bg-wayfarer-surface" />
+                    <div className="mb-2 h-5 w-3/4 rounded bg-wayfarer-surface" />
+                    <div className="mb-2 h-4 w-full rounded bg-wayfarer-surface" />
+                    <div className="h-3 w-2/3 rounded bg-wayfarer-surface" />
+                  </article>
+                )),
+              ]
             : null}
 
           {planOptions.map((option, index) => (
