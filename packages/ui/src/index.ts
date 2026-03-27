@@ -1,2 +1,2 @@
-export * from './components/Button.js';
-export * from './components/Surface.js';
+export * from './components/Button';
+export * from './components/Surface';

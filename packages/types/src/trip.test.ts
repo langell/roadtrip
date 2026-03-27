@@ -3,7 +3,7 @@ import {
   TripCreateRequestSchema,
   TripUpdateRequestSchema,
   TripThemeSchema,
-} from './schemas/trip.js';
+} from './schemas/trip';
 
 describe('Trip Schemas', () => {
   const validStop = {
