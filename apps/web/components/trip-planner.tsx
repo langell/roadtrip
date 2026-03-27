@@ -1,10 +1,48 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TripFilters } from '@roadtrip/types';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripIdeas, type TripIdea } from '../lib/api-client';
+
+const formatCoordinates = (latitude: number, longitude: number) =>
+  `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
+const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
+
+const reverseGeocodeLocation = async (latitude: number, longitude: number) => {
+  const fallback = formatCoordinates(latitude, longitude);
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  if (!mapsApiKey) {
+    return fallback;
+  }
+
+  try {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('latlng', `${latitude},${longitude}`);
+    url.searchParams.set('key', mapsApiKey);
+
+    const response = await fetch(url.toString(), { cache: 'no-store' });
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const data = (await response.json()) as {
+      status?: string;
+      results?: Array<{ formatted_address?: string }>;
+    };
+
+    if (data.status !== 'OK') {
+      return fallback;
+    }
+
+    return data.results?.[0]?.formatted_address ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const TripPlanner = () => {
   const [filters, setFilters] = useState<TripFilters>({
@@ -14,7 +52,10 @@ const TripPlanner = () => {
   });
   const [location, setLocation] = useState('Carmel By The Sea, CA');
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TripIdea[]>([]);
+  const hasRequestedInitialLocation = useRef(false);
 
   const themeOptions = useMemo(() => TripThemeSchema.options, []);
 
@@ -32,6 +73,65 @@ const TripPlanner = () => {
     }
   };
 
+  const requestCurrentLocation = (mode: 'auto' | 'manual') => {
+    if (!navigator.geolocation) {
+      setLocationStatus('Location services are not supported in this browser.');
+      return;
+    }
+
+    setLocating(true);
+    setLocationStatus(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void (async () => {
+          const resolvedLocation = await reverseGeocodeLocation(
+            position.coords.latitude,
+            position.coords.longitude,
+          );
+          localStorage.removeItem(AUTO_LOCATION_DENIED_STORAGE_KEY);
+          setLocation(resolvedLocation);
+          setLocationStatus('Using your current location.');
+          setLocating(false);
+        })();
+      },
+      () => {
+        if (mode === 'auto') {
+          localStorage.setItem(AUTO_LOCATION_DENIED_STORAGE_KEY, 'true');
+        }
+        setLocationStatus(
+          mode === 'auto'
+            ? 'Location permission denied. You can still use the button or enter an origin manually.'
+            : 'Could not access your location. Check browser permissions.',
+        );
+        setLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      },
+    );
+  };
+
+  const handleUseCurrentLocation = () => {
+    requestCurrentLocation('manual');
+  };
+
+  useEffect(() => {
+    if (hasRequestedInitialLocation.current) {
+      return;
+    }
+
+    if (localStorage.getItem(AUTO_LOCATION_DENIED_STORAGE_KEY) === 'true') {
+      hasRequestedInitialLocation.current = true;
+      return;
+    }
+
+    hasRequestedInitialLocation.current = true;
+    requestCurrentLocation('auto');
+  }, []);
+
   return (
     <div className="space-y-8 text-wayfarer-text-main">
       <form
@@ -47,9 +147,25 @@ const TripPlanner = () => {
           </span>
           <input
             className="w-full rounded-xl bg-white px-4 py-3 font-body text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
+            placeholder="Carmel By The Sea, CA"
             value={location}
             onChange={(event) => setLocation(event.target.value)}
           />
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              className="font-body text-xs font-semibold uppercase tracking-[0.14em] text-wayfarer-secondary hover:text-wayfarer-primary disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleUseCurrentLocation}
+              disabled={locating}
+            >
+              {locating ? 'Locating…' : 'Use my location'}
+            </button>
+            {locationStatus ? (
+              <span className="font-body text-xs text-wayfarer-text-muted">
+                {locationStatus}
+              </span>
+            ) : null}
+          </div>
         </label>
 
         <label className="space-y-2 md:col-span-2">
