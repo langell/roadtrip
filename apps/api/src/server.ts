@@ -373,6 +373,10 @@ export const startServer = () => {
   return server;
 };
 
-if (process.env.NODE_ENV !== 'test') {
+const app = createApp();
+
+export default app;
+
+if (process.env.NODE_ENV !== 'test' && process.env.VERCEL !== '1') {
   startServer();
 }
