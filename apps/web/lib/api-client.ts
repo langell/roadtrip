@@ -44,7 +44,9 @@ export type TripPlanResponse = {
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
+  (process.env.NODE_ENV === 'production'
+    ? 'https://api.hoptrip.net'
+    : 'http://localhost:3001');
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
 
