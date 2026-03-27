@@ -131,7 +131,7 @@ export const tripRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
 
-      type JsonPrimitive = string | number | boolean | null;
+      type JsonPrimitive = string | number | boolean;
       type InputJsonValue =
         | JsonPrimitive
         | { [key: string]: InputJsonValue }
