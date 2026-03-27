@@ -12,7 +12,7 @@ const TripPlanner = () => {
     theme: 'scenic',
     maxStops: 6,
   });
-  const [location, setLocation] = useState('Los Angeles, CA');
+  const [location, setLocation] = useState('Carmel By The Sea, CA');
   const [loading, setLoading] = useState(false);
   const [ideas, setIdeas] = useState<TripIdea[]>([]);
 
