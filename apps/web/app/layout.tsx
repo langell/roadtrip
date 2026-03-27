@@ -11,7 +11,13 @@ export const metadata: Metadata = {
 };
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
-  const session = await auth();
+  let session = null;
+
+  try {
+    session = await auth();
+  } catch {
+    session = null;
+  }
 
   return (
     <html lang="en">
