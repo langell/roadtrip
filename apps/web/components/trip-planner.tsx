@@ -6,17 +6,48 @@ import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripIdeas, type TripIdea } from '../lib/api-client';
 
-const formatCoordinates = (latitude: number, longitude: number) =>
-  `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
 
-const reverseGeocodeLocation = async (latitude: number, longitude: number) => {
-  const fallback = formatCoordinates(latitude, longitude);
+type GeocodeComponent = {
+  long_name: string;
+  short_name: string;
+  types: string[];
+};
+
+const findGeocodeComponent = (
+  components: GeocodeComponent[] | undefined,
+  ...types: string[]
+) =>
+  components?.find((component) => types.some((type) => component.types.includes(type)));
+
+const formatNearestCity = (components: GeocodeComponent[] | undefined): string | null => {
+  const city = findGeocodeComponent(
+    components,
+    'locality',
+    'postal_town',
+    'administrative_area_level_2',
+    'sublocality_level_1',
+  )?.long_name;
+
+  if (!city) {
+    return null;
+  }
+
+  const region =
+    findGeocodeComponent(components, 'administrative_area_level_1')?.short_name ??
+    findGeocodeComponent(components, 'country')?.short_name;
+
+  return region ? `${city}, ${region}` : city;
+};
+
+const reverseGeocodeLocation = async (
+  latitude: number,
+  longitude: number,
+): Promise<string | null> => {
   const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   if (!mapsApiKey) {
-    return fallback;
+    return null;
   }
 
   try {
@@ -26,21 +57,21 @@ const reverseGeocodeLocation = async (latitude: number, longitude: number) => {
 
     const response = await fetch(url.toString(), { cache: 'no-store' });
     if (!response.ok) {
-      return fallback;
+      return null;
     }
 
     const data = (await response.json()) as {
       status?: string;
-      results?: Array<{ formatted_address?: string }>;
+      results?: Array<{ address_components?: GeocodeComponent[] }>;
     };
 
     if (data.status !== 'OK') {
-      return fallback;
+      return null;
     }
 
-    return data.results?.[0]?.formatted_address ?? fallback;
+    return formatNearestCity(data.results?.[0]?.address_components);
   } catch {
-    return fallback;
+    return null;
   }
 };
 
@@ -90,8 +121,14 @@ const TripPlanner = () => {
             position.coords.longitude,
           );
           localStorage.removeItem(AUTO_LOCATION_DENIED_STORAGE_KEY);
-          setLocation(resolvedLocation);
-          setLocationStatus('Using your current location.');
+          if (resolvedLocation) {
+            setLocation(resolvedLocation);
+            setLocationStatus('Using your nearest city.');
+          } else {
+            setLocationStatus(
+              'Location found, but nearest city could not be resolved. Enter an origin manually.',
+            );
+          }
           setLocating(false);
         })();
       },
