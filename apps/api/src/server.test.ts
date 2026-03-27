@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 
 vi.mock('./config/env.js', () => ({
@@ -7,6 +7,7 @@ vi.mock('./config/env.js', () => ({
     PORT: 0,
     ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: 60000,
     ANON_SUGGESTIONS_RATE_LIMIT_MAX: 2,
+    TRIP_PLAN_CACHE_TTL_DAYS: 30,
   },
 }));
 
@@ -19,6 +20,11 @@ const prismaMock = {
     findMany: vi.fn(),
     create: vi.fn(),
   },
+  tripPlanCache: {
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
 };
 vi.mock('./lib/prisma.js', () => ({
   prisma: prismaMock,
@@ -26,6 +32,7 @@ vi.mock('./lib/prisma.js', () => ({
 
 const findStops = vi.fn();
 const resolvePlannedStops = vi.fn();
+const geocodeLocation = vi.fn();
 vi.mock('./services/google-places-service.js', () => ({
   GooglePlacesUpstreamError: class GooglePlacesUpstreamError extends Error {
     constructor(
@@ -47,6 +54,7 @@ vi.mock('./services/google-places-service.js', () => ({
   googlePlacesService: {
     findStops,
     resolvePlannedStops,
+    geocodeLocation,
   },
 }));
 
@@ -70,6 +78,18 @@ vi.mock('./services/ai-trip-planner-service.js', () => ({
 const { createApp, startServer, registerSignalHandlers } = await import('./server.js');
 
 describe('HTTP server', () => {
+  beforeEach(() => {
+    findStops.mockReset();
+    resolvePlannedStops.mockReset();
+    geocodeLocation.mockReset();
+    generatePlans.mockReset();
+    prismaMock.trip.findMany.mockReset();
+    prismaMock.trip.create.mockReset();
+    prismaMock.tripPlanCache.findMany.mockReset();
+    prismaMock.tripPlanCache.create.mockReset();
+    prismaMock.tripPlanCache.update.mockReset();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -332,6 +352,8 @@ describe('HTTP server', () => {
   });
 
   it('returns AI trip plan options with enriched stops', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
     generatePlans.mockResolvedValue({
       options: [
         {
@@ -395,6 +417,7 @@ describe('HTTP server', () => {
       themes: ['scenic', 'culture'],
       maxOptions: 2,
     });
+    expect(response.body.source).toBe('ai');
     expect(response.status).toBe(200);
     expect(response.body.options).toHaveLength(2);
     expect(response.body.options[0].stops[0]).toMatchObject({
@@ -409,6 +432,224 @@ describe('HTTP server', () => {
       status: 'unresolved',
       errorCode: 'NOT_FOUND',
     });
+    expect(prismaMock.tripPlanCache.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        validOptions: 1,
+      }),
+    });
+  });
+
+  it('returns cached trip plan when nearby match exists and tracks engagement', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([
+      {
+        id: 'cache-1',
+        centerLat: 36.56,
+        centerLng: -121.92,
+        radiusKm: 120,
+        themesKey: 'culture|scenic',
+        maxOptions: 2,
+        options: [
+          {
+            title: 'Cached Coastal Highlights',
+            rationale: 'Previously generated.',
+            stops: [
+              {
+                query: 'Bixby Bridge',
+                status: 'resolved',
+                suggestion: {
+                  id: 'stop-a',
+                  placeId: 'place-a',
+                  title: 'Bixby Bridge',
+                  description: 'Big Sur, CA',
+                  distanceKm: 12,
+                  lat: 36.3715,
+                  lng: -121.9013,
+                },
+              },
+            ],
+          },
+        ],
+        validOptions: 1,
+        engagementScore: 7,
+        updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+        expiresAt: new Date('2026-04-10T00:00:00.000Z'),
+      },
+    ]);
+
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('cache');
+    expect(response.body.options).toHaveLength(1);
+    expect(generatePlans).not.toHaveBeenCalled();
+    expect(prismaMock.tripPlanCache.update).toHaveBeenCalledWith({
+      where: { id: 'cache-1' },
+      data: {
+        engagementScore: { increment: 1 },
+        lastServedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it('saves only fully resolved options into cache when AI generation succeeds', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+    generatePlans.mockResolvedValue({
+      options: [
+        {
+          title: 'Valid Route',
+          rationale: 'All resolved.',
+          stops: ['Stop One', 'Stop Two'],
+        },
+        {
+          title: 'Partial Route',
+          rationale: 'One unresolved stop.',
+          stops: ['Stop Three'],
+        },
+      ],
+    });
+
+    resolvePlannedStops
+      .mockResolvedValueOnce([
+        {
+          query: 'Stop One',
+          suggestion: {
+            id: 'stop-1',
+            placeId: 'place-1',
+            title: 'Stop One',
+            description: 'Desc 1',
+            distanceKm: 10,
+            lat: 1,
+            lng: 1,
+          },
+        },
+        {
+          query: 'Stop Two',
+          suggestion: {
+            id: 'stop-2',
+            placeId: 'place-2',
+            title: 'Stop Two',
+            description: 'Desc 2',
+            distanceKm: 11,
+            lat: 2,
+            lng: 2,
+          },
+        },
+      ])
+      .mockResolvedValueOnce([{ query: 'Stop Three', errorCode: 'NOT_FOUND' }]);
+
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('ai');
+    expect(prismaMock.tripPlanCache.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.tripPlanCache.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themesKey: 'culture|scenic',
+        maxOptions: 2,
+        validOptions: 1,
+        engagementScore: 1,
+        expiresAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it('treats cache entries beyond 10 miles as misses', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([
+      {
+        id: 'cache-far',
+        centerLat: 36.81,
+        centerLng: -121.9233,
+        radiusKm: 120,
+        themesKey: 'culture|scenic',
+        maxOptions: 2,
+        options: [
+          {
+            title: 'Far cache entry',
+            rationale: 'Should not be used.',
+            stops: [
+              {
+                query: 'Far Stop',
+                status: 'resolved',
+                suggestion: {
+                  id: 'far-1',
+                  placeId: 'far-1',
+                  title: 'Far Stop',
+                  description: 'Far away',
+                  distanceKm: 40,
+                  lat: 36.81,
+                  lng: -121.9233,
+                },
+              },
+            ],
+          },
+        ],
+        validOptions: 1,
+        engagementScore: 100,
+        updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+        expiresAt: new Date('2026-04-10T00:00:00.000Z'),
+      },
+    ]);
+
+    generatePlans.mockResolvedValue({
+      options: [
+        {
+          title: 'Fresh generation',
+          rationale: 'Used when far cache misses.',
+          stops: ['Nearby Stop'],
+        },
+      ],
+    });
+
+    resolvePlannedStops.mockResolvedValue([
+      {
+        query: 'Nearby Stop',
+        suggestion: {
+          id: 'near-1',
+          placeId: 'near-1',
+          title: 'Nearby Stop',
+          description: 'Nearby',
+          distanceKm: 5,
+          lat: 36.56,
+          lng: -121.92,
+        },
+      },
+    ]);
+
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('ai');
+    expect(generatePlans).toHaveBeenCalledTimes(1);
+    expect(prismaMock.tripPlanCache.update).not.toHaveBeenCalled();
   });
 
   it('rejects invalid trip plan payloads', async () => {

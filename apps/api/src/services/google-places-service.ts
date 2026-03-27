@@ -103,6 +103,36 @@ export class GooglePlacesService {
     private readonly now: () => number = () => Date.now(),
   ) {}
 
+  async geocodeLocation(location: string): Promise<{ lat: number; lng: number }> {
+    const geocodeUrl = new URL('/maps/api/geocode/json', env.GOOGLE_MAPS_API_BASE_URL);
+    geocodeUrl.searchParams.set('address', location);
+    geocodeUrl.searchParams.set('key', env.GOOGLE_MAPS_API_KEY);
+
+    const geocode = await this.fetchWithRetry<GeocodeResponse>(geocodeUrl);
+    if (geocode.status !== 'OK' || !geocode.results.length) {
+      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_FAILED', {
+        stage: 'geocode',
+        details: {
+          googleStatus: geocode.status,
+          googleMessage: geocode.error_message,
+          location,
+        },
+      });
+    }
+
+    const origin = geocode.results[0].geometry?.location;
+    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
+      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_INVALID_LOCATION', {
+        stage: 'geocode',
+        details: {
+          location,
+        },
+      });
+    }
+
+    return { lat: origin.lat, lng: origin.lng };
+  }
+
   async findStops(params: {
     location: string;
     radiusKm: number;
@@ -133,31 +163,7 @@ export class GooglePlacesService {
       return cached.data;
     }
 
-    const geocodeUrl = new URL('/maps/api/geocode/json', env.GOOGLE_MAPS_API_BASE_URL);
-    geocodeUrl.searchParams.set('address', params.location);
-    geocodeUrl.searchParams.set('key', env.GOOGLE_MAPS_API_KEY);
-
-    const geocode = await this.fetchWithRetry<GeocodeResponse>(geocodeUrl);
-    if (geocode.status !== 'OK' || !geocode.results.length) {
-      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_FAILED', {
-        stage: 'geocode',
-        details: {
-          googleStatus: geocode.status,
-          googleMessage: geocode.error_message,
-          location: params.location,
-        },
-      });
-    }
-
-    const origin = geocode.results[0].geometry?.location;
-    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
-      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_INVALID_LOCATION', {
-        stage: 'geocode',
-        details: {
-          location: params.location,
-        },
-      });
-    }
+    const origin = await this.geocodeLocation(params.location);
     const originLat = origin.lat;
     const originLng = origin.lng;
 
@@ -269,32 +275,7 @@ export class GooglePlacesService {
       errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
     }>
   > {
-    const geocodeUrl = new URL('/maps/api/geocode/json', env.GOOGLE_MAPS_API_BASE_URL);
-    geocodeUrl.searchParams.set('address', params.location);
-    geocodeUrl.searchParams.set('key', env.GOOGLE_MAPS_API_KEY);
-
-    const geocode = await this.fetchWithRetry<GeocodeResponse>(geocodeUrl);
-    if (geocode.status !== 'OK' || !geocode.results.length) {
-      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_FAILED', {
-        stage: 'geocode',
-        details: {
-          googleStatus: geocode.status,
-          googleMessage: geocode.error_message,
-          location: params.location,
-        },
-      });
-    }
-
-    const origin = geocode.results[0].geometry?.location;
-    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
-      throw new GooglePlacesUpstreamError('GOOGLE_GEOCODE_INVALID_LOCATION', {
-        stage: 'geocode',
-        details: {
-          location: params.location,
-        },
-      });
-    }
-
+    const origin = await this.geocodeLocation(params.location);
     const originLat = origin.lat;
     const originLng = origin.lng;
     const nearbyRadiusMeters = Math.max(

@@ -39,6 +39,7 @@ export type TripPlanResponse = {
   location: string;
   radiusKm: number;
   themes: string[];
+  source: 'cache' | 'ai';
   options: TripPlanOption[];
 };
 

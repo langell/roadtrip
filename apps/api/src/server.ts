@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { TripThemeSchema } from '@roadtrip/types';
 import { appRouter } from './routes/index.js';
@@ -26,6 +27,93 @@ import { getRequestUserId } from './lib/request-auth.js';
 type RateLimitEntry = {
   count: number;
   resetAt: number;
+};
+
+type PlannedStopResolved = {
+  query: string;
+  status: 'resolved';
+  suggestion: {
+    id: string;
+    placeId: string;
+    title: string;
+    description: string;
+    distanceKm: number;
+    lat: number;
+    lng: number;
+    imageUrl?: string;
+  };
+};
+
+type PlannedStopUnresolved = {
+  query: string;
+  status: 'unresolved';
+  errorCode: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+};
+
+type PlannedStop = PlannedStopResolved | PlannedStopUnresolved;
+
+type PlannedOption = {
+  title: string;
+  rationale: string;
+  stops: PlannedStop[];
+};
+
+const plannedStopResolvedSchema = z.object({
+  query: z.string().min(1),
+  status: z.literal('resolved'),
+  suggestion: z.object({
+    id: z.string().min(1),
+    placeId: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    distanceKm: z.number().positive(),
+    lat: z.number(),
+    lng: z.number(),
+    imageUrl: z.string().url().optional(),
+  }),
+});
+
+const plannedStopUnresolvedSchema = z.object({
+  query: z.string().min(1),
+  status: z.literal('unresolved'),
+  errorCode: z.union([z.literal('NOT_FOUND'), z.literal('UPSTREAM_ERROR')]),
+});
+
+const plannedOptionSchema = z.object({
+  title: z.string().min(1),
+  rationale: z.string().min(1),
+  stops: z
+    .array(z.union([plannedStopResolvedSchema, plannedStopUnresolvedSchema]))
+    .min(1),
+});
+
+const plannedOptionsSchema = z.array(plannedOptionSchema).min(1);
+
+const TRIP_PLAN_CACHE_RADIUS_MILES = 10;
+const KM_PER_MILE = 1.60934;
+
+const normalizeThemes = (themes: string[]) =>
+  Array.from(
+    new Set(themes.map((theme) => theme.trim().toLowerCase()).filter(Boolean)),
+  ).sort();
+
+const toThemesKey = (themes: string[]) => normalizeThemes(themes).join('|');
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
 };
 
 const toPlacesErrorMeta = (error: unknown) => {
@@ -301,6 +389,7 @@ export const createApp = () => {
   app.post(
     '/trips/plan',
     withAsyncHandler(async (req, res) => {
+      const requestLogger = getRequestLogger(res);
       const userId = await getRequestUserId(req);
 
       if (!userId && !allowAnonymousSuggestionRequest(getRequesterIp(req))) {
@@ -322,6 +411,169 @@ export const createApp = () => {
       }
 
       const input = parsed.data;
+      const themesKey = toThemesKey(input.themes);
+      const cacheRadiusKm = TRIP_PLAN_CACHE_RADIUS_MILES * KM_PER_MILE;
+      const now = new Date();
+
+      let origin;
+      try {
+        origin = await googlePlacesService.geocodeLocation(input.location);
+      } catch (error) {
+        const placesError = toPlacesErrorMeta(error);
+        logError(requestLogger, 'places.trip-planner geocode failure', error, {
+          ...placesError,
+          input: {
+            location: input.location,
+            radiusKm: input.radiusKm,
+            themes: input.themes,
+            maxOptions: input.maxOptions,
+          },
+        });
+
+        res.status(502).json({
+          error: 'UPSTREAM_PLACES_ERROR',
+          ...(process.env.NODE_ENV !== 'production'
+            ? {
+                diagnosticCode: placesError.code,
+                diagnosticStage: placesError.stage,
+              }
+            : {}),
+        });
+        return;
+      }
+
+      const latDelta = cacheRadiusKm / 111.32;
+      const cosLatitude = Math.max(Math.cos(toRadians(origin.lat)), 0.2);
+      const lngDelta = cacheRadiusKm / (111.32 * cosLatitude);
+
+      const cacheCandidates = await prisma.tripPlanCache.findMany({
+        where: {
+          themesKey,
+          radiusKm: input.radiusKm,
+          maxOptions: input.maxOptions,
+          expiresAt: { gt: now },
+          validOptions: { gt: 0 },
+          centerLat: {
+            gte: origin.lat - latDelta,
+            lte: origin.lat + latDelta,
+          },
+          centerLng: {
+            gte: origin.lng - lngDelta,
+            lte: origin.lng + lngDelta,
+          },
+        },
+        orderBy: [{ engagementScore: 'desc' }, { updatedAt: 'desc' }],
+        take: 25,
+      });
+
+      const cacheCandidatesWithDistance = cacheCandidates.map((candidate) => ({
+        candidate,
+        distanceKm: haversineKm(
+          origin.lat,
+          origin.lng,
+          candidate.centerLat,
+          candidate.centerLng,
+        ),
+      }));
+
+      const cacheHitWithDistance = cacheCandidatesWithDistance
+        .filter(({ distanceKm }) => distanceKm <= cacheRadiusKm)
+        .sort((a, b) => {
+          if (b.candidate.engagementScore !== a.candidate.engagementScore) {
+            return b.candidate.engagementScore - a.candidate.engagementScore;
+          }
+          if (a.distanceKm !== b.distanceKm) {
+            return a.distanceKm - b.distanceKm;
+          }
+          return b.candidate.updatedAt.getTime() - a.candidate.updatedAt.getTime();
+        })[0];
+
+      const cacheHit = cacheHitWithDistance?.candidate;
+      const cacheHitDistanceKm = cacheHitWithDistance?.distanceKm;
+      const nearestCandidateDistanceKm =
+        cacheCandidatesWithDistance.length > 0
+          ? Math.min(...cacheCandidatesWithDistance.map(({ distanceKm }) => distanceKm))
+          : null;
+      const debugEnabled =
+        env.TRIP_PLAN_CACHE_DEBUG && process.env.NODE_ENV !== 'production';
+
+      if (cacheHit) {
+        const parsedOptions = plannedOptionsSchema.safeParse(cacheHit.options);
+        if (parsedOptions.success && parsedOptions.data.length) {
+          await prisma.tripPlanCache.update({
+            where: { id: cacheHit.id },
+            data: {
+              engagementScore: { increment: 1 },
+              lastServedAt: now,
+            },
+          });
+
+          requestLogger.info(
+            {
+              cacheId: cacheHit.id,
+              engagementScore: cacheHit.engagementScore,
+              validOptions: cacheHit.validOptions,
+              distanceMiles:
+                typeof cacheHitDistanceKm === 'number'
+                  ? Number((cacheHitDistanceKm / KM_PER_MILE).toFixed(2))
+                  : undefined,
+            },
+            'trip.plan.cache_hit',
+          );
+
+          const responsePayload: {
+            location: string;
+            radiusKm: number;
+            themes: string[];
+            source: 'cache';
+            options: z.infer<typeof plannedOptionsSchema>;
+            cacheDebug?: {
+              enabled: true;
+              radiusMiles: number;
+              nearestCandidateDistanceMiles: number | null;
+              selectedCandidateDistanceMiles: number | null;
+              candidateCount: number;
+            };
+          } = {
+            location: input.location,
+            radiusKm: input.radiusKm,
+            themes: input.themes,
+            source: 'cache',
+            options: parsedOptions.data,
+          };
+
+          if (debugEnabled) {
+            responsePayload.cacheDebug = {
+              enabled: true,
+              radiusMiles: TRIP_PLAN_CACHE_RADIUS_MILES,
+              nearestCandidateDistanceMiles:
+                typeof nearestCandidateDistanceKm === 'number'
+                  ? Number((nearestCandidateDistanceKm / KM_PER_MILE).toFixed(2))
+                  : null,
+              selectedCandidateDistanceMiles:
+                typeof cacheHitDistanceKm === 'number'
+                  ? Number((cacheHitDistanceKm / KM_PER_MILE).toFixed(2))
+                  : null,
+              candidateCount: cacheCandidates.length,
+            };
+          }
+
+          res.status(200).json(responsePayload);
+          return;
+        }
+      }
+
+      requestLogger.info(
+        {
+          themesKey,
+          candidateCount: cacheCandidates.length,
+          nearestCandidateDistanceMiles:
+            typeof nearestCandidateDistanceKm === 'number'
+              ? Number((nearestCandidateDistanceKm / KM_PER_MILE).toFixed(2))
+              : null,
+        },
+        'trip.plan.cache_miss',
+      );
 
       let plans;
       try {
@@ -333,7 +585,6 @@ export const createApp = () => {
         });
       } catch (error) {
         const aiError = toAiPlannerErrorMeta(error);
-        const requestLogger = getRequestLogger(res);
         logError(requestLogger, 'ai.trip-planner failure', error, {
           ...aiError,
           input: {
@@ -358,11 +609,39 @@ export const createApp = () => {
 
       const options = await Promise.all(
         plans.options.map(async (option) => {
-          const stopResults = await googlePlacesService.resolvePlannedStops({
-            location: input.location,
-            radiusKm: input.radiusKm,
-            stopQueries: option.stops,
-          });
+          let stopResults: Array<{
+            query: string;
+            suggestion?: {
+              id: string;
+              placeId: string;
+              title: string;
+              description: string;
+              distanceKm: number;
+              lat: number;
+              lng: number;
+              photoName?: string;
+            };
+            errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+          }>;
+
+          try {
+            stopResults = await googlePlacesService.resolvePlannedStops({
+              location: input.location,
+              radiusKm: input.radiusKm,
+              stopQueries: option.stops,
+            });
+          } catch (error) {
+            const placesError = toPlacesErrorMeta(error);
+            logError(requestLogger, 'places.trip-planner enrich failure', error, {
+              ...placesError,
+              optionTitle: option.title,
+            });
+
+            stopResults = option.stops.map((query) => ({
+              query,
+              errorCode: 'UPSTREAM_ERROR' as const,
+            }));
+          }
 
           return {
             title: option.title,
@@ -386,16 +665,71 @@ export const createApp = () => {
                 },
               };
             }),
-          };
+          } satisfies PlannedOption;
         }),
       );
 
-      res.status(200).json({
+      const validOptions = options.filter(
+        (option) =>
+          option.stops.length > 0 &&
+          option.stops.every((stop) => stop.status === 'resolved'),
+      );
+
+      if (validOptions.length > 0) {
+        await prisma.tripPlanCache.create({
+          data: {
+            location: input.location,
+            centerLat: origin.lat,
+            centerLng: origin.lng,
+            radiusKm: input.radiusKm,
+            themesKey,
+            maxOptions: input.maxOptions,
+            options: validOptions as Prisma.InputJsonValue,
+            validOptions: validOptions.length,
+            engagementScore: 1,
+            lastServedAt: now,
+            expiresAt: new Date(
+              now.getTime() + env.TRIP_PLAN_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000,
+            ),
+          },
+        });
+      }
+
+      const responsePayload: {
+        location: string;
+        radiusKm: number;
+        themes: string[];
+        source: 'ai';
+        options: PlannedOption[];
+        cacheDebug?: {
+          enabled: true;
+          radiusMiles: number;
+          nearestCandidateDistanceMiles: number | null;
+          selectedCandidateDistanceMiles: null;
+          candidateCount: number;
+        };
+      } = {
         location: input.location,
         radiusKm: input.radiusKm,
         themes: input.themes,
+        source: 'ai',
         options,
-      });
+      };
+
+      if (debugEnabled) {
+        responsePayload.cacheDebug = {
+          enabled: true,
+          radiusMiles: TRIP_PLAN_CACHE_RADIUS_MILES,
+          nearestCandidateDistanceMiles:
+            typeof nearestCandidateDistanceKm === 'number'
+              ? Number((nearestCandidateDistanceKm / KM_PER_MILE).toFixed(2))
+              : null,
+          selectedCandidateDistanceMiles: null,
+          candidateCount: cacheCandidates.length,
+        };
+      }
+
+      res.status(200).json(responsePayload);
     }),
   );
 

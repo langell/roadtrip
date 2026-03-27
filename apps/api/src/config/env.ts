@@ -23,6 +23,11 @@ const schema = z.object({
     .max(3600000)
     .default(300000),
   ANON_SUGGESTIONS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1000).default(60),
+  TRIP_PLAN_CACHE_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  TRIP_PLAN_CACHE_DEBUG: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 export const env = schema.parse(process.env);

@@ -7,7 +7,7 @@ import HeroPhrase from '../components/hero-phrase';
 
 const HomePage = () => (
   <div className="bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
-    <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between px-6 md:px-10">
+    <header className="relative z-20 flex h-16 items-center justify-between px-6 md:px-10">
       <p className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary">
         HopTrip
       </p>
@@ -15,7 +15,7 @@ const HomePage = () => (
     </header>
 
     <main className="relative overflow-hidden">
-      <section className="relative h-[36rem] min-h-[32rem] w-full md:h-screen">
+      <section className="relative h-[23rem] min-h-[20rem] w-full md:h-screen md:min-h-[32rem]">
         <img
           src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdZLdf8nn9pGc50ZxckpxO-MI4Z43NG62UapCBUrflkzyOSIMOXQ91-z0gXPE_N4O12b2LD5COH98TcH8qwt54m6y-RDlLubcQbRMzpGiym0zMRsSyv12hfEARw_dGIswWfHhIX4IggfyOE9C4iy8aSmVsCqMfHWBH24pcVP8orhSzxgLaDPGlwnfYKci1hPHvQhd7-M4-Y93Pbm8O1c0dp2UURc8IjHOeoHgQLnx1v3r18vvONM6uPIikoZh3F_WDgZCUtH0akKA"
           alt="Scenic mountain road"
@@ -24,8 +24,8 @@ const HomePage = () => (
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-wayfarer-bg/20 to-wayfarer-bg" />
       </section>
 
-      <section className="relative z-10 -mt-24 px-6 pb-14 md:absolute md:inset-0 md:flex md:items-center md:px-14 lg:px-24">
-        <div className="max-w-2xl rounded-3xl bg-wayfarer-bg/80 p-6 shadow-wayfarer-ambient backdrop-blur-sm md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
+      <section className="relative z-10 -mt-16 px-6 pb-10 md:-mt-[30rem] md:px-14 md:pb-20 lg:px-24">
+        <div className="max-w-2xl rounded-3xl bg-wayfarer-bg/80 p-5 shadow-wayfarer-ambient backdrop-blur-sm md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
           <div className="mb-6 flex items-center gap-3">
             <span className="h-1 w-12 rounded-full bg-wayfarer-primary-light" />
             <span className="font-display text-xs font-bold uppercase tracking-[0.2em] text-wayfarer-primary">
@@ -33,11 +33,11 @@ const HomePage = () => (
             </span>
           </div>
 
-          <h1 className="mb-5 font-display text-4xl font-extrabold leading-tight text-wayfarer-primary md:text-6xl">
+          <h1 className="mb-4 font-display text-3xl font-extrabold leading-[1.05] text-wayfarer-primary md:mb-5 md:text-6xl md:leading-tight">
             <HeroPhrase />.
           </h1>
 
-          <p className="mb-8 max-w-xl text-base leading-relaxed text-wayfarer-text-muted md:text-lg">
+          <p className="mb-6 max-w-xl text-sm leading-relaxed text-wayfarer-text-muted md:mb-8 md:text-lg">
             Experience hidden gems, scenic detours, and local secrets that transform
             transportation into exploration.
           </p>
@@ -45,20 +45,20 @@ const HomePage = () => (
           <div className="flex flex-col gap-3 sm:flex-row">
             <a
               href="#route-planner"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-wayfarer-primary px-7 py-4 text-base font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-wayfarer-primary px-6 py-3 text-base font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90 md:px-7 md:py-4"
             >
               Start Your Trip
               <span aria-hidden>→</span>
             </a>
             <a
               href="#route-planner"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-wayfarer-surface-deep px-7 py-4 text-base font-bold text-wayfarer-primary transition hover:bg-wayfarer-surface"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-wayfarer-surface-deep px-6 py-3 text-base font-bold text-wayfarer-primary transition hover:bg-wayfarer-surface md:px-7 md:py-4"
             >
               Browse Routes
             </a>
           </div>
 
-          <div className="mt-10 flex items-center gap-5">
+          <div className="mt-8 hidden items-center gap-5 sm:flex md:mt-10">
             <div className="flex -space-x-3">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-wayfarer-bg bg-wayfarer-primary text-xs font-bold text-white">
                 AL
@@ -80,9 +80,9 @@ const HomePage = () => (
         </div>
       </section>
 
-      <section className="bg-wayfarer-bg px-6 pb-24 pt-10 md:px-14 lg:px-24">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <article className="relative min-h-[22rem] overflow-hidden rounded-[2rem] bg-wayfarer-surface p-8 md:col-span-2 md:p-10">
+      <section className="bg-wayfarer-bg px-6 pb-20 pt-4 md:px-14 md:pb-24 md:pt-10 lg:px-24">
+        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 pr-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:pb-0 md:pr-0">
+          <article className="relative min-h-[16rem] min-w-[85%] snap-start overflow-hidden rounded-[2rem] bg-wayfarer-surface p-6 md:col-span-2 md:min-h-[22rem] md:min-w-0 md:p-10">
             <div className="relative z-10 max-w-md">
               <h2 className="mb-4 font-display text-3xl font-bold text-wayfarer-primary">
                 Curated Scenic Byways
@@ -94,7 +94,7 @@ const HomePage = () => (
                 Explore Collections →
               </a>
             </div>
-            <div className="absolute inset-y-0 right-0 w-2/3 opacity-50">
+            <div className="absolute inset-y-0 right-0 hidden w-2/3 opacity-50 sm:block">
               <img
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9N2jnzWTz1IaMG2SlTDB38l567WNr8pvaWNXcH0DGDN2Ww3DNYsm5iQotL0Vr_r5iu-ULDISF8rX6mfcGmawnq_G3pYdg9xuhyKIEsvR4fXx1FARKn_6A_9BBaeWTusa6qjhDE530zH85Sd0y_ShdrGf5b4cK6RA7wMYcwbYk5zqwkZTXqsXZAUPv144v2EMuFKj5nXJ_WXZzwkk6RoQaVVcEzuX03-7k04fGCZU0kHB1ol-XVGJ8860u7inK_Oq6H-DLRxKuP7k"
                 alt="Breathtaking mountain lake view"
@@ -103,7 +103,7 @@ const HomePage = () => (
             </div>
           </article>
 
-          <article className="flex flex-col justify-end gap-4 rounded-[2rem] bg-wayfarer-primary p-8 text-white">
+          <article className="flex min-h-[16rem] min-w-[85%] snap-start flex-col justify-end gap-4 rounded-[2rem] bg-wayfarer-primary p-6 text-white md:min-h-0 md:min-w-0 md:p-8">
             <p className="text-3xl">🗺️</p>
             <h3 className="font-display text-2xl font-bold">Offline Precision</h3>
             <p className="text-sm text-white/80">
@@ -111,7 +111,7 @@ const HomePage = () => (
             </p>
           </article>
 
-          <article className="flex flex-col gap-6 rounded-[2rem] bg-wayfarer-surface-deep p-8">
+          <article className="flex min-h-[16rem] min-w-[85%] snap-start flex-col gap-6 rounded-[2rem] bg-wayfarer-surface-deep p-6 md:min-h-0 md:min-w-0 md:p-8">
             <div className="flex items-center gap-4">
               <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-wayfarer-secondary/10 text-wayfarer-secondary">
                 🍽️
@@ -133,7 +133,7 @@ const HomePage = () => (
             </div>
           </article>
 
-          <article className="flex flex-col items-center gap-6 rounded-[2rem] border border-wayfarer-accent/40 p-8 md:col-span-2 md:flex-row md:p-10">
+          <article className="flex min-h-[16rem] min-w-[85%] snap-start flex-col items-center gap-5 rounded-[2rem] border border-wayfarer-accent/40 p-6 md:col-span-2 md:min-h-0 md:min-w-0 md:gap-6 md:flex-row md:p-10">
             <div className="flex-1">
               <h3 className="mb-4 font-display text-3xl font-bold text-wayfarer-primary">
                 Journey Journal
@@ -152,6 +152,9 @@ const HomePage = () => (
             </div>
           </article>
         </div>
+        <p className="mt-3 text-xs text-wayfarer-text-muted md:hidden">
+          Swipe to explore more features →
+        </p>
       </section>
 
       <section id="route-planner" className="mx-auto w-full max-w-6xl px-6 pb-24 md:px-8">

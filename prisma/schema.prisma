@@ -79,3 +79,25 @@ model AnalyticsEvent {
   @@index([createdAt])
   @@index([userId, createdAt])
 }
+
+model TripPlanCache {
+  id              String   @id @default(uuid())
+  location        String
+  centerLat       Float
+  centerLng       Float
+  radiusKm        Float
+  themesKey       String
+  maxOptions      Int
+  options         Json
+  validOptions    Int
+  engagementScore Int      @default(0)
+  lastServedAt    DateTime?
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@index([themesKey, radiusKm, maxOptions, expiresAt])
+  @@index([centerLat, centerLng])
+  @@index([engagementScore, updatedAt])
+}

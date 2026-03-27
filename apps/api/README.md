@@ -35,6 +35,8 @@ Optional values:
 - `PORT` (defaults to `3001`)
 - `ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS` (defaults to `300000`)
 - `ANON_SUGGESTIONS_RATE_LIMIT_MAX` (defaults to `60`)
+- `TRIP_PLAN_CACHE_TTL_DAYS` (defaults to `30`; controls itinerary cache expiration)
+- `TRIP_PLAN_CACHE_DEBUG` (`true`/`false`; defaults to `false`, adds cache debug metadata to `/trips/plan` response in non-production)
 - `OTEL_ENABLED` (`true` to enable OpenTelemetry)
 - `OTEL_SERVICE_NAME` (defaults to `roadtrip-api`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT`

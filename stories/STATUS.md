@@ -13,6 +13,7 @@ Tracks completed story work in chronological order.
 - 2026-03-27 — RT-011 `2026-03-footer-company-pages.md` moved to `stories/Done/`.
 - 2026-03-27 — RT-012 `2026-03-footer-product-pages.md` moved to `stories/Done/`.
 - 2026-03-27 — RT-013 `2026-03-footer-legal-pages.md` moved to `stories/Done/`.
+- 2026-03-27 — RT-017 `2026-03-itinerary-cache-by-location.md` moved to `stories/Done/`.
 
 ## In Progress
 

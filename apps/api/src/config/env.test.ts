@@ -12,6 +12,8 @@ const baseEnv = {
   GOOGLE_PLACES_RETRY_COUNT: '1',
   ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: '60000',
   ANON_SUGGESTIONS_RATE_LIMIT_MAX: '10',
+  TRIP_PLAN_CACHE_TTL_DAYS: '45',
+  TRIP_PLAN_CACHE_DEBUG: 'true',
 };
 
 const loadEnvModule = async (
@@ -53,6 +55,8 @@ describe('env schema', () => {
     expect(env.GOOGLE_PLACES_RETRY_COUNT).toBe(1);
     expect(env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS).toBe(60000);
     expect(env.ANON_SUGGESTIONS_RATE_LIMIT_MAX).toBe(10);
+    expect(env.TRIP_PLAN_CACHE_TTL_DAYS).toBe(45);
+    expect(env.TRIP_PLAN_CACHE_DEBUG).toBe(true);
   });
 
   it('throws when required variables are invalid', async () => {
@@ -70,6 +74,8 @@ describe('env schema', () => {
       GOOGLE_PLACES_RETRY_COUNT: undefined,
       ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: undefined,
       ANON_SUGGESTIONS_RATE_LIMIT_MAX: undefined,
+      TRIP_PLAN_CACHE_TTL_DAYS: undefined,
+      TRIP_PLAN_CACHE_DEBUG: undefined,
     });
 
     expect(env.GOOGLE_MAPS_API_BASE_URL).toBe('https://maps.googleapis.com');
@@ -79,5 +85,7 @@ describe('env schema', () => {
     expect(env.GOOGLE_PLACES_RETRY_COUNT).toBe(2);
     expect(env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS).toBe(300000);
     expect(env.ANON_SUGGESTIONS_RATE_LIMIT_MAX).toBe(60);
+    expect(env.TRIP_PLAN_CACHE_TTL_DAYS).toBe(30);
+    expect(env.TRIP_PLAN_CACHE_DEBUG).toBe(false);
   });
 });
