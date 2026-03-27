@@ -19,3 +19,4 @@ packages/ui/tsconfig.tsbuildinfo
 .husky/_
 *.log
 *.LOG
+.vercel

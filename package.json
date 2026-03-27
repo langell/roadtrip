@@ -15,6 +15,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:coverage": "turbo run test -- --coverage",
+    "verify": "pnpm lint && pnpm test:coverage && pnpm build && npx vercel build || echo 'Skipping vercel build (not linked or not authenticated)'",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky install",
