@@ -132,12 +132,12 @@ export const tripRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
 
-      type AnalyticsPayload = Prisma.AnalyticsEventCreateInput['payload'];
+      type PrismaJsonNonNull = Exclude<Prisma.JsonValue, null>;
       const event = await ctx.prisma.analyticsEvent.create({
         data: {
           userId,
           type: input.type,
-          payload: input.payload as AnalyticsPayload,
+          payload: input.payload as PrismaJsonNonNull,
         },
       });
 
