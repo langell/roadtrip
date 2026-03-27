@@ -6,7 +6,11 @@ export type TripIdea = {
   imageUrl?: string;
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  (process.env.NODE_ENV === 'production'
+    ? 'https://hoptrip.net'
+    : 'http://localhost:3001');
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
 
