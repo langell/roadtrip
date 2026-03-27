@@ -136,7 +136,7 @@ export const tripRouter = router({
         data: {
           userId,
           type: input.type,
-          payload: input.payload as Prisma.InputJsonValue,
+          payload: input.payload as Prisma.JsonValue,
         },
       });
 

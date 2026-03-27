@@ -29,7 +29,8 @@ Optional values:
 
 - `NEXTAUTH_URL` (defaults to `http://localhost:3000`)
 - `NEXTAUTH_SECRET` (legacy alias for `AUTH_SECRET`)
-- `NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:3001` in development and `https://hoptrip.net` in production)
+- `NEXT_PUBLIC_API_BASE_URL` (optional client override; defaults to `http://localhost:3001` in development and same-origin in production)
+- `API_BASE_URL` (recommended in production for server proxy routes like `/suggestions`; example: `https://api.hoptrip.net`)
 
 ## Run (development)
 
