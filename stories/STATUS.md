@@ -8,10 +8,13 @@ Tracks completed story work in chronological order.
 - 2026-03-26 — RT-003 `2026-03-saved-trip-details-mobile.md` moved to `stories/Done/`.
 - 2026-03-26 — RT-009 `2026-03-structured-logging.md` moved to `stories/Done/`.
 - 2026-03-26 — RT-010 `2026-03-observability-baseline.md` moved to `stories/Done/`.
+- 2026-03-27 — RT-008 `2026-03-web-stitch-audit-and-gap-map.md` moved to `stories/Done/`.
+- 2026-03-27 — RT-009 `2026-03-web-stitch-design-token-alignment.md` moved to `stories/Done/`.
 
 ## In Progress
 
 - 2026-03-26 — RT-004 `2026-03-auth-user-context.md` started (web Google/Apple NextAuth foundation wired; signed web API tokens + API bearer verification implemented).
+- 2026-03-27 — RT-010 `2026-03-web-stitch-home-and-planner-parity.md` started (home/planner parity implementation sequence established from Stitch audit output).
 
 ## Next Up (Backlog)
 
@@ -22,3 +25,4 @@ Tracks completed story work in chronological order.
 - RT-007 `2026-03-reliability-deploy-hardening.md`
 - RT-008 `2026-03-anonymous-trip-search-gated-save.md`
 - `2026-03-mobile-trip-builder.md`
+- `2026-03-web-stitch-home-and-planner-parity.md`

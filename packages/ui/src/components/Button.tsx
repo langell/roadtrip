@@ -10,8 +10,10 @@ type ButtonProps = PropsWithChildren<{
   ButtonHTMLAttributes<HTMLButtonElement>;
 
 const toneClasses: Record<ButtonTone, string> = {
-  primary: 'bg-[#1B4332] text-white hover:opacity-90 focus-visible:ring-[#a5d0b9]',
-  ghost: 'bg-transparent text-[#1B4332] ring-1 ring-[#c1c8c2] hover:bg-[#fafaf5]',
+  primary:
+    'bg-wayfarer-primary text-white hover:opacity-90 focus-visible:ring-wayfarer-primary-light',
+  ghost:
+    'bg-transparent text-wayfarer-primary ring-1 ring-wayfarer-accent hover:bg-wayfarer-bg',
 };
 
 export const Button = ({
@@ -24,7 +26,7 @@ export const Button = ({
 }: ButtonProps) => (
   <button
     className={clsx(
-      'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#fafaf5] disabled:opacity-60',
+      'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-body text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-wayfarer-bg disabled:opacity-60',
       toneClasses[tone],
       className,
     )}

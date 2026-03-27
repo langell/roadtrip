@@ -9,7 +9,9 @@ const AuthControls = () => {
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-end">
-        <span className="text-sm text-stone-500">Checking session…</span>
+        <span className="font-body text-sm text-wayfarer-text-muted">
+          Checking session…
+        </span>
       </div>
     );
   }
@@ -17,7 +19,7 @@ const AuthControls = () => {
   if (session?.user) {
     return (
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <span className="text-sm text-stone-600">
+        <span className="font-body text-sm text-wayfarer-text-muted">
           Signed in as {session.user.name ?? session.user.email ?? session.user.id}
         </span>
         <Button

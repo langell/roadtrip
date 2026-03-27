@@ -33,7 +33,7 @@ const HeroPhrase = () => {
 
   return (
     <>
-      {line.lead} <span className="text-[#3b6090]">{line.accent}</span>
+      {line.lead} <span className="text-wayfarer-secondary">{line.accent}</span>
     </>
   );
 };

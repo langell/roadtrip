@@ -11,7 +11,7 @@ const config: PlaywrightTestConfig = {
   },
   webServer: {
     command: isCI
-      ? 'pnpm build && pnpm start --hostname 127.0.0.1 --port 3100'
+      ? 'rm -rf .next && pnpm build && pnpm start --hostname 127.0.0.1 --port 3100'
       : 'pnpm dev --hostname 127.0.0.1 --port 3100',
     url: 'http://127.0.0.1:3100',
     reuseExistingServer: false,

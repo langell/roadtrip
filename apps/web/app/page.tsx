@@ -5,26 +5,43 @@ import AuthControls from '../components/auth-controls';
 import HeroPhrase from '../components/hero-phrase';
 
 const HomePage = () => (
-  <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-10 md:px-8 md:py-12">
-    <header className="space-y-5">
+  <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-12 px-6 py-10 md:px-8 md:py-14">
+    <header className="space-y-7">
       <AuthControls />
-      <p className="inline-flex items-center gap-2 rounded-full bg-[#f4f4ef] px-4 py-1 text-xs uppercase tracking-widest text-stone-500">
+      <p className="inline-flex items-center gap-2 rounded-full bg-wayfarer-surface px-4 py-1 font-body text-xs uppercase tracking-widest text-wayfarer-text-muted">
         RoadTrip Alpha · Production-grade foundations
       </p>
-      <h1 className="text-4xl font-semibold leading-tight text-[#1B4332] md:text-6xl">
+      <h1 className="max-w-4xl font-display text-4xl font-semibold leading-tight text-wayfarer-primary md:text-6xl">
         <HeroPhrase />.
       </h1>
-      <p className="max-w-3xl text-lg text-stone-600">
+      <p className="max-w-2xl font-body text-lg leading-relaxed text-wayfarer-text-muted">
         Plug in a region, we will stitch local gems, sponsored highlights, and traveler
         intel into a monetizable itinerary that actually feels curated.
       </p>
     </header>
 
-    <Surface elevation="raised" className="bg-gradient-to-br from-[#f4f4ef] to-[#eeeee9]">
-      <Suspense fallback={<p>Loading planner…</p>}>
-        <TripPlanner />
-      </Suspense>
-    </Surface>
+    <section className="space-y-4">
+      <div className="space-y-3">
+        <p className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
+          Route builder
+        </p>
+        <h2 className="font-display text-2xl font-bold text-wayfarer-primary md:text-3xl">
+          Plan your next drive in minutes
+        </h2>
+        <p className="max-w-2xl font-body text-sm text-wayfarer-text-muted">
+          Tune your route, generate curated stop ideas, and explore options in one
+          continuous planning flow.
+        </p>
+      </div>
+      <Surface
+        elevation="raised"
+        className="bg-gradient-to-br from-wayfarer-surface to-wayfarer-surface-deep"
+      >
+        <Suspense fallback={<p>Loading planner…</p>}>
+          <TripPlanner />
+        </Suspense>
+      </Surface>
+    </section>
   </div>
 );
 
