@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 import { auth } from '../auth';
 import AuthSessionProvider from '../components/session-provider';
+import GoogleMapsScriptLoader from '../components/GoogleMapsScriptLoader';
 
 export const metadata: Metadata = {
   title: 'RoadTrip | Plan unforgettable drives',
@@ -25,6 +26,7 @@ const RootLayout = async ({ children }: { children: ReactNode }) => {
   return (
     <html lang="en">
       <body>
+        <GoogleMapsScriptLoader />
         <AuthSessionProvider session={session}>
           <main>{children}</main>
         </AuthSessionProvider>
