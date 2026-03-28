@@ -1,0 +1,13 @@
+# Spec Kit Configuration
+
+version: 1
+specs:
+  - path: specs/*.md
+    required: true
+    reviewers:
+      - lonnyangell
+    labels:
+      - spec
+      - architecture
+      - security
+      - performance

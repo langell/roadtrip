@@ -1,0 +1,16 @@
+name: Spec Kit Lint
+
+on:
+  pull_request:
+    paths:
+      - '.specs/**'
+      - 'docs/**'
+      - 'stories/**'
+
+jobs:
+  spec-kit-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run spec-kit lint
+        run: npx github:github/spec-kit lint .specs/specs/*.md

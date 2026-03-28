@@ -33,3 +33,5 @@ Tracks completed story work in chronological order.
 - RT-014 `2026-03-ai-trip-planning-and-stop-details.md`
 - RT-015 `2026-03-ai-trip-planner-api-orchestration.md`
 - RT-016 `2026-03-ai-trip-planner-web-experience.md`
+- [ ] 2026-03-main-search-ui-improvements.md Main Search UI Improvements
+- [ ] 2026-03-architecture-security-performance.md Architecture, Security, Performance
