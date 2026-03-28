@@ -10,6 +10,7 @@
     "test": "node ./scripts/run-tests.mjs"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
     "@roadtrip/types": "workspace:*",
     "@roadtrip/ui": "workspace:*",
     "jose": "^6.2.2",

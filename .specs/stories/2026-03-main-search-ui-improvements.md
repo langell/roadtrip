@@ -15,7 +15,6 @@ As a user planning a road trip, I want the main search interface to be more help
 ## Acceptance Criteria
 
 - Location input provides auto-complete suggestions (Google Places or similar).
-- Location input auto-capitalizes to proper case (e.g., "san francisco" → "San Francisco").
 - Radius slider increments by 5 miles and defaults to 100 miles.
 - Checkbox for "Smart pitstops" (AI/curated suggestions).
 - Checkbox for "Photo ops" (photogenic locations).
@@ -24,13 +23,13 @@ As a user planning a road trip, I want the main search interface to be more help
 
 ## Tasks
 
-- [ ] Implement location input with auto-complete and capitalization.
-- [ ] Update radius slider to increment by 5 and default to 100.
-- [ ] Add checkboxes for Smart pit stops and Photo ops.
-- [ ] Apply design system tokens and styles.
-- [ ] Test on both mobile and desktop layouts.
-- [ ] Reference Stitch MCP for visual direction.
-- [ ] Update docs/design-system.md if new tokens are needed.
+- [x] Implement location input with auto-complete and capitalization.
+- [x] Update radius slider to increment by 5 and default to 100.
+- [x] Add checkboxes for Smart pit stops and Photo ops.
+- [x] Apply design system tokens and styles.
+- [x] Test on both mobile and desktop layouts.
+- [x] Reference Stitch MCP for visual direction.
+- [x] Update docs/design-system.md if new tokens are needed.
 
 ## Notes
 

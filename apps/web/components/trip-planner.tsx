@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
 const KM_PER_MILE = 1.60934;
-const MIN_RADIUS_MILES = 16;
-const MAX_RADIUS_MILES = 311;
+const MIN_RADIUS_MILES = 10;
+const MAX_RADIUS_MILES = 300;
 const LOADING_MESSAGES = [
   'Scanning local standouts and hidden gems…',
   'Balancing your selected themes into unique route options…',
@@ -144,13 +145,51 @@ const reverseGeocodeLocation = async (
 
 const TripPlanner = () => {
   const [filters, setFilters] = useState({
-    radiusMiles: 93,
+    radiusMiles: 100, // Default to 100 miles
     maxStops: 6,
+    smartPitstops: false,
+    photoOps: false,
   });
+  {
+    /* Smart pitstops and Photo ops checkboxes */
+  }
+  <section className="space-y-2">
+    <div className="flex items-center gap-3">
+      <input
+        id="smart-pitstops"
+        type="checkbox"
+        checked={filters.smartPitstops}
+        onChange={(e) => setFilters((f) => ({ ...f, smartPitstops: e.target.checked }))}
+        className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
+      />
+      <label
+        htmlFor="smart-pitstops"
+        className="font-body text-sm text-wayfarer-text-main select-none cursor-pointer"
+      >
+        Smart Pit-Stops
+      </label>
+    </div>
+    <div className="flex items-center gap-3">
+      <input
+        id="photo-ops"
+        type="checkbox"
+        checked={filters.photoOps}
+        onChange={(e) => setFilters((f) => ({ ...f, photoOps: e.target.checked }))}
+        className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
+      />
+      <label
+        htmlFor="photo-ops"
+        className="font-body text-sm text-wayfarer-text-main select-none cursor-pointer"
+      >
+        Photo Ops
+      </label>
+    </div>
+  </section>;
   const [selectedThemes, setSelectedThemes] = useState<
     Array<(typeof TripThemeSchema.options)[number]>
   >(['scenic']);
   const [location, setLocation] = useState('Carmel By The Sea, CA');
+
   const [loading, setLoading] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -308,11 +347,11 @@ const TripPlanner = () => {
             >
               ⌖
             </span>
-            <input
-              className="h-16 w-full rounded-xl border-none bg-white pl-12 pr-6 font-body font-medium text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
-              placeholder="Carmel By The Sea, CA"
+            <GooglePlacesAutocomplete
               value={location}
-              onChange={(event) => setLocation(event.target.value)}
+              onChange={setLocation}
+              onSelect={setLocation}
+              placeholder="Carmel By The Sea, CA"
             />
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -348,6 +387,7 @@ const TripPlanner = () => {
             type="range"
             min={MIN_RADIUS_MILES}
             max={MAX_RADIUS_MILES}
+            step={5}
             className="h-2 w-full cursor-pointer appearance-none rounded-full bg-wayfarer-surface-deep accent-wayfarer-primary"
             value={filters.radiusMiles}
             onChange={(event) =>
@@ -357,6 +397,34 @@ const TripPlanner = () => {
           <div className="flex justify-between px-1 font-body text-[10px] font-bold uppercase tracking-tight text-wayfarer-text-muted">
             <span>{MIN_RADIUS_MILES} mi</span>
             <span>{MAX_RADIUS_MILES} mi</span>
+          </div>
+
+          {/* Smart pitstops and Photo ops checkboxes */}
+          <div className="flex gap-8 py-2">
+            <label className="flex items-center gap-2 font-body text-sm text-wayfarer-text-main select-none cursor-pointer">
+              <input
+                id="smart-pitstops"
+                type="checkbox"
+                checked={filters.smartPitstops}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, smartPitstops: e.target.checked }))
+                }
+                className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
+              />
+              Smart Pit-Stops
+            </label>
+            <label className="flex items-center gap-2 font-body text-sm text-wayfarer-text-main select-none cursor-pointer">
+              <input
+                id="photo-ops"
+                type="checkbox"
+                checked={filters.photoOps}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, photoOps: e.target.checked }))
+                }
+                className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
+              />
+              Photo Ops
+            </label>
           </div>
         </section>
 
