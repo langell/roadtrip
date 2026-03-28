@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Started
 
 ## Context
 
@@ -26,7 +26,7 @@ As a user planning a road trip, I want the main search interface to be more help
 
 - [ ] Implement location input with auto-complete and capitalization.
 - [ ] Update radius slider to increment by 5 and default to 100.
-- [ ] Add checkboxes for Smart pitstops and Photo ops.
+- [ ] Add checkboxes for Smart pit stops and Photo ops.
 - [ ] Apply design system tokens and styles.
 - [ ] Test on both mobile and desktop layouts.
 - [ ] Reference Stitch MCP for visual direction.
