@@ -176,7 +176,8 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   }
 
   const encodedPhotoName = encodeURIComponent(photoName);
-  return `${req.protocol}://${req.get('host')}/places/photo?name=${encodedPhotoName}`;
+  const base = env.PUBLIC_API_BASE_URL ?? `${req.protocol}://${req.get('host')}`;
+  return `${base}/places/photo?name=${encodedPhotoName}`;
 };
 
 const createAnonymousSuggestionsRateLimiter = () => {
@@ -206,6 +207,7 @@ const createAnonymousSuggestionsRateLimiter = () => {
 
 export const createApp = () => {
   const app = express();
+  app.set('trust proxy', 1);
   const allowAnonymousSuggestionRequest = createAnonymousSuggestionsRateLimiter();
   app.use(cors());
   app.use(helmet());

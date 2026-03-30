@@ -28,6 +28,7 @@ const schema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  PUBLIC_API_BASE_URL: z.string().url().optional(),
 });
 
 export const env = schema.parse(process.env);
