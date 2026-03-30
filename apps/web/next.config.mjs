@@ -14,6 +14,11 @@ const config = {
   outputFileTracingRoot: path.join(__dirname, '../..'),
   transpilePackages: ['@roadtrip/ui'],
   turbopack: {},
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+    ],
+  },
 };
 
 export default withBundleAnalyzer()(config);

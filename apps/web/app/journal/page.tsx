@@ -5,10 +5,10 @@ const JournalPage = () => (
         Company
       </p>
       <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
-        HopTrip Journal
+        HipTrip Journal
       </h1>
       <p className="max-w-3xl text-lg leading-relaxed text-wayfarer-text-muted">
-        Stories, road notes, and practical travel insights from the HopTrip team.
+        Stories, road notes, and practical travel insights from the HipTrip team.
       </p>
 
       <section className="space-y-4">

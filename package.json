@@ -8,7 +8,7 @@
   },
   "scripts": {
     "setup:pnpm": "corepack enable && corepack prepare pnpm@9.1.0 --activate",
-    "dev": "turbo run dev --parallel",
+    "dev": "turbo run dev",
     "dev:web": "node ./scripts/kill-port.mjs 3000 && pnpm --filter @roadtrip/web dev",
     "dev:api": "node ./scripts/kill-port.mjs 3001 && pnpm --filter @roadtrip/api dev",
     "dev:mobile": "pnpm --filter @roadtrip/mobile start",
@@ -38,7 +38,7 @@
     "husky": "^9.0.11",
     "lint-staged": "^15.2.2",
     "prettier": "^3.2.5",
-    "turbo": "^2.0.3",
+    "turbo": "^2.8.21",
     "typescript": "5.5.4"
   },
   "lint-staged": {

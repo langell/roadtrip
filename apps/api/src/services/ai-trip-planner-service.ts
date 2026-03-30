@@ -31,12 +31,122 @@ export class AiTripPlannerService {
   constructor(private readonly fetchFn: typeof fetch = fetch) {}
 
   private readonly themeKeywords: Record<string, string[]> = {
-    scenic: ['viewpoint', 'overlook', 'waterfront', 'coast', 'scenic', 'lake', 'trail'],
-    foodie: ['restaurant', 'food', 'market', 'brewery', 'cafe', 'bakery', 'diner'],
-    culture: ['museum', 'history', 'historic', 'gallery', 'landmark', 'arts', 'cultural'],
-    adventure: ['hike', 'kayak', 'climb', 'outdoor', 'adventure', 'park', 'trail'],
-    family: ['family', 'kids', 'playground', 'zoo', 'aquarium', 'all-ages'],
-    sports: ['stadium', 'arena', 'sports', 'game', 'match', 'athletic', 'field'],
+    scenic: [
+      'viewpoint',
+      'overlook',
+      'waterfront',
+      'coast',
+      'scenic',
+      'lake',
+      'trail',
+      'falls',
+      'ridge',
+      'bluff',
+      'creek',
+      'river',
+      'gorge',
+      'canyon',
+      'beach',
+      'bay',
+      'harbor',
+      'pier',
+    ],
+    foodie: [
+      'restaurant',
+      'food',
+      'market',
+      'brewery',
+      'brew',
+      'cafe',
+      'bakery',
+      'diner',
+      'pub',
+      'bistro',
+      'eatery',
+      'taco',
+      'pizza',
+      'burger',
+      'bbq',
+      'sushi',
+      'kitchen',
+      'grill',
+      'wine',
+      'farm',
+      'co-op',
+      'creamery',
+      'chocolat',
+      'candy',
+      'dining',
+      'cuisine',
+      'eat',
+      'bar &',
+    ],
+    culture: [
+      'museum',
+      'history',
+      'historic',
+      'gallery',
+      'landmark',
+      'arts',
+      'cultural',
+      'theatre',
+      'theater',
+      'heritage',
+      'monument',
+      'library',
+      'cathedral',
+      'chapel',
+      'district',
+      'center',
+    ],
+    adventure: [
+      'hike',
+      'kayak',
+      'climb',
+      'outdoor',
+      'adventure',
+      'park',
+      'trail',
+      'ski',
+      'bike',
+      'raft',
+      'zipline',
+      'summit',
+      'ridge',
+      'wilderness',
+      'preserve',
+      'forest',
+      'gorge',
+    ],
+    family: [
+      'family',
+      'kids',
+      'playground',
+      'zoo',
+      'aquarium',
+      'all-ages',
+      'children',
+      'discovery',
+      'science',
+      'fair',
+      'park',
+      'farm',
+      'petting',
+    ],
+    sports: [
+      'stadium',
+      'arena',
+      'sports',
+      'game',
+      'match',
+      'athletic',
+      'field',
+      'ballpark',
+      'rink',
+      'track',
+      'gym',
+      'center',
+    ],
   };
 
   private buildThemePrompt(themes: string[]) {
@@ -290,11 +400,30 @@ export class AiTripPlannerService {
     };
   }
 
+  private buildModifierPrompt(modifiers?: {
+    smartPitstops?: boolean;
+    photoOps?: boolean;
+  }) {
+    const lines: string[] = [];
+    if (modifiers?.smartPitstops) {
+      lines.push(
+        '- smart pitstops: Weave in 1-2 practical road trip stops per option — a well-regarded local coffee shop, a scenic fuel stop, or a roadside spot worth a 10-minute stretch.',
+      );
+    }
+    if (modifiers?.photoOps) {
+      lines.push(
+        '- photo ops: Prioritize stops with strong visual character — golden-hour overlooks, striking murals, iconic backdrops, or locations known for photography.',
+      );
+    }
+    return lines.join('\n');
+  }
+
   async generatePlans(input: {
     location: string;
     radiusKm: number;
     themes: string[];
     maxOptions: 2 | 3;
+    modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
   }): Promise<AiTripPlans> {
     const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
     if (!apiKey) {
@@ -305,6 +434,7 @@ export class AiTripPlannerService {
     const fallbackModel = 'gemini-2.5-flash';
 
     const themePrompt = this.buildThemePrompt(input.themes);
+    const modifierPrompt = this.buildModifierPrompt(input.modifiers);
     const prompt = [
       'You are an expert regional road-trip designer.',
       'Create distinctly lovable itinerary options that feel surprising, local, and memorable.',
@@ -317,6 +447,9 @@ export class AiTripPlannerService {
       '',
       'Theme direction (apply all selected themes):',
       themePrompt,
+      ...(modifierPrompt
+        ? ['', 'Additional modifiers (layer on top of themes):', modifierPrompt]
+        : []),
       '',
       'Hard requirements:',
       '- Every itinerary option must include all selected themes (no theme may be omitted).',
@@ -353,6 +486,8 @@ export class AiTripPlannerService {
         return primaryPlans;
       }
 
+      // If all requested options are accounted for and only some fail coverage,
+      // retry only when we'd lose too many — otherwise proceed to retry for a better result.
       const retryPrompt = [
         prompt,
         '',
@@ -372,14 +507,25 @@ export class AiTripPlannerService {
 
       const retryPlans = this.parsePlansFromResponseBody(responseBodyText);
       const retryCoverage = this.evaluateThemeCoverage(retryPlans, input.themes);
-      if (!retryCoverage.isCovered) {
-        throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
-          reason: 'theme_coverage_failed',
-          missingByOption: retryCoverage.missingByOption,
-        });
+      if (retryCoverage.isCovered) {
+        return retryPlans;
       }
 
-      return retryPlans;
+      // Filter to options that pass coverage; return partial set rather than erroring.
+      const passingIndices = new Set(
+        retryCoverage.missingByOption
+          .filter((entry) => entry.missingThemes.length === 0)
+          .map((entry) => entry.optionIndex),
+      );
+      const passingOptions = retryPlans.options.filter((_, i) => passingIndices.has(i));
+      if (passingOptions.length > 0) {
+        return { options: passingOptions };
+      }
+
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: 'theme_coverage_failed',
+        missingByOption: retryCoverage.missingByOption,
+      });
     } catch (error) {
       if (error instanceof AiTripPlannerError) {
         throw error;

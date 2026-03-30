@@ -6,7 +6,7 @@ import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
 
-const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hoptrip:auto-location-denied';
+const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const KM_PER_MILE = 1.60934;
 const MIN_RADIUS_MILES = 10;
 const MAX_RADIUS_MILES = 300;
@@ -143,48 +143,16 @@ const reverseGeocodeLocation = async (
   return reverseGeocodeWithFallback(latitude, longitude);
 };
 
+const toTitleCase = (value: string) =>
+  value.replace(/\b\w/g, (char) => char.toUpperCase());
+
 const TripPlanner = () => {
   const [filters, setFilters] = useState({
-    radiusMiles: 100, // Default to 100 miles
+    radiusMiles: 100,
     maxStops: 6,
     smartPitstops: false,
     photoOps: false,
   });
-  {
-    /* Smart pitstops and Photo ops checkboxes */
-  }
-  <section className="space-y-2">
-    <div className="flex items-center gap-3">
-      <input
-        id="smart-pitstops"
-        type="checkbox"
-        checked={filters.smartPitstops}
-        onChange={(e) => setFilters((f) => ({ ...f, smartPitstops: e.target.checked }))}
-        className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
-      />
-      <label
-        htmlFor="smart-pitstops"
-        className="font-body text-sm text-wayfarer-text-main select-none cursor-pointer"
-      >
-        Smart Pit-Stops
-      </label>
-    </div>
-    <div className="flex items-center gap-3">
-      <input
-        id="photo-ops"
-        type="checkbox"
-        checked={filters.photoOps}
-        onChange={(e) => setFilters((f) => ({ ...f, photoOps: e.target.checked }))}
-        className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
-      />
-      <label
-        htmlFor="photo-ops"
-        className="font-body text-sm text-wayfarer-text-main select-none cursor-pointer"
-      >
-        Photo Ops
-      </label>
-    </div>
-  </section>;
   const [selectedThemes, setSelectedThemes] = useState<
     Array<(typeof TripThemeSchema.options)[number]>
   >(['scenic']);
@@ -214,11 +182,19 @@ const TripPlanner = () => {
     setPlanError(null);
     setPlanSource(null);
     try {
+      const modifiers =
+        filters.smartPitstops || filters.photoOps
+          ? {
+              smartPitstops: filters.smartPitstops || undefined,
+              photoOps: filters.photoOps || undefined,
+            }
+          : undefined;
       const data = await fetchTripPlans({
         location,
         radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
         themes: selectedThemes,
         maxOptions: 3,
+        modifiers,
       });
 
       if (!data) {
@@ -336,25 +312,17 @@ const TripPlanner = () => {
           void handleGenerate();
         }}
       >
-        <label className="block space-y-3">
+        <div className="space-y-3">
           <span className="block px-1 font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-primary">
             Where are you starting?
           </span>
-          <div className="group relative">
-            <span
-              aria-hidden
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl text-wayfarer-primary/50 transition-colors group-focus-within:text-wayfarer-primary"
-            >
-              ⌖
-            </span>
-            <GooglePlacesAutocomplete
-              value={location}
-              onChange={setLocation}
-              onSelect={setLocation}
-              placeholder="Carmel By The Sea, CA"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-3 pt-1">
+          <GooglePlacesAutocomplete
+            value={location}
+            onChange={(val) => setLocation(toTitleCase(val))}
+            onSelect={setLocation}
+            placeholder="City, State or region…"
+          />
+          <div className="flex flex-wrap items-center gap-3 pt-0.5">
             <button
               type="button"
               className="font-body text-xs font-semibold uppercase tracking-[0.14em] text-wayfarer-secondary hover:text-wayfarer-primary disabled:cursor-not-allowed disabled:opacity-60"
@@ -369,7 +337,7 @@ const TripPlanner = () => {
               </span>
             ) : null}
           </div>
-        </label>
+        </div>
 
         <section className="space-y-3">
           <div className="flex items-end justify-between px-1">
@@ -397,34 +365,6 @@ const TripPlanner = () => {
           <div className="flex justify-between px-1 font-body text-[10px] font-bold uppercase tracking-tight text-wayfarer-text-muted">
             <span>{MIN_RADIUS_MILES} mi</span>
             <span>{MAX_RADIUS_MILES} mi</span>
-          </div>
-
-          {/* Smart pitstops and Photo ops checkboxes */}
-          <div className="flex gap-8 py-2">
-            <label className="flex items-center gap-2 font-body text-sm text-wayfarer-text-main select-none cursor-pointer">
-              <input
-                id="smart-pitstops"
-                type="checkbox"
-                checked={filters.smartPitstops}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, smartPitstops: e.target.checked }))
-                }
-                className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
-              />
-              Smart Pit-Stops
-            </label>
-            <label className="flex items-center gap-2 font-body text-sm text-wayfarer-text-main select-none cursor-pointer">
-              <input
-                id="photo-ops"
-                type="checkbox"
-                checked={filters.photoOps}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, photoOps: e.target.checked }))
-                }
-                className="h-5 w-5 accent-wayfarer-primary rounded border-wayfarer-surface focus:ring-2 focus:ring-wayfarer-primary"
-              />
-              Photo Ops
-            </label>
           </div>
         </section>
 
@@ -461,6 +401,47 @@ const TripPlanner = () => {
                 </button>
               );
             })}
+          </div>
+
+          <div className="mt-5 space-y-2 border-t border-wayfarer-surface pt-5">
+            <span className="block px-1 font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-primary">
+              Add-Ons
+            </span>
+            <div className="flex flex-wrap gap-3">
+              {(
+                [
+                  { key: 'smartPitstops', label: 'Smart Pit-Stops', emoji: '⛽' },
+                  { key: 'photoOps', label: 'Photo Ops', emoji: '📸' },
+                ] as const
+              ).map(({ key, label, emoji }) => {
+                const active = filters[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="switch"
+                    aria-checked={active}
+                    onClick={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}
+                    className={
+                      active
+                        ? 'flex items-center gap-2.5 rounded-full px-4 py-2.5 font-body text-sm font-semibold transition-all active:scale-95 bg-wayfarer-secondary text-white shadow-wayfarer-soft'
+                        : 'flex items-center gap-2.5 rounded-full px-4 py-2.5 font-body text-sm font-semibold transition-all active:scale-95 bg-wayfarer-surface-deep text-wayfarer-text-muted hover:bg-wayfarer-surface'
+                    }
+                  >
+                    <span
+                      aria-hidden
+                      className={`inline-flex h-[18px] w-8 flex-shrink-0 items-center rounded-full p-0.5 transition-colors ${active ? 'bg-white/25' : 'bg-black/10'}`}
+                    >
+                      <span
+                        className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-200 ${active ? 'translate-x-[14px] bg-white' : 'translate-x-0 bg-wayfarer-text-muted/60'}`}
+                      />
+                    </span>
+                    <span>{emoji}</span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 

@@ -1,4 +1,4 @@
-# Story ID: RT-009 – Web Design Token Alignment to Stitch
+# Story ID: RT-024 – Web Design Token Alignment to Stitch
 
 ## Outcome
 

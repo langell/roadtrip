@@ -79,6 +79,11 @@ const { createApp, startServer, registerSignalHandlers } = await import('./serve
 
 describe('HTTP server', () => {
   beforeEach(() => {
+    // Ensure test-mode auth bypass (bare bearer strings) by removing secrets
+    // that may have been loaded from .env via dotenv/config in server.ts.
+    delete process.env.AUTH_SECRET;
+    delete process.env.NEXTAUTH_SECRET;
+
     findStops.mockReset();
     resolvePlannedStops.mockReset();
     geocodeLocation.mockReset();
@@ -265,6 +270,24 @@ describe('HTTP server', () => {
       diagnosticCode: 'UNKNOWN_PLACES_ERROR',
       diagnosticStage: 'unknown',
     });
+  });
+
+  it('returns 401 for unauthenticated GET /trips', async () => {
+    const app = createApp();
+    const response = await request(app).get('/trips');
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: 'UNAUTHORIZED' });
+    expect(prismaMock.trip.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for unauthenticated POST /trips/save-generated', async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/save-generated')
+      .send({ location: 'Austin, TX', radiusKm: 120, theme: 'scenic' });
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: 'UNAUTHORIZED' });
+    expect(prismaMock.trip.create).not.toHaveBeenCalled();
   });
 
   it('lists saved trips for authenticated users', async () => {
