@@ -32,7 +32,7 @@
 
 ### Docs & Ops
 
-- [ ] Update `.env.example` and README with Google API enablement steps and required vars.
+- [x] Update `.env.example` and README with Google API enablement steps and required vars.
 
 ## Notes
 
