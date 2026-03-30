@@ -26,9 +26,9 @@ const AuthControls = ({ variant = 'default' }: AuthControlsProps) => {
 
   if (session?.user) {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <span className="font-body text-sm text-wayfarer-text-muted/90">
-          Signed in as {session.user.name ?? session.user.email ?? session.user.id}
+      <div className="flex items-center justify-end gap-3">
+        <span className="hidden font-body text-sm text-wayfarer-text-muted/90 sm:inline">
+          {session.user.name ?? session.user.email ?? session.user.id}
         </span>
         {isNav ? (
           <Link
