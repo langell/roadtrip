@@ -5,10 +5,10 @@ const AboutPage = () => (
         Company
       </p>
       <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
-        About HopTrip
+        About HipTrip
       </h1>
       <p className="max-w-3xl text-lg leading-relaxed text-wayfarer-text-muted">
-        HopTrip helps travelers turn everyday drives into curated journeys with scenic
+        HipTrip helps travelers turn everyday drives into curated journeys with scenic
         routes, local discoveries, and practical trip planning tools.
       </p>
 

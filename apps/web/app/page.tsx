@@ -9,7 +9,7 @@ const HomePage = () => (
   <div className="bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
     <header className="relative z-20 flex h-16 items-center justify-between px-6 md:px-10">
       <p className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary">
-        HopTrip
+        HipTrip
       </p>
       <AuthControls variant="nav" />
     </header>
@@ -185,7 +185,7 @@ const HomePage = () => (
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 md:flex-row md:justify-between md:px-8">
         <div>
           <p className="font-display text-xl font-black uppercase tracking-[0.2em] text-wayfarer-primary">
-            HopTrip
+            HipTrip
           </p>
           <p className="mt-2 max-w-xs text-sm text-wayfarer-text-muted">
             Built for the curious. Designed for the drive.

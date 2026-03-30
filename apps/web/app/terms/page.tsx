@@ -18,7 +18,7 @@ const TermsPage = () => (
             Acceptable Use
           </h2>
           <p className="text-sm leading-relaxed text-wayfarer-text-muted">
-            Users agree to use HopTrip responsibly and avoid misuse of platform services.
+            Users agree to use HipTrip responsibly and avoid misuse of platform services.
           </p>
         </article>
         <article className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft">

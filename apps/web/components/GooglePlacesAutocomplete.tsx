@@ -1,7 +1,14 @@
 'use client';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+};
 
 export interface GooglePlacesAutocompleteProps {
   value: string;
@@ -31,95 +38,82 @@ export default function GooglePlacesAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!GOOGLE_MAPS_API_KEY) return;
-    if (window.google && window.google.maps && window.google.maps.places) {
+    if (!window.google && !document.getElementById('google-maps-script')) return;
+    if (window.google?.maps?.places) {
       setScriptLoaded(true);
       return;
     }
-    if (!document.getElementById('google-maps')) {
-      const script = document.createElement('script');
-      script.id = 'google-maps';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly`;
-      script.async = true;
-      script.onload = () => setScriptLoaded(true);
-      document.body.appendChild(script);
-    } else {
-      setScriptLoaded(true);
+    // GoogleMapsScriptLoader in layout owns the script — wait for it
+    const existing = document.getElementById('google-maps-script');
+    if (existing) {
+      const onLoad = () => setScriptLoaded(true);
+      existing.addEventListener('load', onLoad);
+      return () => existing.removeEventListener('load', onLoad);
     }
   }, []);
 
-  // Debounce input
-  // Use ReturnType<typeof setTimeout> for browser compatibility
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
-    let timer: ReturnType<typeof setTimeout>;
-    return (...args: Parameters<T>) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn(...args), delay);
-    };
-  };
-
   // Fetch suggestions with debounce
-  const fetchSuggestions = useCallback(
-    debounce((inputValue: string) => {
-      if (!scriptLoaded || !inputValue) {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        setLoading(false);
-        setError(null);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let service: any = null;
-      if (window.google && window.google.maps && window.google.maps.places) {
-        if (window.google.maps.importLibrary) {
-          window.google.maps.importLibrary('places').then(() => {
-            service = new window.google.maps.places.AutocompleteService();
-            // Only call if google is defined
-
-            if (
-              typeof window !== 'undefined' &&
-              window.google &&
-              window.google.maps &&
-              window.google.maps.places
-            ) {
-              service.getPlacePredictions(
-                { input: inputValue, types: ['(cities)'] },
-                (predictions: PlacePrediction[] | null, status: string) => {
-                  setLoading(false);
-                  if (status === 'OK' && predictions) {
-                    setSuggestions(predictions);
-                    setShowSuggestions(true);
-                  } else {
-                    setSuggestions([]);
-                    setShowSuggestions(true);
-                    if (status !== 'ZERO_RESULTS') setError('No results found.');
-                  }
-                },
-              );
-            }
-          });
-        } else {
-          service = new window.google.maps.places.AutocompleteService();
-          service.getPlacePredictions(
-            { input: inputValue, types: ['(cities)'] },
-            (predictions: PlacePrediction[], status: string) => {
-              setLoading(false);
-              if (status === 'OK' && predictions) {
-                setSuggestions(predictions);
-                setShowSuggestions(true);
-              } else {
-                setSuggestions([]);
-                setShowSuggestions(true);
-                if (status !== 'ZERO_RESULTS') setError('No results found.');
-              }
-            },
-          );
+  const fetchSuggestions = useMemo(
+    () =>
+      debounce((inputValue: string) => {
+        if (!scriptLoaded || !inputValue) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+          setLoading(false);
+          setError(null);
+          return;
         }
-      }
-    }, 250),
+        setLoading(true);
+        setError(null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let service: any = null;
+        if (window.google && window.google.maps && window.google.maps.places) {
+          if (window.google.maps.importLibrary) {
+            window.google.maps.importLibrary('places').then(() => {
+              service = new window.google.maps.places.AutocompleteService();
+              // Only call if google is defined
+
+              if (
+                typeof window !== 'undefined' &&
+                window.google &&
+                window.google.maps &&
+                window.google.maps.places
+              ) {
+                service.getPlacePredictions(
+                  { input: inputValue, types: ['(cities)'] },
+                  (predictions: PlacePrediction[] | null, status: string) => {
+                    setLoading(false);
+                    if (status === 'OK' && predictions) {
+                      setSuggestions(predictions);
+                      setShowSuggestions(true);
+                    } else {
+                      setSuggestions([]);
+                      setShowSuggestions(true);
+                      if (status !== 'ZERO_RESULTS') setError('No results found.');
+                    }
+                  },
+                );
+              }
+            });
+          } else {
+            service = new window.google.maps.places.AutocompleteService();
+            service.getPlacePredictions(
+              { input: inputValue, types: ['(cities)'] },
+              (predictions: PlacePrediction[], status: string) => {
+                setLoading(false);
+                if (status === 'OK' && predictions) {
+                  setSuggestions(predictions);
+                  setShowSuggestions(true);
+                } else {
+                  setSuggestions([]);
+                  setShowSuggestions(true);
+                  if (status !== 'ZERO_RESULTS') setError('No results found.');
+                }
+              },
+            );
+          }
+        }
+      }, 250),
     [scriptLoaded],
   );
 
@@ -160,14 +154,27 @@ export default function GooglePlacesAutocomplete({
 
   return (
     <div
-      className="relative"
+      className="group relative"
       ref={containerRef}
       aria-haspopup="listbox"
       aria-owns="autocomplete-listbox"
     >
+      <svg
+        aria-hidden
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-wayfarer-primary/40 transition-colors group-focus-within:text-wayfarer-primary"
+      >
+        <path
+          fillRule="evenodd"
+          d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-2.006 3.699-4.92 3.699-8.327a8 8 0 10-16 0c0 3.407 1.755 6.321 3.7 8.327a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.144.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z"
+          clipRule="evenodd"
+        />
+      </svg>
       <input
         ref={inputRef}
-        className="h-16 w-full rounded-xl border-none bg-white pl-12 pr-6 font-body font-medium text-wayfarer-text-main placeholder:text-wayfarer-text-muted focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
+        className="h-14 w-full rounded-xl border-none bg-wayfarer-surface pl-12 pr-6 text-left font-body text-base font-medium text-wayfarer-text-main placeholder:text-wayfarer-text-muted/60 focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
         placeholder={placeholder}
         value={value}
         onChange={(e) => {
@@ -185,7 +192,7 @@ export default function GooglePlacesAutocomplete({
         aria-expanded={showSuggestions}
       />
       {loading && (
-        <div className="absolute left-0 right-0 top-full z-10 bg-white px-4 py-2 text-wayfarer-text-muted shadow-lg rounded-xl mt-1">
+        <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-xl bg-wayfarer-surface px-4 py-2 text-sm text-wayfarer-text-muted shadow-wayfarer-soft">
           Loading…
         </div>
       )}
@@ -193,10 +200,10 @@ export default function GooglePlacesAutocomplete({
         <div
           id="autocomplete-listbox"
           role="listbox"
-          className="absolute left-0 right-0 top-full z-10 bg-white shadow-lg rounded-xl mt-1"
+          className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl bg-wayfarer-surface shadow-wayfarer-soft"
         >
           {suggestions.length === 0 && !loading && (
-            <div className="px-4 py-2 text-wayfarer-text-muted">
+            <div className="px-4 py-3 text-sm text-wayfarer-text-muted">
               {error || 'No results found.'}
             </div>
           )}
@@ -206,7 +213,7 @@ export default function GooglePlacesAutocomplete({
               key={suggestion.place_id}
               role="option"
               aria-selected={activeIndex === idx}
-              className={`px-4 py-2 cursor-pointer font-body text-wayfarer-text-main ${
+              className={`cursor-pointer px-4 py-3 font-body text-sm text-wayfarer-text-main transition-colors ${
                 activeIndex === idx ? 'bg-wayfarer-bg' : 'hover:bg-wayfarer-bg'
               }`}
               onMouseDown={() => {

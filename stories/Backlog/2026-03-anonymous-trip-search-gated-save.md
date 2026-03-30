@@ -1,4 +1,4 @@
-# Story ID: RT-008 – Anonymous Trip Search with Auth-Gated Save
+# Story ID: RT-023 – Anonymous Trip Search with Auth-Gated Save
 
 ## Outcome
 

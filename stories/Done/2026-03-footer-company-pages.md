@@ -2,7 +2,7 @@
 
 ## Outcome
 
-- Visitors can open dedicated company pages from the footer to learn about HopTrip and trust the brand.
+- Visitors can open dedicated company pages from the footer to learn about HipTrip and trust the brand.
 
 ## Acceptance Criteria
 
@@ -21,4 +21,4 @@
 ## Notes
 
 - Keep implementation minimal MVP content; avoid adding features not required by footer navigation.
-- Align page shell with current HopTrip homepage visual language.
+- Align page shell with current HipTrip homepage visual language.

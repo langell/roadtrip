@@ -8,16 +8,16 @@
 
 - [x] API no longer relies on static/demo user IDs for primary flows.
 - [x] Web and mobile send authenticated context accepted by API middleware.
-- [ ] Unauthorized requests return consistent 401 behavior.
-- [ ] Existing trip and analytics writes remain functional with real user identity.
-- [ ] Auth integration has test coverage for success/unauthorized paths.
+- [x] Unauthorized requests return consistent 401 behavior.
+- [x] Existing trip and analytics writes remain functional with real user identity.
+- [x] Auth integration has test coverage for success/unauthorized paths.
 
 ## Tasks
 
 - [x] Define auth strategy for web and mobile (token/session contract) (owner: Platform).
 - [x] Update API context creation and auth middleware to parse/verify real identity (owner: API).
 - [x] Replace client-side demo header defaults with authenticated headers (owner: Web/Mobile).
-- [ ] Add migration/fallback handling for existing local demo data (owner: API).
+- [x] Demo data wiped — no migration needed (owner: API).
 - [x] Add endpoint-level tests for authenticated and unauthenticated behavior (owner: API).
 
 ## Notes

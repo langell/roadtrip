@@ -8,19 +8,16 @@ datasource db {
 }
 
 model User {
-  id              String           @id @default(uuid())
-  email           String           @unique
-  name            String?
-  image           String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  trips           Trip[]
-  analyticsEvents AnalyticsEvent[]
+  id        String   @id
+  email     String?  @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Trip {
   id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
   userId    String
   name      String
   originLat Float
@@ -70,7 +67,6 @@ model SponsoredPlace {
 model AnalyticsEvent {
   id        String   @id @default(uuid())
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   type      String
   payload   Json
   createdAt DateTime @default(now())

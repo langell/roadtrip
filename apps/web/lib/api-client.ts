@@ -46,7 +46,7 @@ export type TripPlanResponse = {
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   (process.env.NODE_ENV === 'production'
-    ? 'https://api.hoptrip.net'
+    ? 'https://api.hiptrip.net'
     : 'http://localhost:3001');
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
@@ -141,6 +141,7 @@ export const fetchTripPlans = async (params: {
   radiusKm: number;
   themes: string[];
   maxOptions: 2 | 3;
+  modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
 }): Promise<TripPlanResponse | null> => {
   try {
     const response = await fetch(`${apiBaseUrl}/trips/plan`, {

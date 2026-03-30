@@ -1,3 +1,8 @@
+// Clear auth secrets so tests use the no-secret bypass path by default.
+// Tests that need JWT verification set AUTH_SECRET explicitly in beforeEach.
+delete process.env.AUTH_SECRET;
+delete process.env.NEXTAUTH_SECRET;
+
 process.env.DATABASE_URL ??= 'postgres://user:pass@localhost:5432/test';
 process.env.GOOGLE_MAPS_API_KEY ??= 'test-key';
 process.env.GOOGLE_MAPS_API_BASE_URL ??= 'https://maps.googleapis.com';

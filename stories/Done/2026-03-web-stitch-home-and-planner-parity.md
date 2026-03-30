@@ -1,4 +1,4 @@
-# Story ID: RT-010 – Home + Planner Screen Parity with Stitch
+# Story ID: RT-025 – Home + Planner Screen Parity with Stitch
 
 ## Outcome
 

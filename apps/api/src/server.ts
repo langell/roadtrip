@@ -23,6 +23,7 @@ import {
 } from './services/ai-trip-planner-service.js';
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
+import { requireAuth } from './lib/require-auth.js';
 
 type RateLimitEntry = {
   count: number;
@@ -362,12 +363,9 @@ export const createApp = () => {
 
   app.get(
     '/trips',
+    requireAuth,
     withAsyncHandler(async (req, res) => {
-      const userId = await getRequestUserId(req);
-      if (!userId) {
-        res.status(401).json({ error: 'UNAUTHORIZED' });
-        return;
-      }
+      const userId = res.locals.userId as string;
 
       const trips = await prisma.trip.findMany({
         where: { userId },
@@ -402,6 +400,12 @@ export const createApp = () => {
         radiusKm: z.number().positive().max(500),
         themes: z.array(TripThemeSchema).min(1),
         maxOptions: z.union([z.literal(2), z.literal(3)]).default(3),
+        modifiers: z
+          .object({
+            smartPitstops: z.boolean().optional(),
+            photoOps: z.boolean().optional(),
+          })
+          .optional(),
       });
 
       const parsed = planTripSchema.safeParse(req.body);
@@ -582,6 +586,7 @@ export const createApp = () => {
           radiusKm: input.radiusKm,
           themes: input.themes,
           maxOptions: input.maxOptions,
+          modifiers: input.modifiers,
         });
       } catch (error) {
         const aiError = toAiPlannerErrorMeta(error);
@@ -735,12 +740,9 @@ export const createApp = () => {
 
   app.post(
     '/trips/save-generated',
+    requireAuth,
     withAsyncHandler(async (req, res) => {
-      const userId = await getRequestUserId(req);
-      if (!userId) {
-        res.status(401).json({ error: 'UNAUTHORIZED' });
-        return;
-      }
+      const userId = res.locals.userId as string;
 
       const parsed = saveGeneratedTripSchema.safeParse(req.body);
       if (!parsed.success) {
