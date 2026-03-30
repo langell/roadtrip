@@ -209,7 +209,13 @@ export const createApp = () => {
   const app = express();
   app.set('trust proxy', 1);
   const allowAnonymousSuggestionRequest = createAnonymousSuggestionsRateLimiter();
-  app.use(cors());
+  app.use(
+    cors(
+      env.CORS_ORIGIN
+        ? { origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()), credentials: true }
+        : undefined,
+    ),
+  );
   app.use(helmet());
   app.use(express.json());
   app.use(requestLoggingMiddleware);
