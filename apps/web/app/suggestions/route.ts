@@ -2,9 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 const getApiBaseUrl = (request: NextRequest) => {
-  const configuredBaseUrl = (
-    process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL
-  )?.trim();
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
   if (!configuredBaseUrl?.length) {
     return process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : undefined;
