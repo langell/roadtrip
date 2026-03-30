@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
-import { useSession } from 'next-auth/react';
-import Link from 'next/link';
-import { fetchTripPlans, savePlanOption, type TripPlanOption } from '../lib/api-client';
+import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const KM_PER_MILE = 1.60934;
@@ -167,12 +165,7 @@ const TripPlanner = () => {
   const [planOptions, setPlanOptions] = useState<TripPlanOption[]>([]);
   const [planSource, setPlanSource] = useState<'cache' | 'ai' | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
-  const [savingIndex, setSavingIndex] = useState<number | null>(null);
-  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [showSignInModal, setShowSignInModal] = useState(false);
   const hasRequestedInitialLocation = useRef(false);
-  const { data: session } = useSession();
 
   const themeOptions = useMemo(() => TripThemeSchema.options, []);
   const themeLabelMap: Record<
@@ -191,8 +184,6 @@ const TripPlanner = () => {
     setLoading(true);
     setPlanError(null);
     setPlanSource(null);
-    setSavedIndices(new Set());
-    setSaveError(null);
     try {
       const modifiers =
         filters.smartPitstops || filters.photoOps
@@ -220,52 +211,6 @@ const TripPlanner = () => {
       setPlanSource(data.source);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSave = async (option: TripPlanOption, index: number) => {
-    if (!session) {
-      setShowSignInModal(true);
-      return;
-    }
-
-    setSaveError(null);
-    setSavingIndex(index);
-
-    const resolvedStops = option.stops.filter((s) => s.status === 'resolved');
-    if (!resolvedStops.length) {
-      setSaveError('No resolved stops to save.');
-      setSavingIndex(null);
-      return;
-    }
-
-    const origin = resolvedStops[0].suggestion;
-    const result = await savePlanOption({
-      title: option.title,
-      rationale: option.rationale,
-      location,
-      originLat: origin.lat,
-      originLng: origin.lng,
-      radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
-      themes: selectedThemes,
-      stops: resolvedStops.map((s, i) => ({
-        placeId: s.suggestion.placeId,
-        name: s.suggestion.title,
-        lat: s.suggestion.lat,
-        lng: s.suggestion.lng,
-        notes: s.suggestion.description,
-        order: i,
-      })),
-    });
-
-    setSavingIndex(null);
-
-    if (result.saved) {
-      setSavedIndices((prev) => new Set(prev).add(index));
-    } else if (result.requiresAuth) {
-      setShowSignInModal(true);
-    } else {
-      setSaveError(result.error);
     }
   };
 
@@ -649,30 +594,15 @@ const TripPlanner = () => {
               </ul>
 
               <div className="mt-4 border-t border-wayfarer-surface pt-4">
-                {savedIndices.has(index) ? (
-                  <p className="text-center font-body text-sm font-semibold text-wayfarer-secondary">
-                    ✓ Saved to your trips
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={savingIndex === index}
-                    onClick={() => {
-                      void handleSave(option, index);
-                    }}
-                    className="w-full rounded-xl bg-wayfarer-primary px-4 py-3 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90 disabled:opacity-60"
-                  >
-                    {savingIndex === index ? 'Saving…' : 'Save this trip'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="w-full rounded-xl bg-wayfarer-primary px-4 py-3 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
+                >
+                  Select this trip →
+                </button>
               </div>
             </article>
           ))}
-          {saveError ? (
-            <p className="col-span-full text-center font-body text-sm text-wayfarer-secondary">
-              {saveError}
-            </p>
-          ) : null}
           {!loading && !planOptions.length && !planError && (
             <div className="rounded-card bg-white/70 p-8 font-body text-wayfarer-text-muted">
               Start by generating a route to see AI itinerary options.
@@ -680,44 +610,6 @@ const TripPlanner = () => {
           )}
         </div>
       </section>
-
-      {showSignInModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="signin-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        >
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowSignInModal(false)}
-          />
-          <div className="relative w-full max-w-sm rounded-3xl bg-wayfarer-bg p-8 shadow-wayfarer-ambient">
-            <h2
-              id="signin-modal-title"
-              className="mb-2 font-display text-2xl font-bold text-wayfarer-primary"
-            >
-              Save your trip
-            </h2>
-            <p className="mb-6 font-body text-sm text-wayfarer-text-muted">
-              Sign in to save this itinerary and access it anytime.
-            </p>
-            <Link
-              href="/sign-in"
-              className="flex w-full items-center justify-center rounded-xl bg-wayfarer-primary px-6 py-3.5 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
-            >
-              Sign in to save
-            </Link>
-            <button
-              type="button"
-              onClick={() => setShowSignInModal(false)}
-              className="mt-3 w-full rounded-xl py-2 font-body text-sm font-semibold text-wayfarer-text-muted transition hover:text-wayfarer-primary"
-            >
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
