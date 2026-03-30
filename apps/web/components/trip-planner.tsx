@@ -168,13 +168,16 @@ const TripPlanner = () => {
   const hasRequestedInitialLocation = useRef(false);
 
   const themeOptions = useMemo(() => TripThemeSchema.options, []);
-  const themeLabelMap: Record<(typeof TripThemeSchema.options)[number], string> = {
-    scenic: 'Hidden Gems',
-    foodie: 'Foodie',
-    culture: 'Cultural',
-    adventure: 'Adventure',
-    family: 'Family Fun',
-    sports: 'Sports',
+  const themeLabelMap: Record<
+    (typeof TripThemeSchema.options)[number],
+    { label: string; icon: string }
+  > = {
+    scenic: { label: 'Hidden Gems', icon: '🏔️' },
+    foodie: { label: 'Foodie', icon: '🍴' },
+    culture: { label: 'Cultural', icon: '🏛️' },
+    adventure: { label: 'Adventure', icon: '🧗' },
+    family: { label: 'Family Fun', icon: '👨‍👩‍👧' },
+    sports: { label: 'Sports', icon: '🏟️' },
   };
 
   const handleGenerate = async () => {
@@ -382,8 +385,8 @@ const TripPlanner = () => {
                   type="button"
                   className={
                     selected
-                      ? 'rounded-full bg-wayfarer-secondary px-5 py-3 font-body text-sm font-semibold text-white shadow-wayfarer-soft transition-all hover:brightness-110 active:scale-95'
-                      : 'rounded-full bg-wayfarer-surface-deep px-5 py-3 font-body text-sm font-semibold text-wayfarer-text-muted transition-all hover:bg-wayfarer-surface active:scale-95'
+                      ? 'flex items-center gap-2 rounded-full bg-wayfarer-secondary px-5 py-3 font-body text-sm font-semibold text-white shadow-wayfarer-soft transition-all hover:brightness-110 active:scale-95'
+                      : 'flex items-center gap-2 rounded-full bg-wayfarer-surface-deep px-5 py-3 font-body text-sm font-semibold text-wayfarer-text-muted transition-all hover:bg-wayfarer-surface active:scale-95'
                   }
                   onClick={() => {
                     setSelectedThemes((prev) => {
@@ -397,7 +400,8 @@ const TripPlanner = () => {
                     });
                   }}
                 >
-                  {themeLabelMap[theme]}
+                  <span aria-hidden>{themeLabelMap[theme].icon}</span>
+                  {themeLabelMap[theme].label}
                 </button>
               );
             })}
@@ -410,33 +414,23 @@ const TripPlanner = () => {
             <div className="flex flex-wrap gap-3">
               {(
                 [
-                  { key: 'smartPitstops', label: 'Smart Pit-Stops', emoji: '⛽' },
-                  { key: 'photoOps', label: 'Photo Ops', emoji: '📸' },
+                  { key: 'smartPitstops', label: 'Pit-Stops', icon: '⛽' },
+                  { key: 'photoOps', label: 'Photo Ops', icon: '📸' },
                 ] as const
-              ).map(({ key, label, emoji }) => {
+              ).map(({ key, label, icon }) => {
                 const active = filters[key];
                 return (
                   <button
                     key={key}
                     type="button"
-                    role="switch"
-                    aria-checked={active}
                     onClick={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}
                     className={
                       active
-                        ? 'flex items-center gap-2.5 rounded-full px-4 py-2.5 font-body text-sm font-semibold transition-all active:scale-95 bg-wayfarer-secondary text-white shadow-wayfarer-soft'
-                        : 'flex items-center gap-2.5 rounded-full px-4 py-2.5 font-body text-sm font-semibold transition-all active:scale-95 bg-wayfarer-surface-deep text-wayfarer-text-muted hover:bg-wayfarer-surface'
+                        ? 'flex items-center gap-2 rounded-full bg-wayfarer-secondary px-5 py-3 font-body text-sm font-semibold text-white shadow-wayfarer-soft transition-all hover:brightness-110 active:scale-95'
+                        : 'flex items-center gap-2 rounded-full bg-wayfarer-surface-deep px-5 py-3 font-body text-sm font-semibold text-wayfarer-text-muted transition-all hover:bg-wayfarer-surface active:scale-95'
                     }
                   >
-                    <span
-                      aria-hidden
-                      className={`inline-flex h-[18px] w-8 flex-shrink-0 items-center rounded-full p-0.5 transition-colors ${active ? 'bg-white/25' : 'bg-black/10'}`}
-                    >
-                      <span
-                        className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-200 ${active ? 'translate-x-[14px] bg-white' : 'translate-x-0 bg-wayfarer-text-muted/60'}`}
-                      />
-                    </span>
-                    <span>{emoji}</span>
+                    <span aria-hidden>{icon}</span>
                     {label}
                   </button>
                 );
@@ -509,7 +503,7 @@ const TripPlanner = () => {
                         key={`loading-theme-${theme}`}
                         className="rounded-full bg-wayfarer-surface px-3 py-1 font-body text-xs font-semibold text-wayfarer-secondary"
                       >
-                        {themeLabelMap[theme]}
+                        {themeLabelMap[theme].icon} {themeLabelMap[theme].label}
                       </span>
                     ))}
                   </div>
