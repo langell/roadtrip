@@ -5,7 +5,6 @@ Stories marked **In Progress** are actively being worked on.
 
 | Rank | ID     | Story                                 | Status  | File                                                                                                         |
 | ---- | ------ | ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| 3    | RT-023 | Anonymous Trip Search with Gated Save | Backlog | [Backlog/2026-03-anonymous-trip-search-gated-save.md](Backlog/2026-03-anonymous-trip-search-gated-save.md)   |
 | 4    | RT-015 | AI Trip Planner API Orchestration     | Backlog | [Backlog/2026-03-ai-trip-planner-api-orchestration.md](Backlog/2026-03-ai-trip-planner-api-orchestration.md) |
 | 5    | RT-016 | AI Trip Planner Web Experience        | Backlog | [Backlog/2026-03-ai-trip-planner-web-experience.md](Backlog/2026-03-ai-trip-planner-web-experience.md)       |
 | 6    | RT-014 | AI Trip Planning with Stop Details    | Backlog | [Backlog/2026-03-ai-trip-planning-and-stop-details.md](Backlog/2026-03-ai-trip-planning-and-stop-details.md) |

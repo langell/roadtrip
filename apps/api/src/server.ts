@@ -826,6 +826,71 @@ export const createApp = () => {
     }),
   );
 
+  const savePlanOptionSchema = z.object({
+    title: z.string().min(1),
+    rationale: z.string().optional(),
+    location: z.string().min(1),
+    originLat: z.number(),
+    originLng: z.number(),
+    radiusKm: z.number().positive(),
+    themes: z.array(z.string().min(1)).min(1),
+    stops: z
+      .array(
+        z.object({
+          placeId: z.string().min(1),
+          name: z.string().min(1),
+          lat: z.number(),
+          lng: z.number(),
+          notes: z.string().optional(),
+          order: z.number().int().min(0),
+        }),
+      )
+      .min(1),
+  });
+
+  app.post(
+    '/trips/save-plan',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+
+      const parsed = savePlanOptionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_BODY' });
+        return;
+      }
+
+      const input = parsed.data;
+      const trip = await prisma.trip.create({
+        data: {
+          userId,
+          name: input.title,
+          originLat: input.originLat,
+          originLng: input.originLng,
+          filters: {
+            radiusKm: input.radiusKm,
+            themes: input.themes,
+            location: input.location,
+            rationale: input.rationale,
+          },
+          stops: {
+            create: input.stops.map((stop) => ({
+              placeId: stop.placeId,
+              name: stop.name,
+              order: stop.order,
+              lat: stop.lat,
+              lng: stop.lng,
+              notes: stop.notes,
+            })),
+          },
+        },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+
+      res.status(201).json(trip);
+    }),
+  );
+
   app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }));
 
   return app;

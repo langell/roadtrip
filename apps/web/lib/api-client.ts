@@ -136,6 +136,57 @@ export const fetchTripIdeas = async (params: {
   }
 };
 
+export type SavePlanResult =
+  | { saved: true; tripId: string }
+  | { saved: false; requiresAuth: true }
+  | { saved: false; requiresAuth: false; error: string };
+
+export const savePlanOption = async (params: {
+  title: string;
+  rationale: string;
+  location: string;
+  originLat: number;
+  originLng: number;
+  radiusKm: number;
+  themes: string[];
+  stops: Array<{
+    placeId: string;
+    name: string;
+    lat: number;
+    lng: number;
+    notes?: string;
+    order: number;
+  }>;
+}): Promise<SavePlanResult> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/save-plan`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(await buildAuthHeaders()),
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (response.status === 401) {
+      return { saved: false, requiresAuth: true };
+    }
+
+    if (!response.ok) {
+      return {
+        saved: false,
+        requiresAuth: false,
+        error: 'Save failed. Please try again.',
+      };
+    }
+
+    const data = (await response.json()) as { id: string };
+    return { saved: true, tripId: data.id };
+  } catch {
+    return { saved: false, requiresAuth: false, error: 'Save failed. Please try again.' };
+  }
+};
+
 export const fetchTripPlans = async (params: {
   location: string;
   radiusKm: number;
