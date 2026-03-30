@@ -503,7 +503,7 @@ const TripPlanner = () => {
                         key={`loading-theme-${theme}`}
                         className="rounded-full bg-wayfarer-surface px-3 py-1 font-body text-xs font-semibold text-wayfarer-secondary"
                       >
-                        {themeLabelMap[theme]}
+                        {themeLabelMap[theme].icon} {themeLabelMap[theme].label}
                       </span>
                     ))}
                   </div>
