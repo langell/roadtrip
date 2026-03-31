@@ -845,6 +845,7 @@ export const createApp = () => {
           lat: z.number(),
           lng: z.number(),
           notes: z.string().optional(),
+          imageUrl: z.string().url().optional(),
           order: z.number().int().min(0),
         }),
       )
@@ -884,6 +885,7 @@ export const createApp = () => {
               lat: stop.lat,
               lng: stop.lng,
               notes: stop.notes,
+              imageUrl: stop.imageUrl,
             })),
           },
         },
@@ -953,6 +955,8 @@ export const createApp = () => {
           name: s.name,
           order: s.order,
           notes: s.notes ?? undefined,
+          placeId: s.placeId,
+          imageUrl: s.imageUrl ?? undefined,
         })),
       });
     }),

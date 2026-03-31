@@ -181,6 +181,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
         name: s.name,
         lat: s.lat,
         lng: s.lng,
+        imageUrl: s.imageUrl,
         order: i,
       })),
     });
