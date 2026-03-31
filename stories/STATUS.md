@@ -9,6 +9,8 @@ _(none)_
 
 ## Completed
 
+- 2026-03-31 — RT-030 `2026-03-pwa-and-remove-native.md` — PWA manifest/SW/icons, mobile app removed, /trips page, a11y fixes.
+
 - 2026-03-30 — RT-028 `2026-03-smart-pitstops-photo-ops-toggles.md` — pill toggles wired to API modifiers.
 - 2026-03-30 — RT-001 `2026-03-trip-suggestions.md` — schema FK fix, test auth bypass fix, all 45 API tests passing.
 - 2026-03-30 — RT-018 `2026-03-main-search-ui-improvements.md` moved to `stories/Done/`.
