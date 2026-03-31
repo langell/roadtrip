@@ -435,6 +435,7 @@ const TripPlanner = () => {
             min={MIN_RADIUS_MILES}
             max={MAX_RADIUS_MILES}
             step={5}
+            aria-label={`Search radius: ${filters.radiusMiles} miles`}
             className="h-2 w-full cursor-pointer appearance-none rounded-full bg-wayfarer-surface-deep accent-wayfarer-primary"
             value={filters.radiusMiles}
             onChange={(event) =>

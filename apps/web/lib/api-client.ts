@@ -175,6 +175,42 @@ export const savePlanOption = async (params: {
   }
 };
 
+export type SavedTripStop = {
+  id: string;
+  placeId: string;
+  name: string;
+  order: number;
+  lat: number;
+  lng: number;
+  notes?: string | null;
+};
+
+export type SavedTrip = {
+  id: string;
+  name: string;
+  originLat: number;
+  originLng: number;
+  createdAt: string;
+  stops: SavedTripStop[];
+};
+
+export const getMyTrips = async (): Promise<SavedTrip[]> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips`, {
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    return (await response.json()) as SavedTrip[];
+  } catch {
+    return [];
+  }
+};
+
 export const fetchTripPlans = async (params: {
   location: string;
   radiusKm: number;

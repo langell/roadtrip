@@ -65,6 +65,14 @@ const AccountPage = async () => {
           </div>
 
           <div className="mt-8 border-t border-wayfarer-accent/40 pt-6">
+            <Link
+              href="/trips"
+              className="mb-4 flex items-center justify-between rounded-xl bg-wayfarer-primary/10 px-4 py-3 text-sm font-semibold text-wayfarer-primary transition-colors hover:bg-wayfarer-primary/20"
+            >
+              My Trips
+              <span aria-hidden="true">→</span>
+            </Link>
+
             <form
               action={async () => {
                 'use server';

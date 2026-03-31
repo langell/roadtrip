@@ -187,12 +187,7 @@ export default function GooglePlacesAutocomplete({
   };
 
   return (
-    <div
-      className="group relative"
-      ref={containerRef}
-      aria-haspopup="listbox"
-      aria-owns="autocomplete-listbox"
-    >
+    <div className="group relative" ref={containerRef} aria-haspopup="listbox">
       <svg
         aria-hidden
         xmlns="http://www.w3.org/2000/svg"

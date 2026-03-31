@@ -22,7 +22,7 @@ const config: Config = {
           accent: '#c1c8c2',
           secondary: '#3b6090',
           'text-main': '#1c1917',
-          'text-muted': '#78716c',
+          'text-muted': '#66615e',
         },
       },
       borderRadius: {

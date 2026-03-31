@@ -4,6 +4,7 @@ import './globals.css';
 import { auth } from '../auth';
 import AuthSessionProvider from '../components/session-provider';
 import GoogleMapsScriptLoader from '../components/GoogleMapsScriptLoader';
+import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
 
 export const metadata: Metadata = {
   title: 'RoadTrip | Plan unforgettable drives',
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
     'RoadTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.',
   icons: {
     icon: '/favicon.svg',
+    apple: '/icons/icon-192x192.png',
   },
+  manifest: '/manifest.json',
 };
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
@@ -25,7 +28,11 @@ const RootLayout = async ({ children }: { children: ReactNode }) => {
 
   return (
     <html lang="en">
+      <head>
+        <meta name="theme-color" content="#1B4332" />
+      </head>
       <body>
+        <ServiceWorkerRegistration />
         <GoogleMapsScriptLoader />
         <AuthSessionProvider session={session}>
           <main>{children}</main>
