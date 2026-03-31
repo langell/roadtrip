@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import GooglePlacesAutocomplete from '../../components/GooglePlacesAutocomplete';
@@ -86,12 +86,10 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
   const [addingStop, setAddingStop] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  const mapDivRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!draftKey) return;
     try {
-      const raw = sessionStorage.getItem(draftKey);
+      const raw = localStorage.getItem(draftKey);
       if (!raw) return;
       const parsed = JSON.parse(raw) as TripDraft;
       setDraft(parsed);
@@ -191,7 +189,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
 
     if (result.saved) {
       try {
-        if (draftKey) sessionStorage.removeItem(draftKey);
+        if (draftKey) localStorage.removeItem(draftKey);
       } catch {
         // ignore
       }
@@ -225,8 +223,6 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
 
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
-      <div ref={mapDivRef} className="hidden" />
-
       {/* Header */}
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-20 bg-wayfarer-bg/80 backdrop-blur-xl">
         <div className="flex items-center gap-4">

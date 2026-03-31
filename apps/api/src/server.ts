@@ -176,7 +176,7 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   }
 
   const encodedPhotoName = encodeURIComponent(photoName);
-  const base = env.PUBLIC_API_BASE_URL ?? `${req.protocol}://${req.get('host')}`;
+  const base = env.NEXT_PUBLIC_API_BASE_URL ?? `${req.protocol}://${req.get('host')}`;
   return `${base}/places/photo?name=${encodedPhotoName}`;
 };
 
@@ -714,6 +714,7 @@ export const createApp = () => {
         themes: string[];
         source: 'ai';
         options: PlannedOption[];
+        degraded?: boolean;
         cacheDebug?: {
           enabled: true;
           radiusMiles: number;
@@ -727,6 +728,7 @@ export const createApp = () => {
         themes: input.themes,
         source: 'ai',
         options,
+        ...(plans.degraded ? { degraded: true } : {}),
       };
 
       if (debugEnabled) {

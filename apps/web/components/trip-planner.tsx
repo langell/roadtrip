@@ -191,6 +191,7 @@ const TripPlanner = () => {
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [planOptions, setPlanOptions] = useState<TripPlanOption[]>([]);
   const [planSource, setPlanSource] = useState<'cache' | 'ai' | null>(null);
+  const [planDegraded, setPlanDegraded] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(
     null,
@@ -229,6 +230,7 @@ const TripPlanner = () => {
     setLoading(true);
     setPlanError(null);
     setPlanSource(null);
+    setPlanDegraded(false);
     try {
       const modifiers =
         filters.smartPitstops || filters.photoOps
@@ -254,6 +256,7 @@ const TripPlanner = () => {
 
       setPlanOptions(data.options);
       setPlanSource(data.source);
+      setPlanDegraded(data.degraded ?? false);
     } finally {
       setLoading(false);
     }
@@ -360,9 +363,9 @@ const TripPlanner = () => {
 
     const key = `hiptrip:trip-draft:${Date.now()}`;
     try {
-      sessionStorage.setItem(key, JSON.stringify(draft));
+      localStorage.setItem(key, JSON.stringify(draft));
     } catch {
-      // sessionStorage unavailable; proceed without it
+      // localStorage unavailable; proceed without it
     }
     router.push(`/plan?draft=${encodeURIComponent(key)}`);
   };
@@ -432,6 +435,7 @@ const TripPlanner = () => {
             min={MIN_RADIUS_MILES}
             max={MAX_RADIUS_MILES}
             step={5}
+            aria-label={`Search radius: ${filters.radiusMiles} miles`}
             className="h-2 w-full cursor-pointer appearance-none rounded-full bg-wayfarer-surface-deep accent-wayfarer-primary"
             value={filters.radiusMiles}
             onChange={(event) =>
@@ -536,8 +540,21 @@ const TripPlanner = () => {
           ) : null}
         </div>
         {planError ? (
-          <div className="rounded-card bg-white/80 p-6 font-body text-sm text-wayfarer-secondary">
-            {planError}
+          <div className="rounded-card bg-white/80 p-5 font-body text-sm text-wayfarer-secondary flex items-center justify-between gap-4">
+            <span>{planError}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg bg-wayfarer-primary px-4 py-2 font-body text-xs font-bold text-white transition hover:opacity-90"
+              onClick={() => void handleGenerate()}
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {planDegraded ? (
+          <div className="rounded-card bg-wayfarer-surface px-4 py-3 font-body text-xs text-wayfarer-text-muted">
+            Some itinerary options were trimmed — not all themes could be fully covered.
+            Try adjusting your themes or radius for more options.
           </div>
         ) : null}
 

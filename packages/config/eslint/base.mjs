@@ -12,7 +12,6 @@ const workspaceNodeModules = fileURLToPath(new URL('node_modules', repoRoot));
 
 const projectConfigs = [
   'apps/api/tsconfig.eslint.json',
-  'apps/mobile/tsconfig.eslint.json',
   'apps/web/tsconfig.eslint.json',
   'packages/ui/tsconfig.eslint.json',
   'packages/types/tsconfig.eslint.json',
@@ -26,7 +25,6 @@ export default [
       '**/*.config.cjs',
       '**/*.config.mjs',
       '**/*.config.ts',
-      'apps/mobile/expo-entry.js',
       '**/coverage/**',
     ],
   },
@@ -61,7 +59,6 @@ export default [
           project: [
             'tsconfig.json',
             'apps/api/tsconfig.json',
-            'apps/mobile/tsconfig.json',
             'apps/web/tsconfig.json',
             'packages/ui/tsconfig.json',
             'packages/types/tsconfig.json',
@@ -99,7 +96,7 @@ export default [
     },
   },
   {
-    files: ['apps/web/**/*.{ts,tsx,js,jsx}', 'apps/mobile/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
+    files: ['apps/web/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
     rules: {
       'no-restricted-imports': [
         'error',

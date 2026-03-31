@@ -41,13 +41,10 @@ export type TripPlanResponse = {
   themes: string[];
   source: 'cache' | 'ai';
   options: TripPlanOption[];
+  degraded?: boolean;
 };
 
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  (process.env.NODE_ENV === 'production'
-    ? 'https://api.hiptrip.net'
-    : 'http://localhost:3001');
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
 
@@ -171,6 +168,42 @@ export const savePlanOption = async (params: {
     return { saved: true, tripId: data.id };
   } catch {
     return { saved: false, requiresAuth: false, error: 'Save failed. Please try again.' };
+  }
+};
+
+export type SavedTripStop = {
+  id: string;
+  placeId: string;
+  name: string;
+  order: number;
+  lat: number;
+  lng: number;
+  notes?: string | null;
+};
+
+export type SavedTrip = {
+  id: string;
+  name: string;
+  originLat: number;
+  originLng: number;
+  createdAt: string;
+  stops: SavedTripStop[];
+};
+
+export const getMyTrips = async (): Promise<SavedTrip[]> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips`, {
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    return (await response.json()) as SavedTrip[];
+  } catch {
+    return [];
   }
 };
 

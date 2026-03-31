@@ -11,7 +11,7 @@ const AiTripPlansSchema = z.object({
   options: z.array(AiTripOptionSchema).min(2).max(3),
 });
 
-export type AiTripPlans = z.infer<typeof AiTripPlansSchema>;
+export type AiTripPlans = z.infer<typeof AiTripPlansSchema> & { degraded?: boolean };
 
 type PlannerStage = 'config' | 'request' | 'parse';
 
@@ -519,7 +519,7 @@ export class AiTripPlannerService {
       );
       const passingOptions = retryPlans.options.filter((_, i) => passingIndices.has(i));
       if (passingOptions.length > 0) {
-        return { options: passingOptions };
+        return { options: passingOptions, degraded: true };
       }
 
       throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
