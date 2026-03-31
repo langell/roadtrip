@@ -238,6 +238,125 @@ export const createApp = () => {
   );
 
   app.get(
+    '/discover',
+    withAsyncHandler(async (req, res) => {
+      const userId = await getRequestUserId(req);
+      const now = new Date();
+
+      // 1. Trending routes — top entries from TripPlanCache, deduplicated by location
+      const trendingCandidates = await prisma.tripPlanCache.findMany({
+        where: { expiresAt: { gt: now }, validOptions: { gt: 0 } },
+        orderBy: [{ engagementScore: 'desc' }, { updatedAt: 'desc' }],
+        take: 30,
+      });
+
+      type CachedStop = {
+        status: string;
+        suggestion?: { imageUrl?: string };
+      };
+      type CachedOption = { title?: string; stops?: CachedStop[] };
+
+      const seenLocations = new Set<string>();
+      const trendingRoutes: {
+        cacheId: string;
+        location: string;
+        radiusKm: number;
+        themes: string[];
+        engagementScore: number;
+        previewTitle: string;
+        previewImageUrl?: string;
+      }[] = [];
+
+      for (const cache of trendingCandidates) {
+        const locKey = cache.location.toLowerCase().trim();
+        if (!seenLocations.has(locKey) && trendingRoutes.length < 6) {
+          seenLocations.add(locKey);
+          const options = cache.options as CachedOption[] | null;
+          const firstOption = Array.isArray(options) ? options[0] : null;
+          const previewImageUrl = firstOption?.stops?.find((s) => s.status === 'resolved')
+            ?.suggestion?.imageUrl;
+          trendingRoutes.push({
+            cacheId: cache.id,
+            location: cache.location,
+            radiusKm: cache.radiusKm,
+            themes: cache.themesKey.split('|'),
+            engagementScore: cache.engagementScore,
+            previewTitle: firstOption?.title ?? cache.location,
+            previewImageUrl,
+          });
+        }
+      }
+
+      // 2. Nearby stops — only for authenticated users with trip history
+      type DiscoverStop = {
+        id: string;
+        placeId: string;
+        title: string;
+        description: string;
+        imageUrl?: string;
+        url?: string;
+        sponsored: boolean;
+      };
+
+      let nearbyStops: DiscoverStop[] = [];
+      let locationContext: string | undefined;
+
+      if (userId) {
+        const lastTrip = await prisma.trip.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (lastTrip) {
+          const filters = lastTrip.filters as {
+            location?: string;
+            themes?: string[];
+          };
+          const location = filters.location ?? lastTrip.name;
+          locationContext = location;
+
+          try {
+            const suggestions = await googlePlacesService.findStops({
+              location,
+              themes: ['scenic'],
+              radiusKm: 200,
+            });
+            nearbyStops = suggestions.slice(0, 9).map(({ photoName, ...s }) => ({
+              id: s.id,
+              placeId: s.placeId,
+              title: s.title,
+              description: s.description,
+              imageUrl: buildSuggestionImageUrl(req, photoName),
+              sponsored: false,
+            }));
+          } catch {
+            // graceful degradation — empty nearby stops
+          }
+        }
+      }
+
+      // 3. Sponsored stops — up to 2 active records
+      const sponsored = await prisma.sponsoredPlace.findMany({
+        where: { active: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 2,
+      });
+
+      const sponsoredStops: DiscoverStop[] = sponsored.map((s) => ({
+        id: s.id,
+        placeId: s.placeId,
+        title: s.title,
+        description: s.description,
+        imageUrl: s.imageUrl ?? undefined,
+        url: s.url ?? undefined,
+        sponsored: true,
+      }));
+
+      res.json({ trendingRoutes, nearbyStops, sponsoredStops, locationContext });
+    }),
+  );
+
+  app.get(
     '/places/photo',
     withAsyncHandler(async (req, res) => {
       const userId = await getRequestUserId(req);
