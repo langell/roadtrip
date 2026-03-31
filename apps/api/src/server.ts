@@ -176,7 +176,7 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   }
 
   const encodedPhotoName = encodeURIComponent(photoName);
-  const base = env.PUBLIC_API_BASE_URL ?? `${req.protocol}://${req.get('host')}`;
+  const base = env.NEXT_PUBLIC_API_BASE_URL ?? `${req.protocol}://${req.get('host')}`;
   return `${base}/places/photo?name=${encodedPhotoName}`;
 };
 
