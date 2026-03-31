@@ -953,6 +953,7 @@ export const createApp = () => {
           name: s.name,
           order: s.order,
           notes: s.notes ?? undefined,
+          placeId: s.placeId,
         })),
       });
     }),

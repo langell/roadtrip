@@ -228,7 +228,7 @@ export type SharedPlan = {
   location: string;
   themes: string[];
   rationale: string;
-  stops: Array<{ name: string; order: number; notes?: string }>;
+  stops: Array<{ name: string; order: number; notes?: string; placeId: string }>;
 };
 
 export const getSharedTrip = async (token: string): Promise<SharedPlan | null> => {
