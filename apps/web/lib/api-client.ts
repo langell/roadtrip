@@ -207,6 +207,43 @@ export const getMyTrips = async (): Promise<SavedTrip[]> => {
   }
 };
 
+export const shareTrip = async (tripId: string): Promise<{ shareUrl: string } | null> => {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/trips/${encodeURIComponent(tripId)}/share`,
+      {
+        method: 'POST',
+        headers: await buildAuthHeaders(),
+      },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as { shareUrl: string };
+  } catch {
+    return null;
+  }
+};
+
+export type SharedPlan = {
+  name: string;
+  location: string;
+  themes: string[];
+  rationale: string;
+  stops: Array<{ name: string; order: number; notes?: string }>;
+};
+
+export const getSharedTrip = async (token: string): Promise<SharedPlan | null> => {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/trips/shared/${encodeURIComponent(token)}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as SharedPlan;
+  } catch {
+    return null;
+  }
+};
+
 export const fetchTripPlans = async (params: {
   location: string;
   radiusKm: number;

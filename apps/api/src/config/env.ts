@@ -29,6 +29,7 @@ const schema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   NEXT_PUBLIC_API_BASE_URL: z.string().url().optional(),
+  PUBLIC_SITE_URL: z.string().url().optional(),
   CORS_ORIGIN: z.string().optional(),
 });
 
