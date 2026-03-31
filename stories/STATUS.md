@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-03-31 — RT-032 `2026-03-discovery-feed.md` — /discover page, trending routes, nearby stops, sponsored injection, home redirect.
 - 2026-03-31 — RT-020 `2026-03-security-best-practices.md` — photo endpoint rate limiting, security checklist doc, auth/logging audit.
 - 2026-03-31 — RT-016 `2026-03-ai-trip-planner-web-experience.md` — implemented; closing as done.
 - 2026-03-31 — RT-015 `2026-03-ai-trip-planner-api-orchestration.md` — implemented; closing as done.
