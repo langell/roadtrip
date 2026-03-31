@@ -177,7 +177,7 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   }
 
   const encodedPhotoName = encodeURIComponent(photoName);
-  const base = env.NEXT_PUBLIC_API_BASE_URL ?? `${req.protocol}://${req.get('host')}`;
+  const base = `${req.protocol}://${req.get('host')}`;
   return `${base}/places/photo?name=${encodedPhotoName}`;
 };
 
@@ -894,13 +894,8 @@ export const createApp = () => {
     }),
   );
 
-  const buildShareUrl = (token: string) => {
-    const base =
-      env.PUBLIC_SITE_URL ??
-      env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/api$/, '') ??
-      'http://localhost:3000';
-    return `${base}/s/${token}`;
-  };
+  const buildShareUrl = (token: string) =>
+    `${env.PUBLIC_SITE_URL ?? 'http://localhost:3000'}/s/${token}`;
 
   app.post(
     '/trips/:id/share',

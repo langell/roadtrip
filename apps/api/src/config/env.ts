@@ -28,9 +28,10 @@ const schema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
-  NEXT_PUBLIC_API_BASE_URL: z.string().url().optional(),
   PUBLIC_SITE_URL: z.string().url().optional(),
   CORS_ORIGIN: z.string().optional(),
+  AUTH_SECRET: z.string().min(1).optional(),
+  NEXTAUTH_SECRET: z.string().min(1).optional(),
 });
 
 export const env = schema.parse(process.env);
