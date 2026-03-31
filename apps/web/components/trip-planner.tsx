@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
+const LOCATION_STORAGE_KEY = 'hiptrip:location';
 const KM_PER_MILE = 1.60934;
 const MIN_RADIUS_MILES = 10;
 const MAX_RADIUS_MILES = 300;
@@ -146,7 +148,31 @@ const reverseGeocodeLocation = async (
 const toTitleCase = (value: string) =>
   value.replace(/\b\w/g, (char) => char.toUpperCase());
 
+const forwardGeocode = async (
+  address: string,
+): Promise<{ lat: number; lng: number } | null> => {
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!mapsApiKey) return null;
+  try {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('address', address);
+    url.searchParams.set('key', mapsApiKey);
+    const response = await fetch(url.toString(), { cache: 'no-store' });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      status?: string;
+      results?: Array<{ geometry?: { location?: { lat: number; lng: number } } }>;
+    };
+    if (data.status !== 'OK') return null;
+    const loc = data.results?.[0]?.geometry?.location;
+    return loc ? { lat: loc.lat, lng: loc.lng } : null;
+  } catch {
+    return null;
+  }
+};
+
 const TripPlanner = () => {
+  const router = useRouter();
   const [filters, setFilters] = useState({
     radiusMiles: 100,
     maxStops: 6,
@@ -157,6 +183,7 @@ const TripPlanner = () => {
     Array<(typeof TripThemeSchema.options)[number]>
   >(['scenic']);
   const [location, setLocation] = useState('Carmel By The Sea, CA');
+  const isFirstLocationRender = useRef(true);
 
   const [loading, setLoading] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
@@ -165,7 +192,25 @@ const TripPlanner = () => {
   const [planOptions, setPlanOptions] = useState<TripPlanOption[]>([]);
   const [planSource, setPlanSource] = useState<'cache' | 'ai' | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
   const hasRequestedInitialLocation = useRef(false);
+
+  // Restore saved location on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(LOCATION_STORAGE_KEY);
+    if (saved) setLocation(saved);
+  }, []);
+
+  // Persist location changes (skip the initial default value)
+  useEffect(() => {
+    if (isFirstLocationRender.current) {
+      isFirstLocationRender.current = false;
+      return;
+    }
+    if (location) localStorage.setItem(LOCATION_STORAGE_KEY, location);
+  }, [location]);
 
   const themeOptions = useMemo(() => TripThemeSchema.options, []);
   const themeLabelMap: Record<
@@ -246,6 +291,10 @@ const TripPlanner = () => {
             position.coords.longitude,
           );
           localStorage.removeItem(AUTO_LOCATION_DENIED_STORAGE_KEY);
+          setOriginCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
           if (resolvedLocation) {
             setLocation(resolvedLocation);
             setLocationStatus('Using your nearest city.');
@@ -293,6 +342,30 @@ const TripPlanner = () => {
     hasRequestedInitialLocation.current = true;
     requestCurrentLocation('auto');
   }, []);
+
+  const handleSelectPlan = async (option: TripPlanOption) => {
+    let coords = originCoords;
+    if (!coords) {
+      coords = await forwardGeocode(location);
+    }
+
+    const draft = {
+      plan: option,
+      location,
+      radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
+      themes: selectedThemes as string[],
+      originLat: coords?.lat ?? 0,
+      originLng: coords?.lng ?? 0,
+    };
+
+    const key = `hiptrip:trip-draft:${Date.now()}`;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(draft));
+    } catch {
+      // sessionStorage unavailable; proceed without it
+    }
+    router.push(`/plan?draft=${encodeURIComponent(key)}`);
+  };
 
   return (
     <div className="space-y-8 text-wayfarer-text-main">
@@ -454,7 +527,7 @@ const TripPlanner = () => {
       <section className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
-            AI itinerary options
+            Itinerary options
           </p>
           {showPlanSourceBadge && planSource ? (
             <span className="rounded-full bg-wayfarer-surface px-3 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.12em] text-wayfarer-secondary">
@@ -597,6 +670,7 @@ const TripPlanner = () => {
                 <button
                   type="button"
                   className="w-full rounded-xl bg-wayfarer-primary px-4 py-3 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
+                  onClick={() => void handleSelectPlan(option)}
                 >
                   Select this trip →
                 </button>

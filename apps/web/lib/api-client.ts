@@ -51,49 +51,36 @@ const apiBaseUrl =
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
 
-const hasAuthSessionCookie = () => {
-  if (typeof document === 'undefined') {
-    return false;
-  }
-
-  return [
-    'authjs.session-token=',
-    '__Secure-authjs.session-token=',
-    'next-auth.session-token=',
-    '__Secure-next-auth.session-token=',
-  ].some((cookieName) => document.cookie.includes(cookieName));
-};
-
 const getApiToken = async () => {
-  if (!hasAuthSessionCookie()) {
-    return undefined;
-  }
-
   const now = Date.now();
   if (cachedApiToken && cachedApiToken.expiresAt > now) {
     return cachedApiToken.value;
   }
 
-  const response = await fetch('/api/auth/api-token', {
-    cache: 'no-store',
-    credentials: 'same-origin',
-  });
+  try {
+    const response = await fetch('/api/auth/api-token', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const data = (await response.json()) as { token?: string };
+    if (!data.token) {
+      return undefined;
+    }
+
+    cachedApiToken = {
+      value: data.token,
+      expiresAt: now + 14 * 60 * 1000,
+    };
+
+    return data.token;
+  } catch {
     return undefined;
   }
-
-  const data = (await response.json()) as { token?: string };
-  if (!data.token) {
-    return undefined;
-  }
-
-  cachedApiToken = {
-    value: data.token,
-    expiresAt: now + 14 * 60 * 1000,
-  };
-
-  return data.token;
 };
 
 const buildAuthHeaders = async () => {
