@@ -51,49 +51,36 @@ const apiBaseUrl =
 
 let cachedApiToken: { value: string; expiresAt: number } | null = null;
 
-const hasAuthSessionCookie = () => {
-  if (typeof document === 'undefined') {
-    return false;
-  }
-
-  return [
-    'authjs.session-token=',
-    '__Secure-authjs.session-token=',
-    'next-auth.session-token=',
-    '__Secure-next-auth.session-token=',
-  ].some((cookieName) => document.cookie.includes(cookieName));
-};
-
 const getApiToken = async () => {
-  if (!hasAuthSessionCookie()) {
-    return undefined;
-  }
-
   const now = Date.now();
   if (cachedApiToken && cachedApiToken.expiresAt > now) {
     return cachedApiToken.value;
   }
 
-  const response = await fetch('/api/auth/api-token', {
-    cache: 'no-store',
-    credentials: 'same-origin',
-  });
+  try {
+    const response = await fetch('/api/auth/api-token', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const data = (await response.json()) as { token?: string };
+    if (!data.token) {
+      return undefined;
+    }
+
+    cachedApiToken = {
+      value: data.token,
+      expiresAt: now + 14 * 60 * 1000,
+    };
+
+    return data.token;
+  } catch {
     return undefined;
   }
-
-  const data = (await response.json()) as { token?: string };
-  if (!data.token) {
-    return undefined;
-  }
-
-  cachedApiToken = {
-    value: data.token,
-    expiresAt: now + 14 * 60 * 1000,
-  };
-
-  return data.token;
 };
 
 const buildAuthHeaders = async () => {
@@ -133,6 +120,57 @@ export const fetchTripIdeas = async (params: {
     return data;
   } catch {
     return [];
+  }
+};
+
+export type SavePlanResult =
+  | { saved: true; tripId: string }
+  | { saved: false; requiresAuth: true }
+  | { saved: false; requiresAuth: false; error: string };
+
+export const savePlanOption = async (params: {
+  title: string;
+  rationale: string;
+  location: string;
+  originLat: number;
+  originLng: number;
+  radiusKm: number;
+  themes: string[];
+  stops: Array<{
+    placeId: string;
+    name: string;
+    lat: number;
+    lng: number;
+    notes?: string;
+    order: number;
+  }>;
+}): Promise<SavePlanResult> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/save-plan`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(await buildAuthHeaders()),
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (response.status === 401) {
+      return { saved: false, requiresAuth: true };
+    }
+
+    if (!response.ok) {
+      return {
+        saved: false,
+        requiresAuth: false,
+        error: 'Save failed. Please try again.',
+      };
+    }
+
+    const data = (await response.json()) as { id: string };
+    return { saved: true, tripId: data.id };
+  } catch {
+    return { saved: false, requiresAuth: false, error: 'Save failed. Please try again.' };
   }
 };
 

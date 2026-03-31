@@ -15,12 +15,12 @@
 
 ## Tasks
 
-- [ ] Define anonymous vs authenticated endpoint contract (owner: Platform/API).
-- [ ] Update API auth guards so read-only search supports anonymous requests while save/write routes require auth (owner: API).
-- [ ] Add rate limiting for anonymous search requests to reduce abuse/spam risk (owner: API/Platform).
-- [ ] Update web planner UX to show sign-in prompt/CTA when anonymous users click save (owner: Web).
-- [ ] Update mobile planner UX to gate save action behind authentication prompt/state (owner: Mobile).
-- [ ] Add/adjust test coverage for anonymous and authenticated flows across API and clients (owner: API/Web/Mobile).
+- [x] Define anonymous vs authenticated endpoint contract (owner: Platform/API).
+- [x] Update API auth guards so read-only search supports anonymous requests while save/write routes require auth (owner: API).
+- [x] Add rate limiting for anonymous search requests to reduce abuse/spam risk (owner: API/Platform).
+- [x] Update web planner UX to show sign-in prompt/CTA when anonymous users click save (owner: Web).
+- [x] Update mobile planner UX to gate save action behind authentication prompt/state (owner: Mobile).
+- [x] Add/adjust test coverage for anonymous and authenticated flows across API and clients (owner: API/Web/Mobile).
 
 ## Notes
 

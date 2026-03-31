@@ -14,14 +14,24 @@ export interface GooglePlacesAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelect: (value: string) => void;
+  onSelectWithPlaceId?: (description: string, placeId: string) => void;
   placeholder?: string;
+  placeTypes?: string[];
+  locationBias?: {
+    lat: number;
+    lng: number;
+    radiusMeters: number;
+  };
 }
 
 export default function GooglePlacesAutocomplete({
   value,
   onChange,
   onSelect,
+  onSelectWithPlaceId,
   placeholder = 'Search for a city or place...',
+  placeTypes = ['(cities)'],
+  locationBias,
 }: GooglePlacesAutocompleteProps) {
   type PlacePrediction = {
     description: string;
@@ -36,6 +46,7 @@ export default function GooglePlacesAutocomplete({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasInteracted = useRef(false);
 
   useEffect(() => {
     if (!window.google && !document.getElementById('google-maps-script')) return;
@@ -80,7 +91,17 @@ export default function GooglePlacesAutocomplete({
                 window.google.maps.places
               ) {
                 service.getPlacePredictions(
-                  { input: inputValue, types: ['(cities)'] },
+                  {
+                    input: inputValue,
+                    types: placeTypes,
+                    ...(locationBias && {
+                      location: new window.google.maps.LatLng(
+                        locationBias.lat,
+                        locationBias.lng,
+                      ),
+                      radius: locationBias.radiusMeters,
+                    }),
+                  },
                   (predictions: PlacePrediction[] | null, status: string) => {
                     setLoading(false);
                     if (status === 'OK' && predictions) {
@@ -98,7 +119,17 @@ export default function GooglePlacesAutocomplete({
           } else {
             service = new window.google.maps.places.AutocompleteService();
             service.getPlacePredictions(
-              { input: inputValue, types: ['(cities)'] },
+              {
+                input: inputValue,
+                types: placeTypes,
+                ...(locationBias && {
+                  location: new window.google.maps.LatLng(
+                    locationBias.lat,
+                    locationBias.lng,
+                  ),
+                  radius: locationBias.radiusMeters,
+                }),
+              },
               (predictions: PlacePrediction[], status: string) => {
                 setLoading(false);
                 if (status === 'OK' && predictions) {
@@ -118,6 +149,7 @@ export default function GooglePlacesAutocomplete({
   );
 
   useEffect(() => {
+    if (!hasInteracted.current) return;
     fetchSuggestions(value);
     setActiveIndex(-1);
   }, [value, fetchSuggestions]);
@@ -144,7 +176,9 @@ export default function GooglePlacesAutocomplete({
       setActiveIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
     } else if (e.key === 'Enter') {
       if (activeIndex >= 0 && activeIndex < suggestions.length) {
-        onSelect(suggestions[activeIndex].description);
+        const s = suggestions[activeIndex];
+        onSelect(s.description);
+        onSelectWithPlaceId?.(s.description, s.place_id);
         setShowSuggestions(false);
       }
     } else if (e.key === 'Escape') {
@@ -177,7 +211,12 @@ export default function GooglePlacesAutocomplete({
         className="h-14 w-full rounded-xl border-none bg-wayfarer-surface pl-12 pr-6 text-left font-body text-base font-medium text-wayfarer-text-main placeholder:text-wayfarer-text-muted/60 focus:outline-none focus:ring-2 focus:ring-wayfarer-primary-light"
         placeholder={placeholder}
         value={value}
+        onFocus={() => {
+          hasInteracted.current = true;
+          if (suggestions.length > 0) setShowSuggestions(true);
+        }}
         onChange={(e) => {
+          hasInteracted.current = true;
           onChange(e.target.value);
           setShowSuggestions(true);
         }}
@@ -218,6 +257,7 @@ export default function GooglePlacesAutocomplete({
               }`}
               onMouseDown={() => {
                 onSelect(suggestion.description);
+                onSelectWithPlaceId?.(suggestion.description, suggestion.place_id);
                 setShowSuggestions(false);
               }}
               onMouseEnter={() => setActiveIndex(idx)}

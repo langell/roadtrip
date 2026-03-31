@@ -29,10 +29,18 @@ Google API requirements for `GOOGLE_MAPS_API_KEY`:
 - API key restrictions must allow `Places API (New)` method `places:searchText`.
 - Billing must be enabled in the Google Cloud project.
 
+AI planning requires one of:
+
+- `GOOGLE_AI_API_KEY` — Google AI Studio key (enable Gemini API in Google Cloud Console).
+- `AI_GATEWAY_API_KEY` — alternative gateway key.
+- `GOOGLE_AI_MODEL` (defaults to `gemini-3-flash`; override to use a different Gemini model).
+
 Optional values:
 
 - `LOG_LEVEL` (defaults to `info`)
 - `PORT` (defaults to `3001`)
+- `PUBLIC_API_BASE_URL` (production only — set to the public API URL, e.g. `https://api.hiptrip.net`; required when the API runs behind a TLS-terminating reverse proxy so image proxy URLs are built correctly)
+- `CORS_ORIGIN` (comma-separated allowed origins, e.g. `https://hiptrip.net`; open in development when unset)
 - `ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS` (defaults to `300000`)
 - `ANON_SUGGESTIONS_RATE_LIMIT_MAX` (defaults to `60`)
 - `TRIP_PLAN_CACHE_TTL_DAYS` (defaults to `30`; controls itinerary cache expiration)
