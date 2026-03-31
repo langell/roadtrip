@@ -25,7 +25,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// Deterministic gradient per stop so cards look distinct without photos
 const GRADIENTS = [
   'from-emerald-900/60 to-teal-800/40',
   'from-wayfarer-primary/50 to-emerald-700/30',
@@ -34,6 +33,45 @@ const GRADIENTS = [
   'from-green-900/60 to-emerald-800/40',
   'from-slate-700/60 to-slate-600/40',
 ] as const;
+
+type Stop = {
+  name: string;
+  order: number;
+  notes?: string;
+  placeId: string;
+  imageUrl?: string;
+};
+
+function StopBadge({ idx }: { idx: number }) {
+  return (
+    <span className="px-3 py-1 bg-wayfarer-primary text-white font-body text-[10px] font-bold uppercase tracking-wider rounded-full">
+      Stop {idx + 1}
+    </span>
+  );
+}
+
+function StopImage({
+  stop,
+  idx,
+  className,
+}: {
+  stop: Stop;
+  idx: number;
+  className: string;
+}) {
+  const gradient = GRADIENTS[idx % GRADIENTS.length];
+  if (stop.imageUrl) {
+    return (
+      <img
+        src={stop.imageUrl}
+        alt={stop.name}
+        className={`${className} object-cover`}
+        loading="lazy"
+      />
+    );
+  }
+  return <div className={`${className} bg-gradient-to-br ${gradient}`} />;
+}
 
 export default async function SharedTripPage({ params }: Props) {
   const { token } = await params;
@@ -111,7 +149,6 @@ export default async function SharedTripPage({ params }: Props) {
         {/* Bento grid */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-16">
           {stops.map((stop, idx) => {
-            const gradient = GRADIENTS[idx % GRADIENTS.length];
             const isFeatured = idx % 6 === 0;
             const isSide = idx % 6 === 1;
             const isWide = idx % 6 === 5;
@@ -131,14 +168,17 @@ export default async function SharedTripPage({ params }: Props) {
               return (
                 <div
                   key={stop.order}
-                  className={`${colSpan} bg-wayfarer-surface rounded-3xl overflow-hidden`}
+                  className={`${colSpan} group bg-wayfarer-surface rounded-3xl overflow-hidden`}
                 >
-                  <div
-                    className={`h-48 bg-gradient-to-br ${gradient} flex items-end p-6`}
-                  >
-                    <span className="px-3 py-1 bg-wayfarer-primary text-white font-body text-[10px] font-bold uppercase tracking-wider rounded-full">
-                      Stop {idx + 1}
-                    </span>
+                  <div className="relative h-52 overflow-hidden">
+                    <StopImage
+                      stop={stop}
+                      idx={idx}
+                      className="w-full h-full transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute bottom-4 left-4">
+                      <StopBadge idx={idx} />
+                    </div>
                   </div>
                   <div className="p-6">
                     <h2 className="font-display text-2xl font-bold text-wayfarer-primary mb-2">
@@ -158,16 +198,25 @@ export default async function SharedTripPage({ params }: Props) {
               return (
                 <div
                   key={stop.order}
-                  className={`${colSpan} bg-wayfarer-primary text-white rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden`}
+                  className={`${colSpan} bg-wayfarer-primary text-white rounded-3xl overflow-hidden flex flex-col`}
                 >
-                  <div className="absolute inset-0 opacity-10 pointer-events-none bg-gradient-to-br from-white via-transparent to-transparent" />
-                  <div className="relative z-10">
-                    <span className="px-2 py-0.5 bg-white/20 text-white font-body text-[10px] font-bold uppercase tracking-wider rounded-md">
+                  {stop.imageUrl && (
+                    <div className="relative h-36 overflow-hidden">
+                      <StopImage stop={stop} idx={idx} className="w-full h-full" />
+                    </div>
+                  )}
+                  <div className="p-6 flex-1 relative">
+                    {!stop.imageUrl && (
+                      <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-white via-transparent to-transparent pointer-events-none" />
+                    )}
+                    <span className="px-2 py-0.5 bg-white/20 text-white font-body text-[10px] font-bold uppercase tracking-wider rounded-md relative z-10">
                       Stop {idx + 1}
                     </span>
-                    <h2 className="font-display text-xl font-bold mt-3">{stop.name}</h2>
+                    <h2 className="font-display text-xl font-bold mt-3 relative z-10">
+                      {stop.name}
+                    </h2>
                     {stop.notes && (
-                      <p className="text-white/70 text-sm mt-2 leading-snug line-clamp-3">
+                      <p className="text-white/70 text-sm mt-2 leading-snug line-clamp-3 relative z-10">
                         {stop.notes}
                       </p>
                     )}
@@ -182,9 +231,9 @@ export default async function SharedTripPage({ params }: Props) {
                   key={stop.order}
                   className={`${colSpan} bg-wayfarer-surface rounded-3xl overflow-hidden flex flex-col md:flex-row`}
                 >
-                  <div
-                    className={`md:w-2/5 h-40 md:h-auto bg-gradient-to-br ${gradient}`}
-                  />
+                  <div className="relative md:w-2/5 h-44 md:h-auto overflow-hidden">
+                    <StopImage stop={stop} idx={idx} className="w-full h-full" />
+                  </div>
                   <div className="flex-1 p-8 flex flex-col justify-center">
                     <span className="text-[10px] font-bold text-wayfarer-secondary uppercase tracking-widest font-body mb-2">
                       Stop {idx + 1}
@@ -206,27 +255,27 @@ export default async function SharedTripPage({ params }: Props) {
             return (
               <div
                 key={stop.order}
-                className={`${colSpan} bg-wayfarer-surface rounded-3xl p-6 flex flex-col justify-between`}
+                className={`${colSpan} bg-wayfarer-surface rounded-3xl overflow-hidden flex flex-col`}
               >
-                <div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-display text-sm font-bold text-white shrink-0`}
-                    >
-                      {idx + 1}
-                    </div>
+                {stop.imageUrl && (
+                  <div className="relative h-32 overflow-hidden">
+                    <StopImage stop={stop} idx={idx} className="w-full h-full" />
+                  </div>
+                )}
+                <div className="p-6 flex flex-col justify-between flex-1">
+                  <div>
                     <span className="text-[10px] font-bold text-wayfarer-secondary uppercase tracking-widest font-body">
                       Stop {idx + 1}
                     </span>
+                    <h2 className="font-display text-xl font-bold text-wayfarer-primary leading-tight mt-1 mb-2">
+                      {stop.name}
+                    </h2>
+                    {stop.notes && (
+                      <p className="text-wayfarer-text-muted text-sm leading-snug line-clamp-3">
+                        {stop.notes}
+                      </p>
+                    )}
                   </div>
-                  <h2 className="font-display text-xl font-bold text-wayfarer-primary leading-tight mb-2">
-                    {stop.name}
-                  </h2>
-                  {stop.notes && (
-                    <p className="text-wayfarer-text-muted text-sm leading-snug line-clamp-3">
-                      {stop.notes}
-                    </p>
-                  )}
                 </div>
               </div>
             );

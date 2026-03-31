@@ -139,6 +139,7 @@ export const savePlanOption = async (params: {
     lat: number;
     lng: number;
     notes?: string;
+    imageUrl?: string;
     order: number;
   }>;
 }): Promise<SavePlanResult> => {
@@ -228,7 +229,13 @@ export type SharedPlan = {
   location: string;
   themes: string[];
   rationale: string;
-  stops: Array<{ name: string; order: number; notes?: string; placeId: string }>;
+  stops: Array<{
+    name: string;
+    order: number;
+    notes?: string;
+    placeId: string;
+    imageUrl?: string;
+  }>;
 };
 
 export const getSharedTrip = async (token: string): Promise<SharedPlan | null> => {
