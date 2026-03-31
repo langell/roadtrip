@@ -1,4 +1,5 @@
 import { jwtVerify } from 'jose';
+import { env } from '../config/env.js';
 
 type HeaderLookup = {
   header: (name: string) => string | string[] | undefined;
@@ -33,7 +34,7 @@ const parseBearerToken = (authorizationHeader: string | undefined) => {
 };
 
 const verifyApiToken = async (token: string) => {
-  const secret = (process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET)?.trim();
+  const secret = (env.AUTH_SECRET ?? env.NEXTAUTH_SECRET)?.trim();
 
   if (!secret) {
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
