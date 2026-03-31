@@ -9,6 +9,7 @@ import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const LOCATION_STORAGE_KEY = 'hiptrip:location';
+const PLAN_RESULTS_STORAGE_KEY = 'hiptrip:last-plan-results';
 const KM_PER_MILE = 1.60934;
 const MIN_RADIUS_MILES = 10;
 const MAX_RADIUS_MILES = 300;
@@ -198,10 +199,26 @@ const TripPlanner = () => {
   );
   const hasRequestedInitialLocation = useRef(false);
 
-  // Restore saved location on mount
+  // Restore saved location and last plan results on mount
   useEffect(() => {
-    const saved = localStorage.getItem(LOCATION_STORAGE_KEY);
-    if (saved) setLocation(saved);
+    const savedLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
+    if (savedLocation) setLocation(savedLocation);
+
+    const savedResults = localStorage.getItem(PLAN_RESULTS_STORAGE_KEY);
+    if (savedResults) {
+      try {
+        const parsed = JSON.parse(savedResults) as {
+          options: TripPlanOption[];
+          source: 'cache' | 'ai';
+          degraded: boolean;
+        };
+        setPlanOptions(parsed.options);
+        setPlanSource(parsed.source);
+        setPlanDegraded(parsed.degraded);
+      } catch {
+        localStorage.removeItem(PLAN_RESULTS_STORAGE_KEY);
+      }
+    }
   }, []);
 
   // Persist location changes (skip the initial default value)
@@ -231,6 +248,8 @@ const TripPlanner = () => {
     setPlanError(null);
     setPlanSource(null);
     setPlanDegraded(false);
+    setPlanOptions([]);
+    localStorage.removeItem(PLAN_RESULTS_STORAGE_KEY);
     try {
       const modifiers =
         filters.smartPitstops || filters.photoOps
@@ -257,6 +276,18 @@ const TripPlanner = () => {
       setPlanOptions(data.options);
       setPlanSource(data.source);
       setPlanDegraded(data.degraded ?? false);
+      try {
+        localStorage.setItem(
+          PLAN_RESULTS_STORAGE_KEY,
+          JSON.stringify({
+            options: data.options,
+            source: data.source,
+            degraded: data.degraded ?? false,
+          }),
+        );
+      } catch {
+        // localStorage unavailable or full — results still shown in memory
+      }
     } finally {
       setLoading(false);
     }

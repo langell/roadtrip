@@ -5,6 +5,7 @@ import { auth } from '../auth';
 import AuthSessionProvider from '../components/session-provider';
 import GoogleMapsScriptLoader from '../components/GoogleMapsScriptLoader';
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: 'RoadTrip | Plan unforgettable drives',
@@ -37,6 +38,7 @@ const RootLayout = async ({ children }: { children: ReactNode }) => {
         <AuthSessionProvider session={session}>
           <main>{children}</main>
         </AuthSessionProvider>
+        <Analytics />
       </body>
     </html>
   );

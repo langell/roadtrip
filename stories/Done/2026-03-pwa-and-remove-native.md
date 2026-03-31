@@ -6,13 +6,13 @@
 
 ## Acceptance Criteria
 
-- [ ] Web app is installable on iOS and Android home screens via PWA (manifest + service worker).
-- [ ] App has a name, icon, theme color, and splash screen configured in the manifest.
-- [ ] Saved trips are written to the database (existing `POST /trips/save-plan` endpoint) — no client-side-only storage.
-- [ ] The app works offline for previously-viewed content (service worker caches static assets and shell).
-- [ ] `apps/mobile` directory and all mobile-related workspace config is removed from the monorepo.
-- [ ] Turbo pipeline, root `package.json`, and `pnpm-workspace.yaml` no longer reference `@roadtrip/mobile`.
-- [ ] CI/lint/test pipelines pass cleanly after removal.
+- [x] Web app is installable on iOS and Android home screens via PWA (manifest + service worker).
+- [x] App has a name, icon, theme color, and splash screen configured in the manifest.
+- [x] Saved trips are written to the database (existing `POST /trips/save-plan` endpoint) — no client-side-only storage.
+- [x] The app works offline for previously-viewed content (service worker caches static assets and shell).
+- [x] `apps/mobile` directory and all mobile-related workspace config is removed from the monorepo.
+- [x] Turbo pipeline, root `package.json`, and `pnpm-workspace.yaml` no longer reference `@roadtrip/mobile`.
+- [x] CI/lint/test pipelines pass cleanly after removal.
 
 ## Tasks
 
@@ -22,7 +22,7 @@
 - [x] Add icons (192x192, 512x512 PNG) to `apps/web/public/icons/` — generated via `scripts/generate-pwa-icons.mjs` (owner: web)
 - [x] Add `<link rel="manifest">` and `<meta name="theme-color">` to root layout (owner: web)
 - [x] Register a Next.js-compatible service worker for asset caching — manual `public/sw.js` with cache-first for `_next/static`, network-first for navigation (owner: web)
-- [ ] Verify installability in Chrome DevTools Lighthouse PWA audit (owner: web)
+- [x] Verify installability in Chrome DevTools Lighthouse PWA audit — manifest panel confirmed correct, all warnings resolved (owner: web)
 
 ### Web — Database saves
 

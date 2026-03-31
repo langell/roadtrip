@@ -17,15 +17,16 @@ model User {
 }
 
 model Trip {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  originLat Float
-  originLng Float
-  filters   Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stops     TripStop[]
+  id         String    @id @default(uuid())
+  userId     String
+  name       String
+  originLat  Float
+  originLng  Float
+  filters    Json
+  shareToken String?   @unique
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  stops      TripStop[]
 
   @@index([userId])
   @@index([createdAt])

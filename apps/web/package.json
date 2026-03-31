@@ -13,6 +13,7 @@
     "@googlemaps/js-api-loader": "^2.0.2",
     "@roadtrip/types": "workspace:*",
     "@roadtrip/ui": "workspace:*",
+    "@vercel/analytics": "^2.0.1",
     "jose": "^6.2.2",
     "next": "15.5.14",
     "next-auth": "5.0.0-beta.30",

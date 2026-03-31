@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import GooglePlacesAutocomplete from '../../components/GooglePlacesAutocomplete';
-import { savePlanOption } from '../../lib/api-client';
+import { savePlanOption, shareTrip } from '../../lib/api-client';
 import type { PlannedStopResolved, TripPlanOption } from '../../lib/api-client';
 
 type TripDraft = {
@@ -72,14 +71,15 @@ const COL_SPAN: Record<CardVariant, string> = {
 };
 
 const PlanDetail = ({ draftKey }: PlanDetailProps) => {
-  const router = useRouter();
-
   const [draft, setDraft] = useState<TripDraft | null>(null);
   const [stops, setStops] = useState<EditableStop[]>([]);
   const [droppedCount, setDroppedCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [savedTripId, setSavedTripId] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   const [addQuery, setAddQuery] = useState('');
   const [addPlaceId, setAddPlaceId] = useState<string | null>(null);
@@ -193,11 +193,44 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
       } catch {
         // ignore
       }
-      router.push('/account');
+      setSavedTripId(result.tripId);
     } else if (result.requiresAuth) {
       setShowSignInModal(true);
     } else {
       setSaveError(result.error);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!savedTripId) return;
+    setSharing(true);
+    setShareFeedback(null);
+
+    const result = await shareTrip(savedTripId);
+    setSharing(false);
+
+    if (!result) {
+      setShareFeedback('Could not generate share link. Try again.');
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: draft?.plan.title ?? 'My Road Trip',
+          url: result.shareUrl,
+        });
+        return;
+      } catch {
+        // user cancelled or share failed — fall through to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(result.shareUrl);
+      setShareFeedback('Link copied!');
+    } catch {
+      setShareFeedback(result.shareUrl);
     }
   };
 
@@ -601,16 +634,41 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        type="button"
-        disabled={saving || stops.length === 0}
-        onClick={() => void handleSave()}
-        className="fixed bottom-8 right-8 z-40 h-14 px-6 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-40"
-      >
-        <span className="text-base leading-none">🗺</span>
-        <span>{saving ? 'Saving…' : 'Save trip'}</span>
-      </button>
+      {/* FAB — save / post-save share */}
+      {savedTripId ? (
+        <div className="fixed bottom-8 right-8 z-40 flex flex-col items-end gap-2">
+          <button
+            type="button"
+            disabled={sharing}
+            onClick={() => void handleShare()}
+            className="h-14 px-6 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-70"
+          >
+            <span className="text-base leading-none">↗</span>
+            <span>{sharing ? 'Sharing…' : 'Share trip'}</span>
+          </button>
+          <Link
+            href="/trips"
+            className="h-10 px-5 bg-wayfarer-surface text-wayfarer-primary rounded-full shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm hover:opacity-80 transition-opacity"
+          >
+            <span>✓ Saved — View my trips</span>
+          </Link>
+          {shareFeedback && (
+            <p className="text-xs font-body text-wayfarer-text-muted bg-wayfarer-surface px-4 py-2 rounded-full shadow-wayfarer-soft max-w-[220px] text-center">
+              {shareFeedback}
+            </p>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={saving || stops.length === 0}
+          onClick={() => void handleSave()}
+          className="fixed bottom-8 right-8 z-40 h-14 px-6 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-40"
+        >
+          <span className="text-base leading-none">🗺</span>
+          <span>{saving ? 'Saving…' : 'Save trip'}</span>
+        </button>
+      )}
 
       {/* Sign-in modal */}
       {showSignInModal && (

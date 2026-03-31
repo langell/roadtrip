@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { shutdownObservability } from './observability.js';
 import type { Server } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -890,6 +891,75 @@ export const createApp = () => {
       });
 
       res.status(201).json(trip);
+    }),
+  );
+
+  const buildShareUrl = (token: string) => {
+    const base =
+      env.PUBLIC_SITE_URL ??
+      env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/api$/, '') ??
+      'http://localhost:3000';
+    return `${base}/s/${token}`;
+  };
+
+  app.post(
+    '/trips/:id/share',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const { id } = req.params;
+
+      const trip = await prisma.trip.findUnique({ where: { id } });
+
+      if (!trip || trip.userId !== userId) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      if (trip.shareToken) {
+        res.json({ shareUrl: buildShareUrl(trip.shareToken) });
+        return;
+      }
+
+      const shareToken = randomBytes(9).toString('base64url');
+      await prisma.trip.update({ where: { id }, data: { shareToken } });
+
+      res.json({ shareUrl: buildShareUrl(shareToken) });
+    }),
+  );
+
+  app.get(
+    '/trips/shared/:token',
+    withAsyncHandler(async (req, res) => {
+      const { token } = req.params;
+
+      const trip = await prisma.trip.findUnique({
+        where: { shareToken: token },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+
+      if (!trip) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      const filters = trip.filters as {
+        location?: string;
+        themes?: string[];
+        rationale?: string;
+      };
+
+      res.json({
+        name: trip.name,
+        location: filters.location ?? '',
+        themes: filters.themes ?? [],
+        rationale: filters.rationale ?? '',
+        stops: trip.stops.map((s) => ({
+          name: s.name,
+          order: s.order,
+          notes: s.notes ?? undefined,
+        })),
+      });
     }),
   );
 
