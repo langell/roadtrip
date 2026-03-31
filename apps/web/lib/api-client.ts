@@ -41,6 +41,7 @@ export type TripPlanResponse = {
   themes: string[];
   source: 'cache' | 'ai';
   options: TripPlanOption[];
+  degraded?: boolean;
 };
 
 const apiBaseUrl =

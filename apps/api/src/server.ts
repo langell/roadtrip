@@ -714,6 +714,7 @@ export const createApp = () => {
         themes: string[];
         source: 'ai';
         options: PlannedOption[];
+        degraded?: boolean;
         cacheDebug?: {
           enabled: true;
           radiusMiles: number;
@@ -727,6 +728,7 @@ export const createApp = () => {
         themes: input.themes,
         source: 'ai',
         options,
+        ...(plans.degraded ? { degraded: true } : {}),
       };
 
       if (debugEnabled) {
