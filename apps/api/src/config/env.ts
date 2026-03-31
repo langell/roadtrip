@@ -23,6 +23,13 @@ const schema = z.object({
     .max(3600000)
     .default(300000),
   ANON_SUGGESTIONS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1000).default(60),
+  ANON_PHOTO_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(3600000)
+    .default(300000),
+  ANON_PHOTO_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1000).default(200),
   TRIP_PLAN_CACHE_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   TRIP_PLAN_CACHE_DEBUG: z
     .enum(['true', 'false'])

@@ -181,7 +181,7 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   return `${base}/places/photo?name=${encodedPhotoName}`;
 };
 
-const createAnonymousSuggestionsRateLimiter = () => {
+const createAnonymousRateLimiter = (windowMs: number, max: number) => {
   const hitsByIp = new Map<string, RateLimitEntry>();
 
   return (ipAddress: string) => {
@@ -189,14 +189,11 @@ const createAnonymousSuggestionsRateLimiter = () => {
     const existing = hitsByIp.get(ipAddress);
 
     if (!existing || existing.resetAt <= now) {
-      hitsByIp.set(ipAddress, {
-        count: 1,
-        resetAt: now + env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS,
-      });
+      hitsByIp.set(ipAddress, { count: 1, resetAt: now + windowMs });
       return true;
     }
 
-    if (existing.count >= env.ANON_SUGGESTIONS_RATE_LIMIT_MAX) {
+    if (existing.count >= max) {
       return false;
     }
 
@@ -209,7 +206,14 @@ const createAnonymousSuggestionsRateLimiter = () => {
 export const createApp = () => {
   const app = express();
   app.set('trust proxy', 1);
-  const allowAnonymousSuggestionRequest = createAnonymousSuggestionsRateLimiter();
+  const allowAnonymousSuggestionRequest = createAnonymousRateLimiter(
+    env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS,
+    env.ANON_SUGGESTIONS_RATE_LIMIT_MAX,
+  );
+  const allowAnonymousPhotoRequest = createAnonymousRateLimiter(
+    env.ANON_PHOTO_RATE_LIMIT_WINDOW_MS,
+    env.ANON_PHOTO_RATE_LIMIT_MAX,
+  );
   app.use(
     cors(
       env.CORS_ORIGIN
@@ -236,6 +240,13 @@ export const createApp = () => {
   app.get(
     '/places/photo',
     withAsyncHandler(async (req, res) => {
+      const userId = await getRequestUserId(req);
+
+      if (!userId && !allowAnonymousPhotoRequest(getRequesterIp(req))) {
+        res.status(429).json({ error: 'RATE_LIMITED' });
+        return;
+      }
+
       res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
 
       const photoName = req.query.name;
