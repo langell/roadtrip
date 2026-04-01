@@ -845,6 +845,171 @@ describe('HTTP server', () => {
       expect(response.body.locationContext).toBe('Denver, CO');
     });
 
+    describe('GET /trips/:id', () => {
+      const mockTrip = {
+        id: 'trip-abc',
+        userId: 'user-1',
+        name: 'Oregon Coast',
+        originLat: 45.52,
+        originLng: -122.68,
+        shareToken: null,
+        filters: {
+          location: 'Portland, OR',
+          themes: ['scenic'],
+          rationale: 'Coastal beauty',
+        },
+        stops: [
+          {
+            id: 's1',
+            placeId: 'p1',
+            name: 'Cannon Beach',
+            order: 1,
+            lat: 45.88,
+            lng: -123.96,
+            notes: null,
+            imageUrl: null,
+          },
+          {
+            id: 's2',
+            placeId: 'p2',
+            name: 'Haystack Rock',
+            order: 2,
+            lat: 45.89,
+            lng: -123.97,
+            notes: 'Great view',
+            imageUrl: 'https://img.example.com/rock.jpg',
+          },
+        ],
+      };
+
+      it('returns trip with drive-time legs for authenticated owner', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('trip-abc');
+        expect(response.body.location).toBe('Portland, OR');
+        expect(response.body.stops).toHaveLength(2);
+        expect(response.body.stops[0].driveTimeMin).toBeNull();
+        expect(response.body.stops[1].driveTimeMin).toBeGreaterThan(0);
+        expect(response.body.stops[1].imageUrl).toBe('https://img.example.com/rock.jpg');
+      });
+
+      it('returns 401 for unauthenticated GET /trips/:id', async () => {
+        const app = createApp();
+        const response = await request(app).get('/trips/trip-abc');
+        expect(response.status).toBe(401);
+        expect(prismaMock.trip.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('returns 404 when trip does not belong to user', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue({
+          ...mockTrip,
+          userId: 'other-user',
+        });
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+        expect(response.body).toEqual({ error: 'NOT_FOUND' });
+      });
+
+      it('returns 404 when trip does not exist', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(null);
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+      });
+    });
+
+    describe('GET /trips/:id/sponsored-stop', () => {
+      const mockTrip = {
+        id: 'trip-abc',
+        userId: 'user-1',
+        name: 'Oregon Coast',
+        originLat: 45.52,
+        originLng: -122.68,
+        filters: {},
+        stops: [
+          {
+            id: 's1',
+            placeId: 'p1',
+            name: 'Cannon Beach',
+            order: 1,
+            lat: 45.88,
+            lng: -123.96,
+          },
+        ],
+      };
+
+      it('returns the first active sponsored place', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+          {
+            id: 'sp-1',
+            placeId: 'place-x',
+            title: 'Crater Lodge',
+            description: 'Nice',
+            imageUrl: null,
+            url: 'https://lodge.example.com',
+            active: true,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          id: 'sp-1',
+          title: 'Crater Lodge',
+          placeId: 'place-x',
+        });
+      });
+
+      it('returns null when no sponsored places are active', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toBeNull();
+      });
+
+      it('returns 401 for unauthenticated request', async () => {
+        const app = createApp();
+        const response = await request(app).get('/trips/trip-abc/sponsored-stop');
+        expect(response.status).toBe(401);
+      });
+
+      it('returns 404 when trip does not belong to user', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue({
+          ...mockTrip,
+          userId: 'other-user',
+        });
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+      });
+    });
+
     it('deduplicates trending routes by location', async () => {
       prismaMock.tripPlanCache.findMany.mockResolvedValue([
         {

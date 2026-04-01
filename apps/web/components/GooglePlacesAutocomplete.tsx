@@ -80,7 +80,7 @@ export default function GooglePlacesAutocomplete({
         let service: any = null;
         if (window.google && window.google.maps && window.google.maps.places) {
           if (window.google.maps.importLibrary) {
-            window.google.maps.importLibrary('places').then(() => {
+            void window.google.maps.importLibrary('places').then(() => {
               service = new window.google.maps.places.AutocompleteService();
               // Only call if google is defined
 

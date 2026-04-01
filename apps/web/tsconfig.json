@@ -10,7 +10,7 @@
       "@roadtrip/ui/*": ["../../packages/ui/src/*"]
     },
     "jsx": "preserve",
-    "types": ["node", "next", "next/navigation"],
+    "types": ["node", "next", "next/navigation", "google.maps"],
     "incremental": true,
     "isolatedModules": true,
     "plugins": [

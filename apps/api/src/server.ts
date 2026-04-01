@@ -524,6 +524,109 @@ export const createApp = () => {
     }),
   );
 
+  app.get(
+    '/trips/:id',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const { id } = req.params;
+
+      const trip = await prisma.trip.findUnique({
+        where: { id },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+
+      if (!trip || trip.userId !== userId) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      const filters = trip.filters as {
+        location?: string;
+        themes?: string[];
+        rationale?: string;
+      };
+
+      // Compute drive-time estimates using haversine + 1.4× road factor at ~80 km/h
+      const stopsWithLegs = trip.stops.map((stop, i) => {
+        const prev = trip.stops[i - 1];
+        let driveTimeMin: number | null = null;
+        if (prev) {
+          const distKm = haversineKm(prev.lat, prev.lng, stop.lat, stop.lng);
+          driveTimeMin = Math.round(((distKm * 1.4) / 80) * 60);
+        }
+        return {
+          id: stop.id,
+          placeId: stop.placeId,
+          name: stop.name,
+          order: stop.order,
+          lat: stop.lat,
+          lng: stop.lng,
+          notes: stop.notes ?? undefined,
+          imageUrl: stop.imageUrl ?? undefined,
+          driveTimeMin,
+        };
+      });
+
+      res.json({
+        id: trip.id,
+        name: trip.name,
+        originLat: trip.originLat,
+        originLng: trip.originLng,
+        shareToken: trip.shareToken ?? undefined,
+        location: filters.location ?? '',
+        themes: filters.themes ?? [],
+        rationale: filters.rationale ?? '',
+        stops: stopsWithLegs,
+      });
+    }),
+  );
+
+  app.get(
+    '/trips/:id/sponsored-stop',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const { id } = req.params;
+
+      const trip = await prisma.trip.findUnique({
+        where: { id },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+
+      if (!trip || trip.userId !== userId) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      const sponsored = await prisma.sponsoredPlace.findMany({
+        where: { active: true },
+      });
+
+      if (sponsored.length === 0) {
+        res.json(null);
+        return;
+      }
+
+      // SponsoredPlace has no lat/lng in v1 — return the first active record.
+      // A future iteration can fetch coordinates via Place Details API and pick
+      // the one closest to the trip midpoint.
+      const best = sponsored[0];
+      if (!best) {
+        res.json(null);
+        return;
+      }
+      res.json({
+        id: best.id,
+        placeId: best.placeId,
+        title: best.title,
+        description: best.description,
+        imageUrl: best.imageUrl ?? undefined,
+        url: best.url ?? undefined,
+      });
+    }),
+  );
+
   const saveGeneratedTripSchema = z.object({
     location: z.string().min(3),
     radiusKm: z.number().positive(),

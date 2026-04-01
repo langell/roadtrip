@@ -251,6 +251,70 @@ export const getSharedTrip = async (token: string): Promise<SharedPlan | null> =
   }
 };
 
+export type TripDetailStop = {
+  id: string;
+  placeId: string;
+  name: string;
+  order: number;
+  lat: number;
+  lng: number;
+  notes?: string;
+  imageUrl?: string;
+  driveTimeMin: number | null;
+};
+
+export type TripDetail = {
+  id: string;
+  name: string;
+  originLat: number;
+  originLng: number;
+  shareToken?: string;
+  location: string;
+  themes: string[];
+  rationale: string;
+  stops: TripDetailStop[];
+};
+
+export type SponsoredStop = {
+  id: string;
+  placeId: string;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  url?: string;
+};
+
+export const getTripDetail = async (tripId: string): Promise<TripDetail | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/${encodeURIComponent(tripId)}`, {
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as TripDetail;
+  } catch {
+    return null;
+  }
+};
+
+export const getTripSponsoredStop = async (
+  tripId: string,
+): Promise<SponsoredStop | null> => {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/trips/${encodeURIComponent(tripId)}/sponsored-stop`,
+      {
+        headers: await buildAuthHeaders(),
+        cache: 'no-store',
+      },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as SponsoredStop | null;
+  } catch {
+    return null;
+  }
+};
+
 export type TrendingRoute = {
   cacheId: string;
   location: string;
