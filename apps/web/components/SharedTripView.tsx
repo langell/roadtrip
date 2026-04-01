@@ -376,6 +376,26 @@ export default function SharedTripView({ plan }: Props) {
                                 {stop.notes}
                               </p>
                             )}
+                            <a
+                              href={`https://www.google.com/maps/place/?q=place_id:${stop.placeId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-wayfarer-primary/70 transition-colors hover:text-wayfarer-primary"
+                            >
+                              Details
+                              <svg
+                                className="h-3 w-3"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                              </svg>
+                            </a>
                           </div>
                         </div>
                       </div>
