@@ -109,10 +109,21 @@ export default function TripMapView({ trip, sponsored }: Props) {
     let cancelled = false;
 
     const init = async () => {
-      const bounds = new google.maps.LatLngBounds();
+      // With loading=async all classes must come from importLibrary —
+      // the google.maps namespace exists but constructors are not pre-populated.
+      const [{ LatLngBounds }, { Map: GMap, Polyline }, { AdvancedMarkerElement }] =
+        await Promise.all([
+          google.maps.importLibrary('core') as Promise<google.maps.CoreLibrary>,
+          google.maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
+          google.maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
+        ]);
+
+      if (cancelled) return;
+
+      const bounds = new LatLngBounds();
       sorted.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
 
-      const map = new google.maps.Map(mapRef.current!, {
+      const map = new GMap(mapRef.current!, {
         // mapId is required for AdvancedMarkerElement; styles[] is ignored when mapId is set
         ...(process.env.NEXT_PUBLIC_GOOGLE_MAP_ID
           ? { mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID }
@@ -161,7 +172,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
       mapInstanceRef.current = map;
 
       // Dashed route polyline
-      new google.maps.Polyline({
+      new Polyline({
         path: sorted.map((s) => ({ lat: s.lat, lng: s.lng })),
         map,
         strokeColor: '#1B4332',
@@ -179,13 +190,6 @@ export default function TripMapView({ trip, sponsored }: Props) {
           },
         ],
       });
-
-      // Use importLibrary to guarantee the marker library is loaded before use
-      const { AdvancedMarkerElement } = (await google.maps.importLibrary(
-        'marker',
-      )) as google.maps.MarkerLibrary;
-
-      if (cancelled) return;
 
       markersRef.current = sorted.map((stop, i) => {
         const pin = document.createElement('div');
