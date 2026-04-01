@@ -113,11 +113,15 @@ export default function TripMapView({ trip, sponsored }: Props) {
       sorted.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
 
       const map = new google.maps.Map(mapRef.current!, {
+        // mapId is required for AdvancedMarkerElement; styles[] is ignored when mapId is set
+        ...(process.env.NEXT_PUBLIC_GOOGLE_MAP_ID
+          ? { mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID }
+          : {}),
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
         zoomControl: false,
-        // Natural light style
+        // Natural light style (only applied when no mapId; use Cloud-based styling otherwise)
         styles: [
           { featureType: 'poi', stylers: [{ visibility: 'off' }] },
           { featureType: 'transit', stylers: [{ visibility: 'off' }] },
@@ -209,7 +213,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
           content: pin,
           title: stop.name,
         });
-        marker.addListener('click', () => handleMarkerClick(i));
+        marker.addListener('gmp-click', () => handleMarkerClick(i));
         return marker;
       });
     }; // end init
