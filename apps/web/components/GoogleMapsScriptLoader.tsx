@@ -17,9 +17,9 @@ export default function GoogleMapsScriptLoader() {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
     script.async = true;
     document.body.appendChild(script);
-    return () => {
-      script.remove();
-    };
+    // No cleanup — once the Maps bootstrap is in the DOM it must not be removed.
+    // Removing it on unmount causes a double-load on remount (StrictMode / navigation),
+    // which re-registers already-defined custom elements and corrupts importLibrary.
   }, []);
   return null;
 }
