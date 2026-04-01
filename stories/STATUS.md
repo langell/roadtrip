@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-03-31 — RT-033 `2026-03-route-map-view.md` — /trips/[id]/map, numbered markers, stop list panel, sponsored stop card, drive-time legs.
 - 2026-03-31 — RT-032 `2026-03-discovery-feed.md` — /discover page, trending routes, nearby stops, sponsored injection, home redirect.
 - 2026-03-31 — RT-020 `2026-03-security-best-practices.md` — photo endpoint rate limiting, security checklist doc, auth/logging audit.
 - 2026-03-31 — RT-016 `2026-03-ai-trip-planner-web-experience.md` — implemented; closing as done.
