@@ -225,11 +225,13 @@ export const shareTrip = async (tripId: string): Promise<{ shareUrl: string } | 
 };
 
 export type SharedPlan = {
+  tripId: string;
   name: string;
   location: string;
   themes: string[];
   rationale: string;
   stops: Array<{
+    id: string;
     name: string;
     order: number;
     notes?: string;

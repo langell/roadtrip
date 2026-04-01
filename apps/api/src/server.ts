@@ -1287,6 +1287,7 @@ export const createApp = () => {
           driveTimeMin = Math.round(((distKm * 1.4) / 80) * 60);
         }
         return {
+          id: stop.id,
           name: stop.name,
           order: stop.order,
           notes: stop.notes ?? undefined,
@@ -1299,6 +1300,7 @@ export const createApp = () => {
       });
 
       res.json({
+        tripId: trip.id,
         name: trip.name,
         location: filters.location ?? '',
         themes: filters.themes ?? [],
