@@ -648,6 +648,12 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
             <span>{sharing ? 'Sharing…' : 'Share trip'}</span>
           </button>
           <Link
+            href={`/trips/${savedTripId}/map`}
+            className="h-10 px-5 bg-wayfarer-primary text-white rounded-full shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm hover:opacity-90 transition-opacity"
+          >
+            <span>🗺 View Map</span>
+          </Link>
+          <Link
             href="/trips"
             className="h-10 px-5 bg-wayfarer-surface text-wayfarer-primary rounded-full shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm hover:opacity-80 transition-opacity"
           >

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '../../auth';
-import { getMyTrips } from '../../lib/api-client';
+import { getMyTripsServer } from '../../lib/server-api-client';
 
 const TripsPage = async () => {
   const session = await auth();
@@ -10,7 +10,7 @@ const TripsPage = async () => {
     redirect('/sign-in?callbackUrl=/trips');
   }
 
-  const trips = await getMyTrips();
+  const trips = await getMyTripsServer();
 
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main">
@@ -19,7 +19,7 @@ const TripsPage = async () => {
           href="/"
           className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary"
         >
-          RoadTrip
+          HipTrip
         </Link>
         <Link
           href="/account"
@@ -60,7 +60,7 @@ const TripsPage = async () => {
                   </p>
                   {trip.stops.length > 0 && (
                     <Link
-                      href={{ pathname: '/trips/[id]/map', query: { id: trip.id } }}
+                      href={`/trips/${trip.id}/map`}
                       className="shrink-0 rounded-lg bg-wayfarer-primary/10 px-3 py-1 text-xs font-semibold text-wayfarer-primary transition hover:bg-wayfarer-primary hover:text-white"
                     >
                       Map View

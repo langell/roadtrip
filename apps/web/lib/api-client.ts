@@ -339,7 +339,6 @@ export type DiscoverFeedResponse = {
   trendingRoutes: TrendingRoute[];
   nearbyStops: DiscoverStop[];
   sponsoredStops: DiscoverStop[];
-  locationContext?: string;
 };
 
 export const getDiscoverFeed = async (): Promise<DiscoverFeedResponse | null> => {
@@ -350,6 +349,24 @@ export const getDiscoverFeed = async (): Promise<DiscoverFeedResponse | null> =>
     });
     if (!response.ok) return null;
     return (await response.json()) as DiscoverFeedResponse;
+  } catch {
+    return null;
+  }
+};
+
+export const fetchCachedTripPlan = async (
+  cacheId: string,
+): Promise<TripPlanResponse | null> => {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/trips/cache/${encodeURIComponent(cacheId)}`,
+      {
+        headers: await buildAuthHeaders(),
+        cache: 'no-store',
+      },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as TripPlanResponse;
   } catch {
     return null;
   }

@@ -177,8 +177,27 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   }
 
   const encodedPhotoName = encodeURIComponent(photoName);
-  const base = `${req.protocol}://${req.get('host')}`;
+  const base = env.PUBLIC_API_URL ?? `${req.protocol}://${req.get('host')}`;
   return `${base}/places/photo?name=${encodedPhotoName}`;
+};
+
+// Rewrites a cached photo proxy URL to use the current server's base URL.
+// Cached entries may contain a production hostname; this normalises them at read time.
+const rewritePhotoProxyUrl = (
+  req: express.Request,
+  imageUrl: string | undefined,
+): string | undefined => {
+  if (!imageUrl) return undefined;
+  try {
+    const parsed = new URL(imageUrl);
+    const photoName = parsed.searchParams.get('name');
+    if (parsed.pathname === '/places/photo' && photoName) {
+      return buildSuggestionImageUrl(req, photoName);
+    }
+  } catch {
+    // not a valid URL — return unchanged
+  }
+  return imageUrl;
 };
 
 const createAnonymousRateLimiter = (windowMs: number, max: number) => {
@@ -240,7 +259,6 @@ export const createApp = () => {
   app.get(
     '/discover',
     withAsyncHandler(async (req, res) => {
-      const userId = await getRequestUserId(req);
       const now = new Date();
 
       // 1. Trending routes — top entries from TripPlanCache, deduplicated by location
@@ -282,12 +300,12 @@ export const createApp = () => {
             themes: cache.themesKey.split('|'),
             engagementScore: cache.engagementScore,
             previewTitle: firstOption?.title ?? cache.location,
-            previewImageUrl,
+            previewImageUrl: rewritePhotoProxyUrl(req, previewImageUrl),
           });
         }
       }
 
-      // 2. Nearby stops — only for authenticated users with trip history
+      // 2. Popular stops — mined from TripPlanCache, ranked by weighted appearance count
       type DiscoverStop = {
         id: string;
         placeId: string;
@@ -298,44 +316,66 @@ export const createApp = () => {
         sponsored: boolean;
       };
 
-      let nearbyStops: DiscoverStop[] = [];
-      let locationContext: string | undefined;
+      type CachedResolvedStop = {
+        status: 'resolved';
+        suggestion: {
+          id: string;
+          placeId: string;
+          title: string;
+          description: string;
+          imageUrl?: string;
+        };
+      };
+      type CachedStopEntry = {
+        status: string;
+        suggestion?: CachedResolvedStop['suggestion'];
+      };
+      type CachedOptionEntry = { stops?: CachedStopEntry[] };
 
-      if (userId) {
-        const lastTrip = await prisma.trip.findFirst({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-        });
+      // Reuse the trendingCandidates already fetched, plus fetch a wider set for stop mining
+      const stopCandidates = await prisma.tripPlanCache.findMany({
+        where: { expiresAt: { gt: now }, validOptions: { gt: 0 } },
+        orderBy: [{ engagementScore: 'desc' }, { updatedAt: 'desc' }],
+        take: 100,
+      });
 
-        if (lastTrip) {
-          const filters = lastTrip.filters as {
-            location?: string;
-            themes?: string[];
-          };
-          const location = filters.location ?? lastTrip.name;
-          locationContext = location;
+      // Tally each placeId weighted by the cache entry's engagementScore
+      const stopScores = new Map<
+        string,
+        { score: number; stop: CachedResolvedStop['suggestion'] }
+      >();
 
-          try {
-            const suggestions = await googlePlacesService.findStops({
-              location,
-              themes: ['scenic'],
-              radiusKm: 200,
-            });
-            nearbyStops = suggestions.slice(0, 9).map(({ photoName, ...s }) => ({
-              id: s.id,
-              placeId: s.placeId,
-              title: s.title,
-              description: s.description,
-              imageUrl: buildSuggestionImageUrl(req, photoName),
-              sponsored: false,
-            }));
-          } catch {
-            // graceful degradation — empty nearby stops
+      for (const entry of stopCandidates) {
+        const options = entry.options as CachedOptionEntry[] | null;
+        if (!Array.isArray(options)) continue;
+        for (const option of options) {
+          for (const stop of option.stops ?? []) {
+            if (stop.status !== 'resolved' || !stop.suggestion) continue;
+            const { placeId } = stop.suggestion;
+            const existing = stopScores.get(placeId);
+            const weight = 1 + entry.engagementScore;
+            if (existing) {
+              existing.score += weight;
+            } else {
+              stopScores.set(placeId, { score: weight, stop: stop.suggestion });
+            }
           }
         }
       }
 
-      // 3. Sponsored stops — up to 2 active records
+      const popularStops: DiscoverStop[] = [...stopScores.entries()]
+        .sort((a, b) => b[1].score - a[1].score)
+        .slice(0, 9)
+        .map(([, { stop }]) => ({
+          id: stop.id,
+          placeId: stop.placeId,
+          title: stop.title,
+          description: stop.description,
+          imageUrl: rewritePhotoProxyUrl(req, stop.imageUrl),
+          sponsored: false,
+        }));
+
+      // 3. Sponsored stops — inject up to 2 active records at positions 1 and 4
       const sponsored = await prisma.sponsoredPlace.findMany({
         where: { active: true },
         orderBy: { updatedAt: 'desc' },
@@ -352,7 +392,7 @@ export const createApp = () => {
         sponsored: true,
       }));
 
-      res.json({ trendingRoutes, nearbyStops, sponsoredStops, locationContext });
+      res.json({ trendingRoutes, nearbyStops: popularStops, sponsoredStops });
     }),
   );
 
@@ -366,7 +406,7 @@ export const createApp = () => {
         return;
       }
 
-      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
       const photoName = req.query.name;
       const maxWidthRaw = Number(req.query.maxWidthPx);
@@ -627,6 +667,46 @@ export const createApp = () => {
     }),
   );
 
+  app.get(
+    '/trips/cache/:id',
+    withAsyncHandler(async (req, res) => {
+      const { id } = req.params;
+      const entry = await prisma.tripPlanCache.findUnique({ where: { id } });
+      if (!entry) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      const parsedOptions = plannedOptionsSchema.safeParse(entry.options);
+      if (!parsedOptions.success || parsedOptions.data.length === 0) {
+        res.status(404).json({ error: 'NO_OPTIONS' });
+        return;
+      }
+
+      const options = parsedOptions.data.map((option) => ({
+        ...option,
+        stops: option.stops.map((stop) => {
+          if (stop.status !== 'resolved') return stop;
+          return {
+            ...stop,
+            suggestion: {
+              ...stop.suggestion,
+              imageUrl: rewritePhotoProxyUrl(req, stop.suggestion.imageUrl),
+            },
+          };
+        }),
+      }));
+
+      res.json({
+        location: entry.location,
+        radiusKm: entry.radiusKm,
+        themes: entry.themesKey.split('|'),
+        source: 'cache' as const,
+        options,
+      });
+    }),
+  );
+
   const saveGeneratedTripSchema = z.object({
     location: z.string().min(3),
     radiusKm: z.number().positive(),
@@ -793,7 +873,19 @@ export const createApp = () => {
             radiusKm: input.radiusKm,
             themes: input.themes,
             source: 'cache',
-            options: parsedOptions.data,
+            options: parsedOptions.data.map((option) => ({
+              ...option,
+              stops: option.stops.map((stop) => {
+                if (stop.status !== 'resolved') return stop;
+                return {
+                  ...stop,
+                  suggestion: {
+                    ...stop.suggestion,
+                    imageUrl: rewritePhotoProxyUrl(req, stop.suggestion.imageUrl),
+                  },
+                };
+              }),
+            })),
           };
 
           if (debugEnabled) {

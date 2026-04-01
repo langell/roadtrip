@@ -35,6 +35,7 @@ const schema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  PUBLIC_API_URL: z.string().url().optional(),
   PUBLIC_SITE_URL: z.string().url().optional(),
   CORS_ORIGIN: z.string().optional(),
   AUTH_SECRET: z.string().min(1).optional(),

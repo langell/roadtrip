@@ -172,7 +172,11 @@ const forwardGeocode = async (
   }
 };
 
-const TripPlanner = () => {
+type TripPlannerProps = {
+  initialLocation?: string;
+};
+
+const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
   const router = useRouter();
   const [filters, setFilters] = useState({
     radiusMiles: 100,
@@ -183,7 +187,7 @@ const TripPlanner = () => {
   const [selectedThemes, setSelectedThemes] = useState<
     Array<(typeof TripThemeSchema.options)[number]>
   >(['scenic']);
-  const [location, setLocation] = useState('Carmel By The Sea, CA');
+  const [location, setLocation] = useState(initialLocation ?? 'Carmel By The Sea, CA');
   const isFirstLocationRender = useRef(true);
 
   const [loading, setLoading] = useState(false);
@@ -202,7 +206,7 @@ const TripPlanner = () => {
   // Restore saved location and last plan results on mount
   useEffect(() => {
     const savedLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
-    if (savedLocation) setLocation(savedLocation);
+    if (savedLocation && !initialLocation) setLocation(savedLocation);
 
     const savedResults = localStorage.getItem(PLAN_RESULTS_STORAGE_KEY);
     if (savedResults) {
