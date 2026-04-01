@@ -1,4 +1,8 @@
-import Link from 'next/link';
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { fetchCachedTripPlan } from '../lib/api-client';
 import type { TrendingRoute } from '../lib/api-client';
 
 const GRADIENTS = [
@@ -18,13 +22,50 @@ type Props = {
 const KM_PER_MILE = 1.60934;
 
 const TrendingRouteCard = ({ route, index }: Props) => {
+  const router = useRouter();
   const gradient = GRADIENTS[index % GRADIENTS.length];
   const radiusMiles = Math.round(route.radiusKm / KM_PER_MILE);
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const result = await fetchCachedTripPlan(route.cacheId);
+
+      const option = result?.options[0];
+      if (!option) {
+        // Fallback to planner pre-filled with the location
+        router.push(`/planner?location=${encodeURIComponent(route.location)}`);
+        return;
+      }
+
+      const draft = {
+        plan: option,
+        location: route.location,
+        radiusKm: route.radiusKm,
+        themes: route.themes,
+        originLat: 0,
+        originLng: 0,
+      };
+
+      const key = `hiptrip:trip-draft:${Date.now()}`;
+      try {
+        localStorage.setItem(key, JSON.stringify(draft));
+      } catch {
+        // localStorage unavailable
+      }
+      router.push(`/plan?draft=${encodeURIComponent(key)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <Link
-      href={{ pathname: '/plan', query: { location: route.location } }}
-      className="group relative flex min-w-[260px] snap-start flex-col overflow-hidden rounded-2xl bg-wayfarer-surface shadow-wayfarer-soft transition hover:shadow-wayfarer-ambient md:min-w-0"
+    <button
+      type="button"
+      onClick={() => void handleClick()}
+      disabled={loading}
+      className="group relative flex min-w-[260px] snap-start flex-col overflow-hidden rounded-2xl bg-wayfarer-surface shadow-wayfarer-soft transition hover:shadow-wayfarer-ambient md:min-w-0 text-left disabled:opacity-70"
     >
       <div className="relative h-36 w-full overflow-hidden">
         {route.previewImageUrl ? (
@@ -37,9 +78,15 @@ const TrendingRouteCard = ({ route, index }: Props) => {
           <div className={`h-full w-full bg-gradient-to-br ${gradient}`} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-        <span className="absolute bottom-2 left-3 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
-          {radiusMiles} mi radius
-        </span>
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          </div>
+        ) : (
+          <span className="absolute bottom-2 left-3 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
+            {radiusMiles} mi radius
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
@@ -58,7 +105,7 @@ const TrendingRouteCard = ({ route, index }: Props) => {
           ))}
         </div>
       </div>
-    </Link>
+    </button>
   );
 };
 

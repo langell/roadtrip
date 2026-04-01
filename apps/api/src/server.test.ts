@@ -27,6 +27,7 @@ const prismaMock = {
   },
   tripPlanCache: {
     findMany: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
   },
@@ -102,6 +103,7 @@ describe('HTTP server', () => {
     prismaMock.trip.create.mockReset();
     prismaMock.trip.update.mockReset();
     prismaMock.tripPlanCache.findMany.mockReset();
+    prismaMock.tripPlanCache.findUnique.mockReset();
     prismaMock.tripPlanCache.create.mockReset();
     prismaMock.tripPlanCache.update.mockReset();
     prismaMock.sponsoredPlace.findMany.mockReset();
@@ -716,27 +718,40 @@ describe('HTTP server', () => {
   });
 
   describe('GET /discover', () => {
-    it('returns trending routes and sponsored stops for anonymous users', async () => {
-      prismaMock.tripPlanCache.findMany.mockResolvedValue([
-        {
-          id: 'cache-1',
-          location: 'Portland, OR',
-          radiusKm: 100,
-          themesKey: 'scenic|adventure',
-          engagementScore: 42,
-          options: [
-            {
-              title: 'Pacific Loop',
-              stops: [
-                {
-                  status: 'resolved',
-                  suggestion: { imageUrl: 'http://api/places/photo?name=abc' },
+    const mockCacheWithStops = [
+      {
+        id: 'cache-1',
+        location: 'Portland, OR',
+        radiusKm: 100,
+        themesKey: 'scenic|adventure',
+        engagementScore: 42,
+        updatedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86400000),
+        options: [
+          {
+            title: 'Pacific Loop',
+            stops: [
+              {
+                status: 'resolved',
+                suggestion: {
+                  id: 'stop-1',
+                  placeId: 'place-abc',
+                  title: 'Crater Lake',
+                  description: 'Beautiful volcanic lake',
+                  distanceKm: 50,
+                  lat: 42.9,
+                  lng: -122.1,
+                  imageUrl: 'http://api/places/photo?name=abc',
                 },
-              ],
-            },
-          ],
-        },
-      ]);
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    it('returns trending routes, popular stops, and sponsored stops', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue(mockCacheWithStops);
       prismaMock.sponsoredPlace.findMany.mockResolvedValue([
         {
           id: 'sp-1',
@@ -758,9 +773,14 @@ describe('HTTP server', () => {
         location: 'Portland, OR',
         themes: ['scenic', 'adventure'],
         previewTitle: 'Pacific Loop',
-        previewImageUrl: 'http://api/places/photo?name=abc',
+        previewImageUrl: expect.stringContaining('/places/photo?name=abc'),
       });
-      expect(response.body.nearbyStops).toEqual([]);
+      expect(response.body.nearbyStops).toHaveLength(1);
+      expect(response.body.nearbyStops[0]).toMatchObject({
+        id: 'stop-1',
+        title: 'Crater Lake',
+        sponsored: false,
+      });
       expect(response.body.sponsoredStops).toHaveLength(1);
       expect(response.body.sponsoredStops[0]).toMatchObject({
         id: 'sp-1',
@@ -770,79 +790,86 @@ describe('HTTP server', () => {
       expect(response.body.locationContext).toBeUndefined();
     });
 
-    it('returns nearby stops for authenticated users with trip history', async () => {
-      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
-      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
-      prismaMock.trip.findFirst.mockResolvedValue({
-        id: 'trip-1',
-        name: 'Oregon Coast Road Trip',
-        filters: { location: 'Cannon Beach, OR', themes: ['scenic'] },
-      });
-      findStops.mockResolvedValue([
+    it('ranks stops by weighted engagement score across cache entries', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([
         {
-          id: 'stop-1',
-          placeId: 'place-abc',
-          title: 'Haystack Rock',
-          description: 'Iconic coastal basalt monolith',
-          distanceKm: 0.5,
-          lat: 45.884,
-          lng: -123.969,
-          photoName: 'places/abc/photos/xyz',
+          ...mockCacheWithStops[0],
+          engagementScore: 10,
+          options: [
+            {
+              stops: [
+                {
+                  status: 'resolved',
+                  suggestion: {
+                    id: 'a',
+                    placeId: 'place-A',
+                    title: 'Stop A',
+                    description: '',
+                    distanceKm: 1,
+                    lat: 0,
+                    lng: 0,
+                  },
+                },
+                {
+                  status: 'resolved',
+                  suggestion: {
+                    id: 'b',
+                    placeId: 'place-B',
+                    title: 'Stop B',
+                    description: '',
+                    distanceKm: 1,
+                    lat: 0,
+                    lng: 0,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        {
+          ...mockCacheWithStops[0],
+          id: 'cache-2',
+          engagementScore: 100,
+          options: [
+            {
+              stops: [
+                {
+                  status: 'resolved',
+                  suggestion: {
+                    id: 'b2',
+                    placeId: 'place-B',
+                    title: 'Stop B',
+                    description: '',
+                    distanceKm: 1,
+                    lat: 0,
+                    lng: 0,
+                  },
+                },
+              ],
+            },
+          ],
         },
       ]);
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
 
       const app = createApp();
-      const response = await request(app)
-        .get('/discover')
-        .set('authorization', 'Bearer user-123');
+      const response = await request(app).get('/discover');
 
       expect(response.status).toBe(200);
-      expect(response.body.nearbyStops).toHaveLength(1);
-      expect(response.body.nearbyStops[0]).toMatchObject({
-        id: 'stop-1',
-        title: 'Haystack Rock',
-        sponsored: false,
-      });
-      expect(response.body.locationContext).toBe('Cannon Beach, OR');
-      expect(prismaMock.trip.findFirst).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-        orderBy: { createdAt: 'desc' },
-      });
+      // place-B appears in both entries (scores: 11 + 101 = 112), place-A only once (score: 11)
+      expect(response.body.nearbyStops[0].placeId).toBe('place-B');
+      expect(response.body.nearbyStops[1].placeId).toBe('place-A');
     });
 
-    it('returns empty nearby stops when authenticated user has no trips', async () => {
+    it('returns empty nearbyStops when cache is empty', async () => {
       prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
       prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
-      prismaMock.trip.findFirst.mockResolvedValue(null);
 
       const app = createApp();
-      const response = await request(app)
-        .get('/discover')
-        .set('authorization', 'Bearer user-123');
+      const response = await request(app).get('/discover');
 
       expect(response.status).toBe(200);
       expect(response.body.nearbyStops).toEqual([]);
-      expect(response.body.locationContext).toBeUndefined();
-    });
-
-    it('degrades gracefully when nearby stops Places API fails', async () => {
-      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
-      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
-      prismaMock.trip.findFirst.mockResolvedValue({
-        id: 'trip-1',
-        name: 'Some Trip',
-        filters: { location: 'Denver, CO' },
-      });
-      findStops.mockRejectedValue(new Error('PLACES_DOWN'));
-
-      const app = createApp();
-      const response = await request(app)
-        .get('/discover')
-        .set('authorization', 'Bearer user-123');
-
-      expect(response.status).toBe(200);
-      expect(response.body.nearbyStops).toEqual([]);
-      expect(response.body.locationContext).toBe('Denver, CO');
     });
 
     describe('GET /trips/:id', () => {
@@ -1005,6 +1032,72 @@ describe('HTTP server', () => {
         const response = await request(app)
           .get('/trips/trip-abc/sponsored-stop')
           .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+      });
+    });
+
+    describe('GET /trips/cache/:id', () => {
+      const mockCacheEntry = {
+        id: 'cache-abc',
+        location: 'Portland, OR',
+        radiusKm: 100,
+        themesKey: 'scenic|adventure',
+        options: [
+          {
+            title: 'Pacific Loop',
+            rationale: 'A great route',
+            stops: [
+              {
+                query: 'Crater Lake',
+                status: 'resolved',
+                suggestion: {
+                  id: 'place-1',
+                  placeId: 'ChIJ1',
+                  title: 'Crater Lake',
+                  description: 'Beautiful lake',
+                  distanceKm: 50,
+                  lat: 42.9,
+                  lng: -122.1,
+                  imageUrl: 'http://localhost:3001/places/photo?name=abc',
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      it('returns the first option from a cache entry', async () => {
+        prismaMock.tripPlanCache.findUnique.mockResolvedValue(mockCacheEntry);
+        const app = createApp();
+        const response = await request(app).get('/trips/cache/cache-abc');
+
+        expect(response.status).toBe(200);
+        expect(response.body.location).toBe('Portland, OR');
+        expect(response.body.radiusKm).toBe(100);
+        expect(response.body.themes).toEqual(['scenic', 'adventure']);
+        expect(response.body.source).toBe('cache');
+        expect(response.body.options).toHaveLength(1);
+        expect(response.body.options[0].title).toBe('Pacific Loop');
+        expect(prismaMock.tripPlanCache.findUnique).toHaveBeenCalledWith({
+          where: { id: 'cache-abc' },
+        });
+      });
+
+      it('rewrites photo proxy URLs to the current host', async () => {
+        prismaMock.tripPlanCache.findUnique.mockResolvedValue(mockCacheEntry);
+        const app = createApp();
+        const response = await request(app).get('/trips/cache/cache-abc');
+
+        expect(response.status).toBe(200);
+        const stop = response.body.options[0].stops[0];
+        expect(stop.suggestion.imageUrl).toMatch(/\/places\/photo\?name=abc$/);
+      });
+
+      it('returns 404 for unknown cache id', async () => {
+        prismaMock.tripPlanCache.findUnique.mockResolvedValue(null);
+        const app = createApp();
+        const response = await request(app).get('/trips/cache/unknown');
 
         expect(response.status).toBe(404);
       });

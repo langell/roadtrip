@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation';
 import { auth } from '../../../../auth';
-import { getTripDetail, getTripSponsoredStop } from '../../../../lib/api-client';
+import {
+  getTripDetailServer,
+  getTripSponsoredStopServer,
+} from '../../../../lib/server-api-client';
 import TripMapView from '../../../../components/TripMapView';
 
 type Props = {
@@ -16,8 +19,8 @@ const TripMapPage = async ({ params }: Props) => {
   }
 
   const [trip, sponsored] = await Promise.all([
-    getTripDetail(id),
-    getTripSponsoredStop(id),
+    getTripDetailServer(id),
+    getTripSponsoredStopServer(id),
   ]);
 
   if (!trip) {
