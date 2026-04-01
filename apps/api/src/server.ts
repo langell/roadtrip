@@ -226,6 +226,14 @@ export const createApp = () => {
   });
 
   app.get(
+    '/ready',
+    withAsyncHandler(async (_, res) => {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok' });
+    }),
+  );
+
+  app.get(
     '/places/photo',
     withAsyncHandler(async (req, res) => {
       res.setHeader('Cross-Origin-Resource-Policy', 'same-site');

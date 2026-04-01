@@ -4,6 +4,7 @@ node_modules
 .expo
 .expo-shared
 .env*
+!.env.example
 .DS_Store
 tmp
 coverage
