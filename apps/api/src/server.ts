@@ -1279,18 +1279,31 @@ export const createApp = () => {
         rationale?: string;
       };
 
+      const sharedStopsWithLegs = trip.stops.map((stop, i) => {
+        const prev = trip.stops[i - 1];
+        let driveTimeMin: number | null = null;
+        if (prev) {
+          const distKm = haversineKm(prev.lat, prev.lng, stop.lat, stop.lng);
+          driveTimeMin = Math.round(((distKm * 1.4) / 80) * 60);
+        }
+        return {
+          name: stop.name,
+          order: stop.order,
+          notes: stop.notes ?? undefined,
+          placeId: stop.placeId,
+          imageUrl: stop.imageUrl ?? undefined,
+          lat: stop.lat,
+          lng: stop.lng,
+          driveTimeMin,
+        };
+      });
+
       res.json({
         name: trip.name,
         location: filters.location ?? '',
         themes: filters.themes ?? [],
         rationale: filters.rationale ?? '',
-        stops: trip.stops.map((s) => ({
-          name: s.name,
-          order: s.order,
-          notes: s.notes ?? undefined,
-          placeId: s.placeId,
-          imageUrl: s.imageUrl ?? undefined,
-        })),
+        stops: sharedStopsWithLegs,
       });
     }),
   );
