@@ -277,6 +277,9 @@ export default function SharedTripView({ plan }: Props) {
         <aside className="flex flex-col bg-wayfarer-bg md:min-h-0 md:flex-[2] md:overflow-hidden">
           {/* Panel header */}
           <div className="shrink-0 px-8 pb-4 pt-6">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-text-muted">
+              ✦ A friend thinks you&rsquo;d love this
+            </p>
             <h1 className="mb-1 font-display text-4xl font-extrabold leading-none tracking-tight text-wayfarer-primary">
               {plan.name}
             </h1>
@@ -297,6 +300,12 @@ export default function SharedTripView({ plan }: Props) {
               </div>
             )}
           </div>
+
+          {plan.rationale && (
+            <p className="shrink-0 px-8 pb-4 text-sm leading-relaxed text-wayfarer-text-muted italic">
+              &ldquo;{plan.rationale}&rdquo;
+            </p>
+          )}
 
           {/* Scrollable stop list */}
           <div className="flex-1 overflow-y-auto px-8 py-4 md:overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
