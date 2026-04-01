@@ -198,6 +198,9 @@ importers:
       '@playwright/test':
         specifier: ^1.42.1
         version: 1.58.2
+      '@types/google.maps':
+        specifier: ^3.58.1
+        version: 3.58.1
       '@types/node':
         specifier: ^22.15.30
         version: 22.19.15

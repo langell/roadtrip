@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @roadtrip/web test -- --coverage)",
+      "Bash(pnpm --filter @roadtrip/api test -- --coverage)",
+      "WebFetch(domain:vercel.com)",
+      "Bash(pnpm --filter @roadtrip/web add @vercel/analytics)",
+      "mcp__stitch__generate_screen_from_text",
+      "mcp__stitch__get_screen",
+      "Bash(pnpm --filter @roadtrip/api db:push)",
+      "Bash(pnpm --filter @roadtrip/api exec prisma generate)",
+      "Bash(grep -n \"analyticsEvent\\\\|AnalyticsEvent\" /Users/lonnyangell/dev/roadtrip/apps/api/src/server.ts /Users/lonnyangell/dev/roadtrip/apps/api/src/routes/*.ts)",
+      "Bash(pnpm --filter @roadtrip/web add -D @types/google.maps)"
+    ]
+  }
+}
