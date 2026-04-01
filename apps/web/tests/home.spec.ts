@@ -22,7 +22,7 @@ test('unauthenticated visit to /account redirects to /sign-in', async ({ page })
 test('homepage renders hero copy', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Generate Ideas' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Browse Routes' })).toBeVisible();
 });
 
 test('footer links navigate to content pages', async ({ page }) => {
