@@ -67,6 +67,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'map' | 'list'>('map');
   const stopCardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const sorted = [...trip.stops].sort((a, b) => a.order - b.order);
@@ -291,14 +292,42 @@ export default function TripMapView({ trip, sponsored }: Props) {
         </div>
       </header>
 
+      {/* ── Mobile tab bar (hidden on md+) ───────────────────── */}
+      <div className="fixed top-[64px] z-40 flex w-full bg-wayfarer-bg/95 backdrop-blur-md shadow-[0_1px_0_rgba(0,0,0,0.06)] md:hidden">
+        <button
+          onClick={() => setMobileTab('map')}
+          className={`flex-1 py-3 text-sm font-bold transition-colors ${
+            mobileTab === 'map'
+              ? 'border-b-2 border-wayfarer-primary text-wayfarer-primary'
+              : 'text-wayfarer-text-muted'
+          }`}
+        >
+          Map
+        </button>
+        <button
+          onClick={() => setMobileTab('list')}
+          className={`flex-1 py-3 text-sm font-bold transition-colors ${
+            mobileTab === 'list'
+              ? 'border-b-2 border-wayfarer-primary text-wayfarer-primary'
+              : 'text-wayfarer-text-muted'
+          }`}
+        >
+          Stops
+        </button>
+      </div>
+
       {/* ── Main split layout ─────────────────────────────────── */}
       {/*
-          Mobile  : map stacked above stops (map = fixed 45vw height)
+          Mobile  : full-height map or list based on mobileTab
           Desktop : map left 60%, itinerary right 40%
       */}
-      <main className="flex h-screen flex-col pt-[72px] md:flex-row">
-        {/* Map panel — full width on mobile (fixed height), 60% on desktop */}
-        <section className="relative h-[45vw] shrink-0 overflow-hidden md:h-auto md:flex-[3]">
+      <main className="flex h-screen flex-col pt-[64px] md:pt-[72px] md:flex-row">
+        {/* Map panel */}
+        <section
+          className={`relative shrink-0 overflow-hidden md:h-auto md:flex-[3] ${
+            mobileTab === 'map' ? 'flex-1' : 'hidden md:flex'
+          }`}
+        >
           <div ref={mapRef} className="h-full w-full" />
           {!mapsReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-wayfarer-surface">
@@ -346,10 +375,14 @@ export default function TripMapView({ trip, sponsored }: Props) {
           </div>
         </section>
 
-        {/* ── Itinerary panel — full width on mobile, 40% on desktop ── */}
-        <aside className="flex min-h-0 flex-1 flex-col overflow-hidden bg-wayfarer-bg md:flex-[2]">
+        {/* ── Itinerary panel — full width on mobile (list tab), 40% on desktop ── */}
+        <aside
+          className={`min-h-0 flex-col overflow-hidden bg-wayfarer-bg md:flex md:flex-[2] ${
+            mobileTab === 'list' ? 'flex flex-1' : 'hidden md:flex'
+          }`}
+        >
           {/* Panel header */}
-          <div className="shrink-0 px-8 pb-4 pt-8">
+          <div className="shrink-0 px-8 pb-4 pt-6 md:pt-8">
             <h1 className="mb-1 font-display text-4xl font-extrabold leading-none tracking-tight text-wayfarer-primary">
               {trip.name}
             </h1>
