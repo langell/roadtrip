@@ -19,8 +19,6 @@ const getApiToken = async (): Promise<string | undefined> => {
   }
 };
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
-
 type Props = {
   trip: TripDetail;
   sponsored: SponsoredStop | null;
@@ -72,29 +70,20 @@ export default function TripMapView({ trip, sponsored }: Props) {
   const sorted = [...trip.stops].sort((a, b) => a.order - b.order);
   const totalDriveMin = sorted.reduce((sum, s) => sum + (s.driveTimeMin ?? 0), 0);
 
-  // Load Google Maps script
+  // Wait for the globally-loaded Maps API (GoogleMapsScriptLoader in layout)
+  // to expose importLibrary — poll every 100 ms until it's ready.
   useEffect(() => {
-    if (window.google?.maps) {
+    if (typeof window.google?.maps?.importLibrary === 'function') {
       setMapsReady(true);
       return;
     }
-    if (!GOOGLE_MAPS_API_KEY) return;
-    if (!document.getElementById('gmap-script-map')) {
-      const s = document.createElement('script');
-      s.id = 'gmap-script-map';
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&loading=async`;
-      s.async = true;
-      s.onload = () => setMapsReady(true);
-      document.head.appendChild(s);
-    } else {
-      const interval = setInterval(() => {
-        if (window.google?.maps) {
-          setMapsReady(true);
-          clearInterval(interval);
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
+    const interval = setInterval(() => {
+      if (typeof window.google?.maps?.importLibrary === 'function') {
+        setMapsReady(true);
+        clearInterval(interval);
+      }
+    }, 100);
+    return () => clearInterval(interval);
   }, []);
 
   const handleMarkerClick = useCallback((idx: number) => {
@@ -293,12 +282,12 @@ export default function TripMapView({ trip, sponsored }: Props) {
 
       {/* ── Main split layout ─────────────────────────────────── */}
       {/*
-          Mobile  : map stacked above stops (map = fixed 45vw height)
-          Desktop : map left 60%, itinerary right 40%
+          Mobile  : stacked — map fixed height, itinerary scrolls below
+          Desktop : side-by-side — map 60%, itinerary 40%
       */}
-      <main className="flex h-screen flex-col pt-[72px] md:flex-row">
-        {/* Map panel — full width on mobile (fixed height), 60% on desktop */}
-        <section className="relative h-[45vw] shrink-0 overflow-hidden md:h-auto md:flex-[3]">
+      <main className="flex min-h-screen flex-col pt-[64px] md:h-screen md:flex-row md:overflow-hidden">
+        {/* Map panel */}
+        <section className="relative h-[45vw] min-h-[240px] max-h-[360px] shrink-0 overflow-hidden md:h-auto md:max-h-none md:flex-[3]">
           <div ref={mapRef} className="h-full w-full" />
           {!mapsReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-wayfarer-surface">
@@ -346,10 +335,10 @@ export default function TripMapView({ trip, sponsored }: Props) {
           </div>
         </section>
 
-        {/* ── Itinerary panel — full width on mobile, 40% on desktop ── */}
-        <aside className="flex min-h-0 flex-1 flex-col overflow-hidden bg-wayfarer-bg md:flex-[2]">
+        {/* ── Itinerary panel — full width scrollable on mobile, 40% on desktop ── */}
+        <aside className="flex flex-col bg-wayfarer-bg md:min-h-0 md:flex-[2] md:overflow-hidden">
           {/* Panel header */}
-          <div className="shrink-0 px-8 pb-4 pt-8">
+          <div className="shrink-0 px-8 pb-4 pt-6">
             <h1 className="mb-1 font-display text-4xl font-extrabold leading-none tracking-tight text-wayfarer-primary">
               {trip.name}
             </h1>
@@ -501,24 +490,21 @@ export default function TripMapView({ trip, sponsored }: Props) {
                 );
               })}
             </div>
-            {/* Footer spacer */}
-            <div className="h-20" />
-          </div>
-
-          {/* Footer actions */}
-          <div className="shrink-0 flex items-center justify-between gap-4 bg-wayfarer-bg/80 p-6 shadow-[0_-8px_24px_rgba(0,0,0,0.04)] backdrop-blur-lg">
-            <a
-              href={buildGoogleMapsUrl(trip)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-3 rounded-2xl bg-wayfarer-primary py-4 font-display font-bold text-white shadow-wayfarer-ambient transition-opacity hover:opacity-95"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Start Trip
-            </a>
-            <ShareButton tripId={trip.id} variant="footer" />
+            {/* Actions — inline at bottom of scroll, no sticky chrome */}
+            <div className="flex items-center gap-4 pb-10 pt-4">
+              <a
+                href={buildGoogleMapsUrl(trip)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-1 items-center justify-center gap-3 rounded-2xl bg-wayfarer-primary py-4 font-display font-bold text-white shadow-wayfarer-ambient transition-opacity hover:opacity-95"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Start Trip
+              </a>
+              <ShareButton tripId={trip.id} variant="footer" />
+            </div>
           </div>
         </aside>
       </main>
