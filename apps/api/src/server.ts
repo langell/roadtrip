@@ -181,7 +181,7 @@ const buildSuggestionImageUrl = (req: express.Request, photoName?: string) => {
   return `${base}/places/photo?name=${encodedPhotoName}`;
 };
 
-const createAnonymousSuggestionsRateLimiter = () => {
+const createAnonymousRateLimiter = (windowMs: number, max: number) => {
   const hitsByIp = new Map<string, RateLimitEntry>();
 
   return (ipAddress: string) => {
@@ -189,14 +189,11 @@ const createAnonymousSuggestionsRateLimiter = () => {
     const existing = hitsByIp.get(ipAddress);
 
     if (!existing || existing.resetAt <= now) {
-      hitsByIp.set(ipAddress, {
-        count: 1,
-        resetAt: now + env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS,
-      });
+      hitsByIp.set(ipAddress, { count: 1, resetAt: now + windowMs });
       return true;
     }
 
-    if (existing.count >= env.ANON_SUGGESTIONS_RATE_LIMIT_MAX) {
+    if (existing.count >= max) {
       return false;
     }
 
@@ -209,7 +206,14 @@ const createAnonymousSuggestionsRateLimiter = () => {
 export const createApp = () => {
   const app = express();
   app.set('trust proxy', 1);
-  const allowAnonymousSuggestionRequest = createAnonymousSuggestionsRateLimiter();
+  const allowAnonymousSuggestionRequest = createAnonymousRateLimiter(
+    env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS,
+    env.ANON_SUGGESTIONS_RATE_LIMIT_MAX,
+  );
+  const allowAnonymousPhotoRequest = createAnonymousRateLimiter(
+    env.ANON_PHOTO_RATE_LIMIT_WINDOW_MS,
+    env.ANON_PHOTO_RATE_LIMIT_MAX,
+  );
   app.use(
     cors(
       env.CORS_ORIGIN
@@ -234,8 +238,134 @@ export const createApp = () => {
   );
 
   app.get(
+    '/discover',
+    withAsyncHandler(async (req, res) => {
+      const userId = await getRequestUserId(req);
+      const now = new Date();
+
+      // 1. Trending routes — top entries from TripPlanCache, deduplicated by location
+      const trendingCandidates = await prisma.tripPlanCache.findMany({
+        where: { expiresAt: { gt: now }, validOptions: { gt: 0 } },
+        orderBy: [{ engagementScore: 'desc' }, { updatedAt: 'desc' }],
+        take: 30,
+      });
+
+      type CachedStop = {
+        status: string;
+        suggestion?: { imageUrl?: string };
+      };
+      type CachedOption = { title?: string; stops?: CachedStop[] };
+
+      const seenLocations = new Set<string>();
+      const trendingRoutes: {
+        cacheId: string;
+        location: string;
+        radiusKm: number;
+        themes: string[];
+        engagementScore: number;
+        previewTitle: string;
+        previewImageUrl?: string;
+      }[] = [];
+
+      for (const cache of trendingCandidates) {
+        const locKey = cache.location.toLowerCase().trim();
+        if (!seenLocations.has(locKey) && trendingRoutes.length < 6) {
+          seenLocations.add(locKey);
+          const options = cache.options as CachedOption[] | null;
+          const firstOption = Array.isArray(options) ? options[0] : null;
+          const previewImageUrl = firstOption?.stops?.find((s) => s.status === 'resolved')
+            ?.suggestion?.imageUrl;
+          trendingRoutes.push({
+            cacheId: cache.id,
+            location: cache.location,
+            radiusKm: cache.radiusKm,
+            themes: cache.themesKey.split('|'),
+            engagementScore: cache.engagementScore,
+            previewTitle: firstOption?.title ?? cache.location,
+            previewImageUrl,
+          });
+        }
+      }
+
+      // 2. Nearby stops — only for authenticated users with trip history
+      type DiscoverStop = {
+        id: string;
+        placeId: string;
+        title: string;
+        description: string;
+        imageUrl?: string;
+        url?: string;
+        sponsored: boolean;
+      };
+
+      let nearbyStops: DiscoverStop[] = [];
+      let locationContext: string | undefined;
+
+      if (userId) {
+        const lastTrip = await prisma.trip.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (lastTrip) {
+          const filters = lastTrip.filters as {
+            location?: string;
+            themes?: string[];
+          };
+          const location = filters.location ?? lastTrip.name;
+          locationContext = location;
+
+          try {
+            const suggestions = await googlePlacesService.findStops({
+              location,
+              themes: ['scenic'],
+              radiusKm: 200,
+            });
+            nearbyStops = suggestions.slice(0, 9).map(({ photoName, ...s }) => ({
+              id: s.id,
+              placeId: s.placeId,
+              title: s.title,
+              description: s.description,
+              imageUrl: buildSuggestionImageUrl(req, photoName),
+              sponsored: false,
+            }));
+          } catch {
+            // graceful degradation — empty nearby stops
+          }
+        }
+      }
+
+      // 3. Sponsored stops — up to 2 active records
+      const sponsored = await prisma.sponsoredPlace.findMany({
+        where: { active: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 2,
+      });
+
+      const sponsoredStops: DiscoverStop[] = sponsored.map((s) => ({
+        id: s.id,
+        placeId: s.placeId,
+        title: s.title,
+        description: s.description,
+        imageUrl: s.imageUrl ?? undefined,
+        url: s.url ?? undefined,
+        sponsored: true,
+      }));
+
+      res.json({ trendingRoutes, nearbyStops, sponsoredStops, locationContext });
+    }),
+  );
+
+  app.get(
     '/places/photo',
     withAsyncHandler(async (req, res) => {
+      const userId = await getRequestUserId(req);
+
+      if (!userId && !allowAnonymousPhotoRequest(getRequesterIp(req))) {
+        res.status(429).json({ error: 'RATE_LIMITED' });
+        return;
+      }
+
       res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
 
       const photoName = req.query.name;
@@ -391,6 +521,109 @@ export const createApp = () => {
       });
 
       res.json(trips);
+    }),
+  );
+
+  app.get(
+    '/trips/:id',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const { id } = req.params;
+
+      const trip = await prisma.trip.findUnique({
+        where: { id },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+
+      if (!trip || trip.userId !== userId) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      const filters = trip.filters as {
+        location?: string;
+        themes?: string[];
+        rationale?: string;
+      };
+
+      // Compute drive-time estimates using haversine + 1.4× road factor at ~80 km/h
+      const stopsWithLegs = trip.stops.map((stop, i) => {
+        const prev = trip.stops[i - 1];
+        let driveTimeMin: number | null = null;
+        if (prev) {
+          const distKm = haversineKm(prev.lat, prev.lng, stop.lat, stop.lng);
+          driveTimeMin = Math.round(((distKm * 1.4) / 80) * 60);
+        }
+        return {
+          id: stop.id,
+          placeId: stop.placeId,
+          name: stop.name,
+          order: stop.order,
+          lat: stop.lat,
+          lng: stop.lng,
+          notes: stop.notes ?? undefined,
+          imageUrl: stop.imageUrl ?? undefined,
+          driveTimeMin,
+        };
+      });
+
+      res.json({
+        id: trip.id,
+        name: trip.name,
+        originLat: trip.originLat,
+        originLng: trip.originLng,
+        shareToken: trip.shareToken ?? undefined,
+        location: filters.location ?? '',
+        themes: filters.themes ?? [],
+        rationale: filters.rationale ?? '',
+        stops: stopsWithLegs,
+      });
+    }),
+  );
+
+  app.get(
+    '/trips/:id/sponsored-stop',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const { id } = req.params;
+
+      const trip = await prisma.trip.findUnique({
+        where: { id },
+        include: { stops: { orderBy: { order: 'asc' } } },
+      });
+
+      if (!trip || trip.userId !== userId) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      const sponsored = await prisma.sponsoredPlace.findMany({
+        where: { active: true },
+      });
+
+      if (sponsored.length === 0) {
+        res.json(null);
+        return;
+      }
+
+      // SponsoredPlace has no lat/lng in v1 — return the first active record.
+      // A future iteration can fetch coordinates via Place Details API and pick
+      // the one closest to the trip midpoint.
+      const best = sponsored[0];
+      if (!best) {
+        res.json(null);
+        return;
+      }
+      res.json({
+        id: best.id,
+        placeId: best.placeId,
+        title: best.title,
+        description: best.description,
+        imageUrl: best.imageUrl ?? undefined,
+        url: best.url ?? undefined,
+      });
     }),
   );
 

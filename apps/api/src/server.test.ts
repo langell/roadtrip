@@ -7,6 +7,8 @@ vi.mock('./config/env.js', () => ({
     PORT: 0,
     ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: 60000,
     ANON_SUGGESTIONS_RATE_LIMIT_MAX: 2,
+    ANON_PHOTO_RATE_LIMIT_WINDOW_MS: 60000,
+    ANON_PHOTO_RATE_LIMIT_MAX: 10,
     TRIP_PLAN_CACHE_TTL_DAYS: 30,
   },
 }));
@@ -18,12 +20,18 @@ vi.mock('./types/context.js', () => ({
 const prismaMock = {
   trip: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
   },
   tripPlanCache: {
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+  },
+  sponsoredPlace: {
+    findMany: vi.fn(),
   },
 };
 vi.mock('./lib/prisma.js', () => ({
@@ -89,10 +97,14 @@ describe('HTTP server', () => {
     geocodeLocation.mockReset();
     generatePlans.mockReset();
     prismaMock.trip.findMany.mockReset();
+    prismaMock.trip.findFirst.mockReset();
+    prismaMock.trip.findUnique.mockReset();
     prismaMock.trip.create.mockReset();
+    prismaMock.trip.update.mockReset();
     prismaMock.tripPlanCache.findMany.mockReset();
     prismaMock.tripPlanCache.create.mockReset();
     prismaMock.tripPlanCache.update.mockReset();
+    prismaMock.sponsoredPlace.findMany.mockReset();
   });
 
   afterEach(() => {
@@ -700,6 +712,331 @@ describe('HTTP server', () => {
       where: { userId: 'bearer-user' },
       include: { stops: { orderBy: { order: 'asc' } } },
       orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  describe('GET /discover', () => {
+    it('returns trending routes and sponsored stops for anonymous users', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([
+        {
+          id: 'cache-1',
+          location: 'Portland, OR',
+          radiusKm: 100,
+          themesKey: 'scenic|adventure',
+          engagementScore: 42,
+          options: [
+            {
+              title: 'Pacific Loop',
+              stops: [
+                {
+                  status: 'resolved',
+                  suggestion: { imageUrl: 'http://api/places/photo?name=abc' },
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+        {
+          id: 'sp-1',
+          placeId: 'place-123',
+          title: 'Crater Lake Lodge',
+          description: 'Iconic volcanic caldera lodge',
+          imageUrl: 'https://example.com/crater.jpg',
+          url: 'https://craterlake.com',
+        },
+      ]);
+
+      const app = createApp();
+      const response = await request(app).get('/discover');
+
+      expect(response.status).toBe(200);
+      expect(response.body.trendingRoutes).toHaveLength(1);
+      expect(response.body.trendingRoutes[0]).toMatchObject({
+        cacheId: 'cache-1',
+        location: 'Portland, OR',
+        themes: ['scenic', 'adventure'],
+        previewTitle: 'Pacific Loop',
+        previewImageUrl: 'http://api/places/photo?name=abc',
+      });
+      expect(response.body.nearbyStops).toEqual([]);
+      expect(response.body.sponsoredStops).toHaveLength(1);
+      expect(response.body.sponsoredStops[0]).toMatchObject({
+        id: 'sp-1',
+        title: 'Crater Lake Lodge',
+        sponsored: true,
+      });
+      expect(response.body.locationContext).toBeUndefined();
+    });
+
+    it('returns nearby stops for authenticated users with trip history', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+      prismaMock.trip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        name: 'Oregon Coast Road Trip',
+        filters: { location: 'Cannon Beach, OR', themes: ['scenic'] },
+      });
+      findStops.mockResolvedValue([
+        {
+          id: 'stop-1',
+          placeId: 'place-abc',
+          title: 'Haystack Rock',
+          description: 'Iconic coastal basalt monolith',
+          distanceKm: 0.5,
+          lat: 45.884,
+          lng: -123.969,
+          photoName: 'places/abc/photos/xyz',
+        },
+      ]);
+
+      const app = createApp();
+      const response = await request(app)
+        .get('/discover')
+        .set('authorization', 'Bearer user-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.nearbyStops).toHaveLength(1);
+      expect(response.body.nearbyStops[0]).toMatchObject({
+        id: 'stop-1',
+        title: 'Haystack Rock',
+        sponsored: false,
+      });
+      expect(response.body.locationContext).toBe('Cannon Beach, OR');
+      expect(prismaMock.trip.findFirst).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+
+    it('returns empty nearby stops when authenticated user has no trips', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+      prismaMock.trip.findFirst.mockResolvedValue(null);
+
+      const app = createApp();
+      const response = await request(app)
+        .get('/discover')
+        .set('authorization', 'Bearer user-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.nearbyStops).toEqual([]);
+      expect(response.body.locationContext).toBeUndefined();
+    });
+
+    it('degrades gracefully when nearby stops Places API fails', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+      prismaMock.trip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        name: 'Some Trip',
+        filters: { location: 'Denver, CO' },
+      });
+      findStops.mockRejectedValue(new Error('PLACES_DOWN'));
+
+      const app = createApp();
+      const response = await request(app)
+        .get('/discover')
+        .set('authorization', 'Bearer user-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.nearbyStops).toEqual([]);
+      expect(response.body.locationContext).toBe('Denver, CO');
+    });
+
+    describe('GET /trips/:id', () => {
+      const mockTrip = {
+        id: 'trip-abc',
+        userId: 'user-1',
+        name: 'Oregon Coast',
+        originLat: 45.52,
+        originLng: -122.68,
+        shareToken: null,
+        filters: {
+          location: 'Portland, OR',
+          themes: ['scenic'],
+          rationale: 'Coastal beauty',
+        },
+        stops: [
+          {
+            id: 's1',
+            placeId: 'p1',
+            name: 'Cannon Beach',
+            order: 1,
+            lat: 45.88,
+            lng: -123.96,
+            notes: null,
+            imageUrl: null,
+          },
+          {
+            id: 's2',
+            placeId: 'p2',
+            name: 'Haystack Rock',
+            order: 2,
+            lat: 45.89,
+            lng: -123.97,
+            notes: 'Great view',
+            imageUrl: 'https://img.example.com/rock.jpg',
+          },
+        ],
+      };
+
+      it('returns trip with drive-time legs for authenticated owner', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('trip-abc');
+        expect(response.body.location).toBe('Portland, OR');
+        expect(response.body.stops).toHaveLength(2);
+        expect(response.body.stops[0].driveTimeMin).toBeNull();
+        expect(response.body.stops[1].driveTimeMin).toBeGreaterThan(0);
+        expect(response.body.stops[1].imageUrl).toBe('https://img.example.com/rock.jpg');
+      });
+
+      it('returns 401 for unauthenticated GET /trips/:id', async () => {
+        const app = createApp();
+        const response = await request(app).get('/trips/trip-abc');
+        expect(response.status).toBe(401);
+        expect(prismaMock.trip.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('returns 404 when trip does not belong to user', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue({
+          ...mockTrip,
+          userId: 'other-user',
+        });
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+        expect(response.body).toEqual({ error: 'NOT_FOUND' });
+      });
+
+      it('returns 404 when trip does not exist', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(null);
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+      });
+    });
+
+    describe('GET /trips/:id/sponsored-stop', () => {
+      const mockTrip = {
+        id: 'trip-abc',
+        userId: 'user-1',
+        name: 'Oregon Coast',
+        originLat: 45.52,
+        originLng: -122.68,
+        filters: {},
+        stops: [
+          {
+            id: 's1',
+            placeId: 'p1',
+            name: 'Cannon Beach',
+            order: 1,
+            lat: 45.88,
+            lng: -123.96,
+          },
+        ],
+      };
+
+      it('returns the first active sponsored place', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+          {
+            id: 'sp-1',
+            placeId: 'place-x',
+            title: 'Crater Lodge',
+            description: 'Nice',
+            imageUrl: null,
+            url: 'https://lodge.example.com',
+            active: true,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          id: 'sp-1',
+          title: 'Crater Lodge',
+          placeId: 'place-x',
+        });
+      });
+
+      it('returns null when no sponsored places are active', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toBeNull();
+      });
+
+      it('returns 401 for unauthenticated request', async () => {
+        const app = createApp();
+        const response = await request(app).get('/trips/trip-abc/sponsored-stop');
+        expect(response.status).toBe(401);
+      });
+
+      it('returns 404 when trip does not belong to user', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue({
+          ...mockTrip,
+          userId: 'other-user',
+        });
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(404);
+      });
+    });
+
+    it('deduplicates trending routes by location', async () => {
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([
+        {
+          id: 'cache-1',
+          location: 'Portland, OR',
+          radiusKm: 100,
+          themesKey: 'scenic',
+          engagementScore: 10,
+          options: [{ title: 'Route A', stops: [] }],
+        },
+        {
+          id: 'cache-2',
+          location: 'Portland, OR',
+          radiusKm: 150,
+          themesKey: 'adventure',
+          engagementScore: 5,
+          options: [{ title: 'Route B', stops: [] }],
+        },
+      ]);
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+
+      const app = createApp();
+      const response = await request(app).get('/discover');
+
+      expect(response.status).toBe(200);
+      expect(response.body.trendingRoutes).toHaveLength(1);
+      expect(response.body.trendingRoutes[0].cacheId).toBe('cache-1');
     });
   });
 });

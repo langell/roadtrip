@@ -54,9 +54,19 @@ const TripsPage = async () => {
                 key={trip.id}
                 className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft"
               >
-                <p className="mb-1 font-display text-lg font-bold text-wayfarer-primary">
-                  {trip.name}
-                </p>
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <p className="font-display text-lg font-bold text-wayfarer-primary">
+                    {trip.name}
+                  </p>
+                  {trip.stops.length > 0 && (
+                    <Link
+                      href={{ pathname: '/trips/[id]/map', query: { id: trip.id } }}
+                      className="shrink-0 rounded-lg bg-wayfarer-primary/10 px-3 py-1 text-xs font-semibold text-wayfarer-primary transition hover:bg-wayfarer-primary hover:text-white"
+                    >
+                      Map View
+                    </Link>
+                  )}
+                </div>
                 <p className="mb-3 text-sm text-wayfarer-text-muted">
                   {trip.stops.length} stop{trip.stops.length !== 1 ? 's' : ''} &middot;{' '}
                   {new Date(trip.createdAt).toLocaleDateString()}

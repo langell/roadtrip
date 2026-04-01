@@ -9,6 +9,15 @@ _(none)_
 
 ## Completed
 
+- 2026-03-31 — RT-033 `2026-03-route-map-view.md` — /trips/[id]/map, numbered markers, stop list panel, sponsored stop card, drive-time legs.
+- 2026-03-31 — RT-032 `2026-03-discovery-feed.md` — /discover page, trending routes, nearby stops, sponsored injection, home redirect.
+- 2026-03-31 — RT-020 `2026-03-security-best-practices.md` — photo endpoint rate limiting, security checklist doc, auth/logging audit.
+- 2026-03-31 — RT-016 `2026-03-ai-trip-planner-web-experience.md` — implemented; closing as done.
+- 2026-03-31 — RT-015 `2026-03-ai-trip-planner-api-orchestration.md` — implemented; closing as done.
+- 2026-03-31 — RT-014 `2026-03-ai-trip-planning-and-stop-details.md` — implemented; closing as done.
+- 2026-03-31 — RT-007 `2026-03-reliability-deploy-hardening.md` — /ready endpoint, CI --frozen-lockfile + build step, env.example cleanup.
+- 2026-03-31 — RT-031 `2026-03-shareable-plan-links.md` — share button, /s/[token] public page, bento layout with images.
+- 2026-03-31 — RT-029 `2026-03-save-and-select-plan.md` — save flow wired end-to-end with auth gate.
 - 2026-03-31 — RT-030 `2026-03-pwa-and-remove-native.md` — PWA manifest/SW/icons, mobile app removed, /trips page, a11y fixes.
 
 - 2026-03-30 — RT-028 `2026-03-smart-pitstops-photo-ops-toggles.md` — pill toggles wired to API modifiers.

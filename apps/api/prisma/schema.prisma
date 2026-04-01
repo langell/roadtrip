@@ -57,6 +57,7 @@ model SponsoredPlace {
   placeId     String   @unique
   title       String
   description String
+  imageUrl    String?
   url         String?
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
