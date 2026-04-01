@@ -19,8 +19,6 @@ const getApiToken = async (): Promise<string | undefined> => {
   }
 };
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
-
 type Props = {
   trip: TripDetail;
   sponsored: SponsoredStop | null;
@@ -73,29 +71,20 @@ export default function TripMapView({ trip, sponsored }: Props) {
   const sorted = [...trip.stops].sort((a, b) => a.order - b.order);
   const totalDriveMin = sorted.reduce((sum, s) => sum + (s.driveTimeMin ?? 0), 0);
 
-  // Load Google Maps script
+  // Wait for the globally-loaded Maps API (GoogleMapsScriptLoader in layout)
+  // to expose importLibrary — poll every 100 ms until it's ready.
   useEffect(() => {
-    if (window.google?.maps) {
+    if (typeof window.google?.maps?.importLibrary === 'function') {
       setMapsReady(true);
       return;
     }
-    if (!GOOGLE_MAPS_API_KEY) return;
-    if (!document.getElementById('gmap-script-map')) {
-      const s = document.createElement('script');
-      s.id = 'gmap-script-map';
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&loading=async`;
-      s.async = true;
-      s.onload = () => setMapsReady(true);
-      document.head.appendChild(s);
-    } else {
-      const interval = setInterval(() => {
-        if (window.google?.maps) {
-          setMapsReady(true);
-          clearInterval(interval);
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
+    const interval = setInterval(() => {
+      if (typeof window.google?.maps?.importLibrary === 'function') {
+        setMapsReady(true);
+        clearInterval(interval);
+      }
+    }, 100);
+    return () => clearInterval(interval);
   }, []);
 
   const handleMarkerClick = useCallback((idx: number) => {

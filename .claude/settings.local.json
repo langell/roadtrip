@@ -10,7 +10,9 @@
       "Bash(pnpm --filter @roadtrip/api db:push)",
       "Bash(pnpm --filter @roadtrip/api exec prisma generate)",
       "Bash(grep -n \"analyticsEvent\\\\|AnalyticsEvent\" /Users/lonnyangell/dev/roadtrip/apps/api/src/server.ts /Users/lonnyangell/dev/roadtrip/apps/api/src/routes/*.ts)",
-      "Bash(pnpm --filter @roadtrip/web add -D @types/google.maps)"
+      "Bash(pnpm --filter @roadtrip/web add -D @types/google.maps)",
+      "Bash(git commit:*)",
+      "Bash('google.maps.marker' as it is undefined\" — synchronous namespace:*)"
     ]
   }
 }
