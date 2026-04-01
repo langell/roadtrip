@@ -366,7 +366,7 @@ export const createApp = () => {
         return;
       }
 
-      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
       const photoName = req.query.name;
       const maxWidthRaw = Number(req.query.maxWidthPx);
