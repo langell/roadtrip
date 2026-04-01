@@ -82,7 +82,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
     if (!document.getElementById('gmap-script-map')) {
       const s = document.createElement('script');
       s.id = 'gmap-script-map';
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=marker`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&loading=async`;
       s.async = true;
       s.onload = () => setMapsReady(true);
       document.head.appendChild(s);
@@ -106,102 +106,118 @@ export default function TripMapView({ trip, sponsored }: Props) {
   useEffect(() => {
     if (!mapsReady || !mapRef.current || sorted.length === 0) return;
 
-    const bounds = new google.maps.LatLngBounds();
-    sorted.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
+    let cancelled = false;
 
-    const map = new google.maps.Map(mapRef.current, {
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      zoomControl: false,
-      // Natural light style
-      styles: [
-        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-        { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-        {
-          featureType: 'road',
-          elementType: 'geometry.stroke',
-          stylers: [{ color: '#e8e8e3' }],
-        },
-        {
-          featureType: 'landscape',
-          elementType: 'geometry',
-          stylers: [{ color: '#f4f4ef' }],
-        },
-        {
-          featureType: 'water',
-          elementType: 'geometry',
-          stylers: [{ color: '#c8ddd4' }],
-        },
-        {
-          featureType: 'administrative',
-          elementType: 'labels.text.fill',
-          stylers: [{ color: '#66615e' }],
-        },
-        {
-          featureType: 'road',
-          elementType: 'labels.text.fill',
-          stylers: [{ color: '#66615e' }],
-        },
-      ],
-    });
-    map.fitBounds(bounds);
-    mapInstanceRef.current = map;
+    const init = async () => {
+      const bounds = new google.maps.LatLngBounds();
+      sorted.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
 
-    // Dashed route polyline
-    new google.maps.Polyline({
-      path: sorted.map((s) => ({ lat: s.lat, lng: s.lng })),
-      map,
-      strokeColor: '#1B4332',
-      strokeOpacity: 0,
-      icons: [
-        {
-          icon: {
-            path: 'M 0,-1 0,1',
-            strokeOpacity: 1,
-            strokeWeight: 3,
-            scale: 4,
+      const map = new google.maps.Map(mapRef.current!, {
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: false,
+        // Natural light style
+        styles: [
+          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+          {
+            featureType: 'road',
+            elementType: 'geometry',
+            stylers: [{ color: '#ffffff' }],
           },
-          offset: '0',
-          repeat: '16px',
-        },
-      ],
-    });
-
-    // Numbered markers — using AdvancedMarkerElement (replaces deprecated Marker)
-    const { AdvancedMarkerElement } = google.maps.marker;
-    markersRef.current = sorted.map((stop, i) => {
-      const pin = document.createElement('div');
-      pin.style.cssText = [
-        'width:32px',
-        'height:32px',
-        'border-radius:50%',
-        'background:#1B4332',
-        'border:3px solid #fff',
-        'box-shadow:0 2px 8px rgba(0,0,0,0.25)',
-        'display:flex',
-        'align-items:center',
-        'justify-content:center',
-        'font-family:Plus Jakarta Sans,sans-serif',
-        'font-size:13px',
-        'font-weight:700',
-        'color:#fff',
-        'cursor:pointer',
-      ].join(';');
-      pin.textContent = String(i + 1);
-
-      const marker = new AdvancedMarkerElement({
-        position: { lat: stop.lat, lng: stop.lng },
-        map,
-        content: pin,
-        title: stop.name,
+          {
+            featureType: 'road',
+            elementType: 'geometry.stroke',
+            stylers: [{ color: '#e8e8e3' }],
+          },
+          {
+            featureType: 'landscape',
+            elementType: 'geometry',
+            stylers: [{ color: '#f4f4ef' }],
+          },
+          {
+            featureType: 'water',
+            elementType: 'geometry',
+            stylers: [{ color: '#c8ddd4' }],
+          },
+          {
+            featureType: 'administrative',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#66615e' }],
+          },
+          {
+            featureType: 'road',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#66615e' }],
+          },
+        ],
       });
-      marker.addListener('click', () => handleMarkerClick(i));
-      return marker;
-    });
+      map.fitBounds(bounds);
+      mapInstanceRef.current = map;
+
+      // Dashed route polyline
+      new google.maps.Polyline({
+        path: sorted.map((s) => ({ lat: s.lat, lng: s.lng })),
+        map,
+        strokeColor: '#1B4332',
+        strokeOpacity: 0,
+        icons: [
+          {
+            icon: {
+              path: 'M 0,-1 0,1',
+              strokeOpacity: 1,
+              strokeWeight: 3,
+              scale: 4,
+            },
+            offset: '0',
+            repeat: '16px',
+          },
+        ],
+      });
+
+      // Use importLibrary to guarantee the marker library is loaded before use
+      const { AdvancedMarkerElement } = (await google.maps.importLibrary(
+        'marker',
+      )) as google.maps.MarkerLibrary;
+
+      if (cancelled) return;
+
+      markersRef.current = sorted.map((stop, i) => {
+        const pin = document.createElement('div');
+        pin.style.cssText = [
+          'width:32px',
+          'height:32px',
+          'border-radius:50%',
+          'background:#1B4332',
+          'border:3px solid #fff',
+          'box-shadow:0 2px 8px rgba(0,0,0,0.25)',
+          'display:flex',
+          'align-items:center',
+          'justify-content:center',
+          'font-family:Plus Jakarta Sans,sans-serif',
+          'font-size:13px',
+          'font-weight:700',
+          'color:#fff',
+          'cursor:pointer',
+        ].join(';');
+        pin.textContent = String(i + 1);
+
+        const marker = new AdvancedMarkerElement({
+          position: { lat: stop.lat, lng: stop.lng },
+          map,
+          content: pin,
+          title: stop.name,
+        });
+        marker.addListener('click', () => handleMarkerClick(i));
+        return marker;
+      });
+    }; // end init
+
+    void init();
 
     return () => {
+      cancelled = true;
       markersRef.current.forEach((m) => {
         m.map = null;
       });
