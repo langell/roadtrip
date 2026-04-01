@@ -109,15 +109,30 @@ export default function TripMapView({ trip, sponsored }: Props) {
     let cancelled = false;
 
     const init = async () => {
-      const bounds = new google.maps.LatLngBounds();
+      // With loading=async all classes must come from importLibrary —
+      // the google.maps namespace exists but constructors are not pre-populated.
+      const [{ LatLngBounds }, { Map: GMap, Polyline }, { AdvancedMarkerElement }] =
+        await Promise.all([
+          google.maps.importLibrary('core') as Promise<google.maps.CoreLibrary>,
+          google.maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
+          google.maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
+        ]);
+
+      if (cancelled) return;
+
+      const bounds = new LatLngBounds();
       sorted.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
 
-      const map = new google.maps.Map(mapRef.current!, {
+      const map = new GMap(mapRef.current!, {
+        // mapId is required for AdvancedMarkerElement; styles[] is ignored when mapId is set
+        ...(process.env.NEXT_PUBLIC_GOOGLE_MAP_ID
+          ? { mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID }
+          : {}),
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
         zoomControl: false,
-        // Natural light style
+        // Natural light style (only applied when no mapId; use Cloud-based styling otherwise)
         styles: [
           { featureType: 'poi', stylers: [{ visibility: 'off' }] },
           { featureType: 'transit', stylers: [{ visibility: 'off' }] },
@@ -157,7 +172,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
       mapInstanceRef.current = map;
 
       // Dashed route polyline
-      new google.maps.Polyline({
+      new Polyline({
         path: sorted.map((s) => ({ lat: s.lat, lng: s.lng })),
         map,
         strokeColor: '#1B4332',
@@ -175,13 +190,6 @@ export default function TripMapView({ trip, sponsored }: Props) {
           },
         ],
       });
-
-      // Use importLibrary to guarantee the marker library is loaded before use
-      const { AdvancedMarkerElement } = (await google.maps.importLibrary(
-        'marker',
-      )) as google.maps.MarkerLibrary;
-
-      if (cancelled) return;
 
       markersRef.current = sorted.map((stop, i) => {
         const pin = document.createElement('div');
@@ -209,7 +217,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
           content: pin,
           title: stop.name,
         });
-        marker.addListener('click', () => handleMarkerClick(i));
+        marker.addListener('gmp-click', () => handleMarkerClick(i));
         return marker;
       });
     }; // end init
@@ -253,9 +261,12 @@ export default function TripMapView({ trip, sponsored }: Props) {
       {/* ── Top nav ──────────────────────────────────────────── */}
       <header className="fixed top-0 z-50 flex w-full items-center justify-between bg-wayfarer-bg/90 backdrop-blur-md px-6 py-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-8">
-          <span className="font-display text-2xl font-extrabold tracking-tight text-wayfarer-primary">
+          <Link
+            href="/"
+            className="font-display text-2xl font-extrabold tracking-tight text-wayfarer-primary"
+          >
             HipTrip
-          </span>
+          </Link>
           <nav className="hidden items-center gap-6 md:flex">
             <button className="font-display font-bold text-wayfarer-primary">Map</button>
             <button className="font-display text-wayfarer-text-muted transition-colors hover:text-wayfarer-primary">
@@ -271,14 +282,12 @@ export default function TripMapView({ trip, sponsored }: Props) {
         </div>
         <div className="flex items-center gap-4">
           <ShareButton tripId={trip.id} variant="header" />
-          <a
-            href={buildGoogleMapsUrl(trip)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/planner"
             className="rounded-xl bg-wayfarer-primary px-6 py-2 font-display font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
           >
-            Start Trip
-          </a>
+            New Trip
+          </Link>
         </div>
       </header>
 
