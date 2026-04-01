@@ -235,6 +235,9 @@ export type SharedPlan = {
     notes?: string;
     placeId: string;
     imageUrl?: string;
+    lat: number;
+    lng: number;
+    driveTimeMin: number | null;
   }>;
 };
 
