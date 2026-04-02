@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description:
     'HipTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.',
   icons: {
-    icon: '/favicon.svg',
+    icon: '/favicon.png',
     apple: '/icons/icon-192x192.png',
   },
   manifest: '/manifest.json',
