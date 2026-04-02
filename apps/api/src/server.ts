@@ -25,6 +25,7 @@ import {
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
 import { requireAuth } from './lib/require-auth.js';
+import { normalizeLocationKey } from './lib/normalize-location.js';
 
 type RateLimitEntry = {
   count: number;
@@ -825,7 +826,7 @@ export const createApp = () => {
       const cacheCandidates = await prisma.tripPlanCache.findMany({
         where: {
           themesKey,
-          radiusKm: input.radiusKm,
+          radiusKm: { gte: input.radiusKm * 0.75, lte: input.radiusKm * 1.25 },
           maxOptions: input.maxOptions,
           expiresAt: { gt: now },
           validOptions: { gt: 0 },
@@ -1068,6 +1069,7 @@ export const createApp = () => {
         await prisma.tripPlanCache.create({
           data: {
             location: input.location,
+            locationKey: normalizeLocationKey(input.location),
             centerLat: origin.lat,
             centerLng: origin.lng,
             radiusKm: input.radiusKm,

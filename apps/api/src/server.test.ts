@@ -600,6 +600,7 @@ describe('HTTP server', () => {
     expect(prismaMock.tripPlanCache.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         location: 'Carmel By The Sea, CA',
+        locationKey: 'carmel by the sea',
         radiusKm: 120,
         themesKey: 'culture|scenic',
         maxOptions: 2,
@@ -687,6 +688,83 @@ describe('HTTP server', () => {
     expect(response.body.source).toBe('ai');
     expect(generatePlans).toHaveBeenCalledTimes(1);
     expect(prismaMock.tripPlanCache.update).not.toHaveBeenCalled();
+  });
+
+  it('serves cache hit when stored radiusKm is within ±25% of requested radius', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([
+      {
+        id: 'cache-radius',
+        centerLat: 36.56,
+        centerLng: -121.92,
+        radiusKm: 100, // stored radius — 100 is within ±25% of requested 120 (range: 90–150)
+        themesKey: 'culture|scenic',
+        maxOptions: 2,
+        options: [
+          {
+            title: 'Radius Fuzzy Hit',
+            rationale: 'Should be served despite different radius.',
+            stops: [
+              {
+                query: 'Point Lobos',
+                status: 'resolved',
+                suggestion: {
+                  id: 'stop-pl',
+                  placeId: 'place-pl',
+                  title: 'Point Lobos',
+                  description: 'Carmel, CA',
+                  distanceKm: 5,
+                  lat: 36.52,
+                  lng: -121.94,
+                },
+              },
+            ],
+          },
+        ],
+        validOptions: 1,
+        engagementScore: 3,
+        updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+        expiresAt: new Date('2026-04-10T00:00:00.000Z'),
+      },
+    ]);
+
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('cache');
+    expect(generatePlans).not.toHaveBeenCalled();
+  });
+
+  it('queries cache with radius range (±25%) rather than exact match', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+    generatePlans.mockResolvedValue({ options: [] });
+
+    const app = createApp();
+    await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(prismaMock.tripPlanCache.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          radiusKm: { gte: 90, lte: 150 },
+        }),
+      }),
+    );
   });
 
   it('rejects invalid trip plan payloads', async () => {
