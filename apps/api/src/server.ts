@@ -640,6 +640,30 @@ export const createApp = () => {
     }),
   );
 
+  app.put(
+    '/users/me',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const schema = z.object({
+        email: z.string().email().nullable().optional(),
+        name: z.string().nullable().optional(),
+        image: z.string().nullable().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_BODY' });
+        return;
+      }
+      await prisma.user.upsert({
+        where: { id: userId },
+        update: parsed.data,
+        create: { id: userId, ...parsed.data },
+      });
+      res.status(204).send();
+    }),
+  );
+
   app.get(
     '/trips/:id/sponsored-stop',
     requireAuth,

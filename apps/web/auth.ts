@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import Apple from 'next-auth/providers/apple';
 import Google from 'next-auth/providers/google';
+import { SignJWT } from 'jose';
 
 const authSecret = [process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET].find(
   (value) => value && value.trim().length > 0,
@@ -63,6 +64,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.sub;
       }
       return session;
+    },
+  },
+  events: {
+    async signIn({ user, profile }) {
+      const userId = (profile?.sub ?? user.id)?.toString();
+      if (!userId) return;
+      const secret =
+        authSecret ??
+        (process.env.NODE_ENV === 'development'
+          ? 'roadtrip-dev-auth-secret-change-me'
+          : undefined);
+      if (!secret) return;
+      try {
+        const token = await new SignJWT({})
+          .setProtectedHeader({ alg: 'HS256' })
+          .setIssuer('roadtrip-web')
+          .setAudience('roadtrip-api')
+          .setSubject(userId)
+          .setIssuedAt()
+          .setExpirationTime('15m')
+          .sign(new TextEncoder().encode(secret));
+        const apiBaseUrl =
+          process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+        await fetch(`${apiBaseUrl}/users/me`, {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: user.email ?? null,
+            name: user.name ?? null,
+            image: user.image ?? null,
+          }),
+        });
+      } catch {
+        // Non-critical — don't block sign-in
+      }
     },
   },
   logger: {
