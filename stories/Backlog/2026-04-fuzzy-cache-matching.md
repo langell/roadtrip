@@ -45,3 +45,97 @@ Increase cache hit rate by normalizing location strings and relaxing the radius 
 
 - The `TripPlanCache` already has `centerLat`/`centerLng` — use these for proximity checks
 - No vector embeddings needed; simple string normalization + bounding box covers the common cases
+
+---
+
+## Current Implementation
+
+### Cache lookup (`apps/api/src/server.ts` — `/trips/plan` route)
+
+The current query requires **exact** `themesKey`, `radiusKm`, and `maxOptions` matches. Only the center-point bounding box is already fuzzy:
+
+```typescript
+const themesKey = toThemesKey(input.themes); // e.g. "foodie|scenic"
+const cacheRadiusKm = TRIP_PLAN_CACHE_RADIUS_MILES * KM_PER_MILE;
+
+const latDelta = cacheRadiusKm / 111.32;
+const lngDelta = cacheRadiusKm / (111.32 * Math.cos(toRadians(origin.lat)));
+
+const cacheCandidates = await prisma.tripPlanCache.findMany({
+  where: {
+    themesKey, // exact match — "Key West" vs "Key West, FL" misses here
+    radiusKm: input.radiusKm, // exact match — 25km vs 30km always misses
+    maxOptions: input.maxOptions,
+    expiresAt: { gt: now },
+    validOptions: { gt: 0 },
+    centerLat: { gte: origin.lat - latDelta, lte: origin.lat + latDelta },
+    centerLng: { gte: origin.lng - lngDelta, lte: origin.lng + lngDelta },
+  },
+  orderBy: [{ engagementScore: 'desc' }, { updatedAt: 'desc' }],
+  take: 25,
+});
+```
+
+After fetching candidates, it filters by haversine distance and picks the best:
+
+```typescript
+const cacheHit = cacheCandidates
+  .map((c) => ({
+    candidate: c,
+    distanceKm: haversineKm(origin.lat, origin.lng, c.centerLat, c.centerLng),
+  }))
+  .filter(({ distanceKm }) => distanceKm <= cacheRadiusKm)
+  .sort(
+    (a, b) => b.candidate.engagementScore - a.candidate.engagementScore,
+  )[0]?.candidate;
+```
+
+### Cache write
+
+```typescript
+await prisma.tripPlanCache.create({
+  data: {
+    location: input.location, // raw user string, used for display
+    centerLat: origin.lat,
+    centerLng: origin.lng,
+    radiusKm: input.radiusKm, // exact radius stored
+    themesKey, // pipe-separated sorted themes
+    maxOptions: input.maxOptions,
+    options: validOptions,
+    validOptions: validOptions.length,
+    engagementScore: 1,
+    expiresAt: new Date(
+      now.getTime() + env.TRIP_PLAN_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000,
+    ),
+  },
+});
+```
+
+### Prisma schema (`TripPlanCache`)
+
+```prisma
+model TripPlanCache {
+  id              String    @id @default(uuid())
+  location        String    // display string — "Key West, FL"
+  centerLat       Float
+  centerLng       Float
+  radiusKm        Float
+  themesKey       String    // "foodie|scenic" — exact match today
+  maxOptions      Int
+  options         Json
+  validOptions    Int
+  engagementScore Int       @default(0)
+  lastServedAt    DateTime?
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  // locationKey String?  ← to be added by this story
+}
+```
+
+### What needs to change
+
+1. Add `locationKey String?` to `TripPlanCache` — normalized, used for matching
+2. Write `locationKey` on cache create (normalize `input.location`)
+3. Change cache lookup: match on `locationKey` instead of raw `location` string; relax `radiusKm` to a ±25% range instead of exact
+4. Add a Prisma migration and backfill script for existing rows
