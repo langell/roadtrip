@@ -1,15 +1,29 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import MiniRouteMap from './MiniRouteMap';
 import { useRouter } from 'next/navigation';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
-import { fetchTripPlans, type TripPlanOption } from '../lib/api-client';
+import {
+  fetchTripPlans,
+  type TripPlanOption,
+  type PlannedStopResolved,
+} from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const LOCATION_STORAGE_KEY = 'hiptrip:location';
 const PLAN_RESULTS_STORAGE_KEY = 'hiptrip:last-plan-results';
+const RECENT_SEARCHES_KEY = 'hiptrip:recent-searches';
+const MAX_RECENT_SEARCHES = 5;
+
+type RecentSearch = {
+  location: string;
+  themes: Array<(typeof TripThemeSchema.options)[number]>;
+  radiusMiles: number;
+  searchedAt: string;
+};
 const KM_PER_MILE = 1.60934;
 const MIN_RADIUS_MILES = 10;
 const MAX_RADIUS_MILES = 300;
@@ -198,12 +212,17 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
   const [planSource, setPlanSource] = useState<'cache' | 'ai' | null>(null);
   const [planDegraded, setPlanDegraded] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [lastUsedModifiers, setLastUsedModifiers] = useState<{
+    smartPitstops: boolean;
+    photoOps: boolean;
+  } | null>(null);
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(
     null,
   );
   const hasRequestedInitialLocation = useRef(false);
 
-  // Restore saved location and last plan results on mount
+  // Restore saved location, last plan results, and recent searches on mount
   useEffect(() => {
     const savedLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
     if (savedLocation && !initialLocation) setLocation(savedLocation);
@@ -221,6 +240,15 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
         setPlanDegraded(parsed.degraded);
       } catch {
         localStorage.removeItem(PLAN_RESULTS_STORAGE_KEY);
+      }
+    }
+
+    const savedSearches = localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (savedSearches) {
+      try {
+        setRecentSearches(JSON.parse(savedSearches) as RecentSearch[]);
+      } catch {
+        localStorage.removeItem(RECENT_SEARCHES_KEY);
       }
     }
   }, []);
@@ -247,6 +275,52 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     sports: { label: 'Sports', icon: '🏟️' },
   };
 
+  const saveRecentSearch = (
+    loc: string,
+    themes: typeof selectedThemes,
+    radiusMiles: number,
+  ) => {
+    const entry: RecentSearch = {
+      location: loc,
+      themes,
+      radiusMiles,
+      searchedAt: new Date().toISOString(),
+    };
+    setRecentSearches((prev) => {
+      const deduped = prev.filter(
+        (s) =>
+          s.location !== loc ||
+          s.themes.join() !== themes.join() ||
+          s.radiusMiles !== radiusMiles,
+      );
+      const next = [entry, ...deduped].slice(0, MAX_RECENT_SEARCHES);
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const applyRecentSearch = (search: RecentSearch) => {
+    setLocation(search.location);
+    setSelectedThemes(search.themes);
+    setFilters((f) => ({ ...f, radiusMiles: search.radiusMiles }));
+  };
+
+  const removeRecentSearch = (index: number) => {
+    setRecentSearches((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   const handleGenerate = async () => {
     setLoading(true);
     setPlanError(null);
@@ -254,6 +328,11 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     setPlanDegraded(false);
     setPlanOptions([]);
     localStorage.removeItem(PLAN_RESULTS_STORAGE_KEY);
+    setLastUsedModifiers({
+      smartPitstops: filters.smartPitstops,
+      photoOps: filters.photoOps,
+    });
+    saveRecentSearch(location, selectedThemes, filters.radiusMiles);
     try {
       const modifiers =
         filters.smartPitstops || filters.photoOps
@@ -563,6 +642,45 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
         </div>
       </form>
 
+      {recentSearches.length > 0 && (
+        <section className="space-y-2">
+          <p className="font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-text-muted">
+            Recent Searches
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {recentSearches.map((search, i) => (
+              <div
+                key={`${search.location}-${search.searchedAt}`}
+                className="flex items-center gap-1 rounded-full border border-wayfarer-accent/40 bg-wayfarer-surface pl-3 pr-1 py-1 text-xs"
+              >
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 font-semibold text-wayfarer-primary hover:text-wayfarer-secondary transition-colors"
+                  onClick={() => applyRecentSearch(search)}
+                  title={`${search.location} · ${search.radiusMiles}mi · ${search.themes.map((t) => themeLabelMap[t].label).join(', ')}`}
+                >
+                  <span>{search.location}</span>
+                  <span className="text-wayfarer-text-muted">·</span>
+                  <span className="text-wayfarer-text-muted">{search.radiusMiles}mi</span>
+                  <span className="text-wayfarer-text-muted">·</span>
+                  <span className="text-wayfarer-text-muted">
+                    {search.themes.map((t) => themeLabelMap[t].icon).join('')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-wayfarer-text-muted hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary transition-colors"
+                  onClick={() => removeRecentSearch(i)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-body text-xs uppercase tracking-[0.18em] text-wayfarer-text-muted">
@@ -573,6 +691,16 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
               {planSource === 'cache' ? 'Loaded from cache' : 'Generated by AI'}
             </span>
           ) : null}
+          {lastUsedModifiers?.smartPitstops && (
+            <span className="rounded-full bg-wayfarer-secondary/10 px-3 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.12em] text-wayfarer-secondary">
+              ⛽ Pit-Stops active
+            </span>
+          )}
+          {lastUsedModifiers?.photoOps && (
+            <span className="rounded-full bg-wayfarer-secondary/10 px-3 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.12em] text-wayfarer-secondary">
+              📸 Photo Ops active
+            </span>
+          )}
         </div>
         {planError ? (
           <div className="rounded-card bg-white/80 p-5 font-body text-sm text-wayfarer-secondary flex items-center justify-between gap-4">
@@ -662,6 +790,18 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
               <p className="font-body text-sm leading-relaxed text-wayfarer-text-muted">
                 {option.rationale}
               </p>
+
+              {(() => {
+                const pts = option.stops
+                  .filter((s): s is PlannedStopResolved => s.status === 'resolved')
+                  .map((s) => ({ lat: s.suggestion.lat, lng: s.suggestion.lng }));
+                return (
+                  <MiniRouteMap
+                    stops={pts}
+                    mapsKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''}
+                  />
+                );
+              })()}
 
               <ul className="mt-4 space-y-3">
                 {option.stops.map((stop, stopIndex) => (

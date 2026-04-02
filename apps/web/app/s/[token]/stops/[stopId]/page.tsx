@@ -50,6 +50,8 @@ const SharedStopDetailPage = async ({ params }: Props) => {
   const waypointIndex = sorted.findIndex((s) => s.id === stopId);
   const stop = sorted[waypointIndex];
   if (waypointIndex === -1 || !stop) notFound();
+  const prevStop = waypointIndex > 0 ? sorted[waypointIndex - 1] : null;
+  const nextStop = waypointIndex < sorted.length - 1 ? sorted[waypointIndex + 1] : null;
   const waypointNum = waypointIndex + 1;
   const totalStops = sorted.length;
   const driveLabel = formatDrive(stop.driveTimeMin);
@@ -109,6 +111,57 @@ const SharedStopDetailPage = async ({ params }: Props) => {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-20 md:px-8">
+        {/* ── Prev / Next navigation ───────────────────────── */}
+        <nav className="mb-6 flex items-center justify-between border-b border-wayfarer-accent/20 pb-4">
+          {prevStop ? (
+            <Link
+              href={`/s/${token}/stops/${prevStop.id}`}
+              className="flex items-center gap-2 text-sm font-semibold text-wayfarer-primary transition-colors hover:text-wayfarer-secondary"
+            >
+              <svg
+                className="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              <span className="max-w-[140px] truncate">{prevStop.name}</span>
+            </Link>
+          ) : (
+            <span className="text-xs text-wayfarer-text-muted opacity-50">
+              First stop
+            </span>
+          )}
+          <span className="shrink-0 text-xs text-wayfarer-text-muted">
+            {waypointNum} / {totalStops}
+          </span>
+          {nextStop ? (
+            <Link
+              href={`/s/${token}/stops/${nextStop.id}`}
+              className="flex items-center gap-2 text-sm font-semibold text-wayfarer-primary transition-colors hover:text-wayfarer-secondary"
+            >
+              <span className="max-w-[140px] truncate">{nextStop.name}</span>
+              <svg
+                className="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </Link>
+          ) : (
+            <span className="text-xs text-wayfarer-text-muted opacity-50">Last stop</span>
+          )}
+        </nav>
+
         {/* ── Hero editorial section ────────────────────────── */}
         <section className="mt-4 grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
           {/* Large image — left 8 cols */}
@@ -266,6 +319,13 @@ const SharedStopDetailPage = async ({ params }: Props) => {
                 </div>
               )}
             </div>
+
+            {/* Trip rationale */}
+            {plan.rationale && (
+              <blockquote className="border-l-2 border-wayfarer-primary-light pl-4 text-sm italic leading-relaxed text-wayfarer-text-muted">
+                {plan.rationale}
+              </blockquote>
+            )}
 
             {/* Action buttons */}
             <div className="flex flex-col gap-3 pt-2">

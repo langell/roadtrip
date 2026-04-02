@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SignInButtons from './sign-in-buttons';
+import Logo from '../../components/Logo';
 
 type SignInPageProps = {
   searchParams: Promise<{ callbackUrl?: string }>;
@@ -13,12 +14,7 @@ const SignInPage = async ({ searchParams }: SignInPageProps) => {
   return (
     <div className="flex min-h-screen flex-col bg-wayfarer-bg font-body text-wayfarer-text-main">
       <header className="flex h-16 items-center px-6 md:px-10">
-        <Link
-          href="/"
-          className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary"
-        >
-          HipTrip
-        </Link>
+        <Logo />
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6 py-12">

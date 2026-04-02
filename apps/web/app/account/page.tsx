@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from '../../auth';
 import { requireAuth } from '../../lib/session';
+import Logo from '../../components/Logo';
 
 const AccountPage = async () => {
   const session = await requireAuth('/account');
@@ -16,12 +17,7 @@ const AccountPage = async () => {
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main">
       <header className="flex h-16 items-center justify-between px-6 md:px-10">
-        <Link
-          href="/"
-          className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary"
-        >
-          HipTrip
-        </Link>
+        <Logo />
       </header>
 
       <main className="mx-auto w-full max-w-2xl px-6 py-12 md:px-8">

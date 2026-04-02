@@ -622,6 +622,24 @@ export const createApp = () => {
     }),
   );
 
+  app.delete(
+    '/trips/:id',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const userId = res.locals.userId as string;
+      const { id } = req.params;
+
+      const trip = await prisma.trip.findUnique({ where: { id } });
+      if (!trip || trip.userId !== userId) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+
+      await prisma.trip.delete({ where: { id } });
+      res.status(204).send();
+    }),
+  );
+
   app.get(
     '/trips/:id/sponsored-stop',
     requireAuth,

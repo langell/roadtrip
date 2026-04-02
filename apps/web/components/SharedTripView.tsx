@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import Logo from './Logo';
 import { useRouter } from 'next/navigation';
 import type { SharedPlan } from '../lib/api-client';
 import { savePlanOption } from '../lib/api-client';
@@ -255,12 +256,7 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
     <div className="flex h-screen flex-col bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
       {/* Header */}
       <header className="fixed top-0 z-50 flex w-full items-center justify-between bg-wayfarer-bg/90 backdrop-blur-md px-6 py-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-        <Link
-          href="/"
-          className="font-display text-2xl font-extrabold tracking-tight text-wayfarer-primary"
-        >
-          HipTrip
-        </Link>
+        <Logo />
         <div className="flex items-center gap-2">
           {/* Save button — outlined secondary pill */}
           <button

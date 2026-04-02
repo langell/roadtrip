@@ -188,6 +188,7 @@ export type SavedTrip = {
   originLat: number;
   originLng: number;
   createdAt: string;
+  shareToken?: string | null;
   stops: SavedTripStop[];
 };
 
@@ -221,6 +222,18 @@ export const shareTrip = async (tripId: string): Promise<{ shareUrl: string } | 
     return (await response.json()) as { shareUrl: string };
   } catch {
     return null;
+  }
+};
+
+export const deleteTrip = async (tripId: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/${encodeURIComponent(tripId)}`, {
+      method: 'DELETE',
+      headers: await buildAuthHeaders(),
+    });
+    return response.status === 204;
+  } catch {
+    return false;
   }
 };
 
