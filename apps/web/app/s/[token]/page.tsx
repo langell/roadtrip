@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getSharedTrip } from '../../../lib/api-client';
 import SharedTripView from '../../../components/SharedTripView';
 import Link from 'next/link';
+import { getIsLoggedIn } from '../../../lib/session';
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function SharedTripPage({ params }: Props) {
   const { token } = await params;
-  const plan = await getSharedTrip(token);
+  const [plan, isLoggedIn] = await Promise.all([getSharedTrip(token), getIsLoggedIn()]);
 
   if (!plan) {
     return (
@@ -51,5 +52,5 @@ export default async function SharedTripPage({ params }: Props) {
     );
   }
 
-  return <SharedTripView plan={plan} shareToken={token} />;
+  return <SharedTripView plan={plan} shareToken={token} isLoggedIn={isLoggedIn} />;
 }
