@@ -262,38 +262,35 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
           HipTrip
         </Link>
         <div className="flex items-center gap-2">
-          {/* Save button */}
+          {/* Save button — outlined secondary pill */}
           <button
             onClick={() => void handleSave()}
-            title={saveState === 'saved' ? 'Saved to My Trips' : 'Save to My Trips'}
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95 ${
+            className={`flex h-9 items-center gap-2 rounded-full border px-4 font-display text-sm font-bold transition-all active:scale-95 ${
               saveState === 'saved'
-                ? 'bg-wayfarer-primary text-white'
+                ? 'border-wayfarer-primary bg-wayfarer-primary text-white'
                 : saveState === 'error'
-                  ? 'bg-red-100 text-red-500'
-                  : 'bg-wayfarer-surface text-wayfarer-primary hover:bg-wayfarer-surface-deep'
+                  ? 'border-red-300 bg-red-50 text-red-500'
+                  : 'border-wayfarer-primary/30 bg-transparent text-wayfarer-primary hover:border-wayfarer-primary hover:bg-wayfarer-surface'
             }`}
           >
             {saveState === 'saving' ? (
               <svg
-                className="h-4 w-4 animate-spin"
+                className="h-3.5 w-3.5 animate-spin"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2.5"
+                strokeLinecap="round"
               >
-                <path
-                  d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
-                  strokeLinecap="round"
-                />
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
               </svg>
             ) : saveState === 'saved' ? (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M5 3a2 2 0 0 0-2 2v16l9-4 9 4V5a2 2 0 0 0-2-2H5Z" />
               </svg>
             ) : (
               <svg
-                className="h-4 w-4"
+                className="h-3.5 w-3.5"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -304,26 +301,14 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
               </svg>
             )}
+            {saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Failed' : 'Save'}
           </button>
 
-          {/* Plan your own button */}
+          {/* Plan your own button — filled primary pill */}
           <Link
             href="/"
-            title="Plan your own trip"
-            className="flex h-10 items-center gap-2 rounded-full bg-wayfarer-primary pl-4 pr-5 font-display text-sm font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
+            className="flex h-9 items-center rounded-full bg-wayfarer-primary px-5 font-display text-sm font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
           >
-            <svg
-              className="h-4 w-4 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-            </svg>
             Plan your own
           </Link>
         </div>
