@@ -1,10 +1,19 @@
 import { z } from 'zod';
 import { env } from '../config/env.js';
 
+const StopTypeSchema = z.enum(['attraction', 'pit_stop', 'photo_op']).nullable();
+
+export type StopType = z.infer<typeof StopTypeSchema>;
+
+const AiStopSchema = z.object({
+  name: z.string().min(1),
+  stopType: StopTypeSchema,
+});
+
 const AiTripOptionSchema = z.object({
   title: z.string().min(1),
   rationale: z.string().min(1),
-  stops: z.array(z.string().min(1)).min(2).max(8),
+  stops: z.array(AiStopSchema).min(2).max(8),
 });
 
 const AiTripPlansSchema = z.object({
@@ -407,12 +416,12 @@ export class AiTripPlannerService {
     const lines: string[] = [];
     if (modifiers?.smartPitstops) {
       lines.push(
-        '- smart pitstops: Weave in 1-2 practical road trip stops per option — a well-regarded local coffee shop, a scenic fuel stop, or a roadside spot worth a 10-minute stretch.',
+        '- smart pitstops: Weave in 1-2 practical road trip stops per option — a well-regarded local coffee shop, a scenic fuel stop, or a roadside spot worth a 10-minute stretch. Set stopType="pit_stop" on those stops.',
       );
     }
     if (modifiers?.photoOps) {
       lines.push(
-        '- photo ops: Prioritize stops with strong visual character — golden-hour overlooks, striking murals, iconic backdrops, or locations known for photography.',
+        '- photo ops: Prioritize stops with strong visual character — golden-hour overlooks, striking murals, iconic backdrops, or locations known for photography. Set stopType="photo_op" on those stops.',
       );
     }
     return lines.join('\n');
@@ -462,10 +471,12 @@ export class AiTripPlannerService {
       'Output rules:',
       '- Return JSON only (no markdown, no prose, no code fences).',
       '- Use this exact schema:',
-      '{"options":[{"title":"...","rationale":"...","stops":["Stop 1","Stop 2"]}]}',
+      '{"options":[{"title":"...","rationale":"...","stops":[{"name":"Stop 1","stopType":"attraction"},{"name":"Stop 2","stopType":null}]}]}',
       '- `options` length must equal requested option count.',
-      '- Each `stops` array must contain 2-8 stop names.',
-      '- All fields are required and must be non-empty strings.',
+      '- Each `stops` array must contain 2-8 stop objects.',
+      '- Each stop must have a `name` (non-empty string) and `stopType` ("attraction", "pit_stop", "photo_op", or null).',
+      '- Use stopType="attraction" for standard themed stops. Only use "pit_stop" or "photo_op" when those modifiers are active.',
+      '- All other fields are required and must be non-empty strings.',
     ].join('\n');
 
     let responseBodyText = '';

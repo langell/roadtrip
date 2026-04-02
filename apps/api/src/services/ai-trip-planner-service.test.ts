@@ -23,12 +23,17 @@ vi.mock('../config/env.js', () => ({ env: mockEnv }));
 const geminiBody = (innerText: string) =>
   JSON.stringify({ candidates: [{ content: { parts: [{ text: innerText }] } }] });
 
+const makeStop = (
+  name: string,
+  stopType: 'attraction' | 'pit_stop' | 'photo_op' | null = 'attraction',
+) => ({ name, stopType });
+
 /** Build a minimal valid plans object — rationale/stops cover scenic AND foodie keywords */
 const validPlans = (count: 2 | 3 = 2) => ({
   options: Array.from({ length: count }, (_, i) => ({
     title: `Route ${i + 1}`,
     rationale: `Covers scenic viewpoints, local restaurants, and trail highlights for option ${i + 1}.`,
-    stops: [`Coastal Viewpoint ${i + 1}`, `Ridge Trail ${i + 1}`],
+    stops: [makeStop(`Coastal Viewpoint ${i + 1}`), makeStop(`Ridge Trail ${i + 1}`)],
   })),
 });
 
@@ -36,7 +41,7 @@ const validPlans = (count: 2 | 3 = 2) => ({
 const bareOption = (i = 0) => ({
   title: `Route ${i}`,
   rationale: 'A balanced route.',
-  stops: ['Place Alpha', 'Place Beta'],
+  stops: [makeStop('Place Alpha'), makeStop('Place Beta')],
 });
 
 /** Build a mock fetch that returns sequential responses */
@@ -333,7 +338,7 @@ describe('AiTripPlannerService', () => {
 
     it('throws AI_INVALID_RESPONSE (parse) when option stops array is too short', async () => {
       const badPlans = {
-        options: [{ title: 'Route', rationale: 'Good', stops: ['Only one'] }],
+        options: [{ title: 'Route', rationale: 'Good', stops: [makeStop('Only one')] }],
       };
       const fetch = mockFetch(ok(geminiBody(JSON.stringify(badPlans))));
       const service = new AiTripPlannerService(fetch);
@@ -354,9 +359,13 @@ describe('AiTripPlannerService', () => {
           {
             title: 'Scenic Loop',
             rationale: '',
-            stops: ['Viewpoint Trail', 'River Gorge'],
+            stops: [makeStop('Viewpoint Trail'), makeStop('River Gorge')],
           },
-          { title: 'Coastal Run', rationale: '   ', stops: ['Beach Bay', 'Harbor Pier'] },
+          {
+            title: 'Coastal Run',
+            rationale: '   ',
+            stops: [makeStop('Beach Bay'), makeStop('Harbor Pier')],
+          },
         ],
       };
       const fetch = mockFetch(ok(geminiBody(JSON.stringify(plans))));
@@ -543,7 +552,7 @@ describe('AiTripPlannerService', () => {
           {
             title: 'Route 1',
             rationale: 'Great viewpoint.',
-            stops: ['Viewpoint Trail', 'Lake Path'],
+            stops: [makeStop('Viewpoint Trail'), makeStop('Lake Path')],
           },
           bareOption(2),
         ],

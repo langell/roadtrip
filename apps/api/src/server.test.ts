@@ -396,12 +396,18 @@ describe('HTTP server', () => {
         {
           title: 'Coastal Highlights',
           rationale: 'Great ocean views and local culture.',
-          stops: ['Bixby Bridge', 'Monterey Bay Aquarium'],
+          stops: [
+            { name: 'Bixby Bridge', stopType: 'attraction' },
+            { name: 'Monterey Bay Aquarium', stopType: 'attraction' },
+          ],
         },
         {
           title: 'Scenic Food Loop',
           rationale: 'Mix of food and viewpoints.',
-          stops: ['Carmel Mission', 'Point Lobos'],
+          stops: [
+            { name: 'Carmel Mission', stopType: 'attraction' },
+            { name: 'Point Lobos', stopType: 'attraction' },
+          ],
         },
       ],
     });
@@ -545,12 +551,15 @@ describe('HTTP server', () => {
         {
           title: 'Valid Route',
           rationale: 'All resolved.',
-          stops: ['Stop One', 'Stop Two'],
+          stops: [
+            { name: 'Stop One', stopType: 'attraction' },
+            { name: 'Stop Two', stopType: 'attraction' },
+          ],
         },
         {
           title: 'Partial Route',
           rationale: 'One unresolved stop.',
-          stops: ['Stop Three'],
+          stops: [{ name: 'Stop Three', stopType: null }],
         },
       ],
     });
@@ -654,7 +663,7 @@ describe('HTTP server', () => {
         {
           title: 'Fresh generation',
           rationale: 'Used when far cache misses.',
-          stops: ['Nearby Stop'],
+          stops: [{ name: 'Nearby Stop', stopType: 'attraction' }],
         },
       ],
     });
@@ -855,12 +864,12 @@ describe('HTTP server', () => {
           {
             title: 'SSE Route A',
             rationale: 'First streamed option.',
-            stops: ['Stop One'],
+            stops: [{ name: 'Stop One', stopType: 'attraction' }],
           },
           {
             title: 'SSE Route B',
             rationale: 'Second streamed option.',
-            stops: ['Stop Two'],
+            stops: [{ name: 'Stop Two', stopType: 'attraction' }],
           },
         ],
       });

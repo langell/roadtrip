@@ -35,6 +35,7 @@ type RateLimitEntry = {
 type PlannedStopResolved = {
   query: string;
   status: 'resolved';
+  stopType: StopType;
   suggestion: {
     id: string;
     placeId: string;
@@ -47,9 +48,12 @@ type PlannedStopResolved = {
   };
 };
 
+type StopType = 'attraction' | 'pit_stop' | 'photo_op' | null;
+
 type PlannedStopUnresolved = {
   query: string;
   status: 'unresolved';
+  stopType: StopType;
   errorCode: 'NOT_FOUND' | 'UPSTREAM_ERROR';
 };
 
@@ -61,9 +65,16 @@ type PlannedOption = {
   stops: PlannedStop[];
 };
 
+const stopTypeSchema = z
+  .enum(['attraction', 'pit_stop', 'photo_op'])
+  .nullable()
+  .optional()
+  .transform((v) => v ?? null);
+
 const plannedStopResolvedSchema = z.object({
   query: z.string().min(1),
   status: z.literal('resolved'),
+  stopType: stopTypeSchema,
   suggestion: z.object({
     id: z.string().min(1),
     placeId: z.string().min(1),
@@ -79,6 +90,7 @@ const plannedStopResolvedSchema = z.object({
 const plannedStopUnresolvedSchema = z.object({
   query: z.string().min(1),
   status: z.literal('unresolved'),
+  stopType: stopTypeSchema,
   errorCode: z.union([z.literal('NOT_FOUND'), z.literal('UPSTREAM_ERROR')]),
 });
 
@@ -1049,8 +1061,10 @@ export const createApp = () => {
       const resolveOption = async (option: {
         title: string;
         rationale: string;
-        stops: string[];
+        stops: { name: string; stopType: StopType }[];
       }): Promise<PlannedOption> => {
+        const stopTypeByName = new Map(option.stops.map((s) => [s.name, s.stopType]));
+
         let stopResults: Array<{
           query: string;
           suggestion?: {
@@ -1070,7 +1084,7 @@ export const createApp = () => {
           stopResults = await googlePlacesService.resolvePlannedStops({
             location: input.location,
             radiusKm: input.radiusKm,
-            stopQueries: option.stops,
+            stopQueries: option.stops.map((s) => s.name),
           });
         } catch (error) {
           const placesError = toPlacesErrorMeta(error);
@@ -1079,8 +1093,8 @@ export const createApp = () => {
             optionTitle: option.title,
           });
 
-          stopResults = option.stops.map((query) => ({
-            query,
+          stopResults = option.stops.map((s) => ({
+            query: s.name,
             errorCode: 'UPSTREAM_ERROR' as const,
           }));
         }
@@ -1089,10 +1103,12 @@ export const createApp = () => {
           title: option.title,
           rationale: option.rationale,
           stops: stopResults.map((stopResult) => {
+            const stopType = stopTypeByName.get(stopResult.query) ?? null;
             if (!stopResult.suggestion) {
               return {
                 query: stopResult.query,
                 status: 'unresolved' as const,
+                stopType,
                 errorCode: stopResult.errorCode ?? 'NOT_FOUND',
               };
             }
@@ -1101,6 +1117,7 @@ export const createApp = () => {
             return {
               query: stopResult.query,
               status: 'resolved' as const,
+              stopType,
               suggestion: {
                 ...suggestion,
                 imageUrl: buildSuggestionImageUrl(req, photoName),

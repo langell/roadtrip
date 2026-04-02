@@ -6,9 +6,12 @@ export type TripIdea = {
   imageUrl?: string;
 };
 
+export type StopType = 'attraction' | 'pit_stop' | 'photo_op' | null;
+
 export type PlannedStopResolved = {
   query: string;
   status: 'resolved';
+  stopType: StopType;
   suggestion: {
     id: string;
     placeId: string;
@@ -24,6 +27,7 @@ export type PlannedStopResolved = {
 export type PlannedStopUnresolved = {
   query: string;
   status: 'unresolved';
+  stopType: StopType;
   errorCode: 'NOT_FOUND' | 'UPSTREAM_ERROR';
 };
 
