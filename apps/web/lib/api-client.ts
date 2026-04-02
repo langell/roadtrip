@@ -418,3 +418,86 @@ export const fetchTripPlans = async (params: {
     return null;
   }
 };
+
+export type TripPlanStreamCallbacks = {
+  onHeader: (data: {
+    location: string;
+    radiusKm: number;
+    themes: string[];
+    source: 'cache' | 'ai';
+  }) => void;
+  onOption: (option: TripPlanOption) => void;
+  onDone: (data: { degraded: boolean }) => void;
+  onError: () => void;
+};
+
+export const streamTripPlans = async (
+  params: {
+    location: string;
+    radiusKm: number;
+    themes: string[];
+    maxOptions: 2 | 3;
+    modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
+  },
+  callbacks: TripPlanStreamCallbacks,
+): Promise<void> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/plan`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+        ...(await buildAuthHeaders()),
+      },
+      cache: 'no-store',
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok || !response.body) {
+      callbacks.onError();
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() ?? '';
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+
+        let eventType = '';
+        let eventData = '';
+        for (const line of block.split('\n')) {
+          if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+          else if (line.startsWith('data: ')) eventData = line.slice(6).trim();
+        }
+
+        if (!eventType || !eventData) continue;
+
+        try {
+          const data = JSON.parse(eventData) as Record<string, unknown>;
+          if (eventType === 'header')
+            callbacks.onHeader(
+              data as Parameters<TripPlanStreamCallbacks['onHeader']>[0],
+            );
+          else if (eventType === 'option') callbacks.onOption(data as TripPlanOption);
+          else if (eventType === 'done')
+            callbacks.onDone(data as Parameters<TripPlanStreamCallbacks['onDone']>[0]);
+          else if (eventType === 'error') callbacks.onError();
+        } catch {
+          // malformed SSE data — skip
+        }
+      }
+    }
+  } catch {
+    callbacks.onError();
+  }
+};

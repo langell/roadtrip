@@ -7,7 +7,7 @@ import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
 import {
-  fetchTripPlans,
+  streamTripPlans,
   type TripPlanOption,
   type PlannedStopResolved,
 } from '../lib/api-client';
@@ -205,6 +205,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
   const isFirstLocationRender = useRef(true);
 
   const [loading, setLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
@@ -323,6 +324,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
 
   const handleGenerate = async () => {
     setLoading(true);
+    setIsStreaming(false);
     setPlanError(null);
     setPlanSource(null);
     setPlanDegraded(false);
@@ -333,46 +335,64 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
       photoOps: filters.photoOps,
     });
     saveRecentSearch(location, selectedThemes, filters.radiusMiles);
+
+    const modifiers =
+      filters.smartPitstops || filters.photoOps
+        ? {
+            smartPitstops: filters.smartPitstops || undefined,
+            photoOps: filters.photoOps || undefined,
+          }
+        : undefined;
+
+    let streamedSource: 'cache' | 'ai' | null = null;
+    const collectedOptions: TripPlanOption[] = [];
+
     try {
-      const modifiers =
-        filters.smartPitstops || filters.photoOps
-          ? {
-              smartPitstops: filters.smartPitstops || undefined,
-              photoOps: filters.photoOps || undefined,
+      await streamTripPlans(
+        {
+          location,
+          radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
+          themes: selectedThemes,
+          maxOptions: 3,
+          modifiers,
+        },
+        {
+          onHeader: ({ source }) => {
+            streamedSource = source;
+            setPlanSource(source);
+            setIsStreaming(true);
+          },
+          onOption: (option) => {
+            collectedOptions.push(option);
+            setLoading(false);
+            setPlanOptions((prev) => [...prev, option]);
+          },
+          onDone: ({ degraded }) => {
+            setIsStreaming(false);
+            setPlanDegraded(degraded);
+            try {
+              localStorage.setItem(
+                PLAN_RESULTS_STORAGE_KEY,
+                JSON.stringify({
+                  options: collectedOptions,
+                  source: streamedSource,
+                  degraded,
+                }),
+              );
+            } catch {
+              // localStorage unavailable or full — results still shown in memory
             }
-          : undefined;
-      const data = await fetchTripPlans({
-        location,
-        radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
-        themes: selectedThemes,
-        maxOptions: 3,
-        modifiers,
-      });
-
-      if (!data) {
-        setPlanOptions([]);
-        setPlanSource(null);
-        setPlanError('We could not generate plans right now. Please try again.');
-        return;
-      }
-
-      setPlanOptions(data.options);
-      setPlanSource(data.source);
-      setPlanDegraded(data.degraded ?? false);
-      try {
-        localStorage.setItem(
-          PLAN_RESULTS_STORAGE_KEY,
-          JSON.stringify({
-            options: data.options,
-            source: data.source,
-            degraded: data.degraded ?? false,
-          }),
-        );
-      } catch {
-        // localStorage unavailable or full — results still shown in memory
-      }
+          },
+          onError: () => {
+            setPlanOptions([]);
+            setPlanSource(null);
+            setPlanError('We could not generate plans right now. Please try again.');
+          },
+        },
+      );
     } finally {
       setLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -869,7 +889,17 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
               </div>
             </article>
           ))}
-          {!loading && !planOptions.length && !planError && (
+          {isStreaming && (
+            <article className="animate-pulse rounded-card bg-white p-5 shadow-wayfarer-soft">
+              <div className="mb-3 h-3 w-1/3 rounded bg-wayfarer-surface" />
+              <div className="mb-3 h-5 w-2/3 rounded bg-wayfarer-surface" />
+              <div className="mb-2 h-5 w-3/4 rounded bg-wayfarer-surface" />
+              <div className="mb-2 h-4 w-full rounded bg-wayfarer-surface" />
+              <div className="h-3 w-2/3 rounded bg-wayfarer-surface" />
+            </article>
+          )}
+
+          {!loading && !isStreaming && !planOptions.length && !planError && (
             <div className="rounded-card bg-white/70 p-8 font-body text-wayfarer-text-muted">
               Start by generating a route to see AI itinerary options.
             </div>

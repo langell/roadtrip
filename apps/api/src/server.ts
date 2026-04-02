@@ -874,6 +874,13 @@ export const createApp = () => {
       const debugEnabled =
         env.TRIP_PLAN_CACHE_DEBUG && process.env.NODE_ENV !== 'production';
 
+      const useSse = req.headers.accept === 'text/event-stream';
+
+      // Helper to write an SSE event (only used on the AI/streaming path)
+      const sendSse = (event: string, data: unknown): void => {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
       if (cacheHit) {
         const parsedOptions = plannedOptionsSchema.safeParse(cacheHit.options);
         if (parsedOptions.success && parsedOptions.data.length) {
@@ -898,56 +905,77 @@ export const createApp = () => {
             'trip.plan.cache_hit',
           );
 
-          const responsePayload: {
-            location: string;
-            radiusKm: number;
-            themes: string[];
-            source: 'cache';
-            options: z.infer<typeof plannedOptionsSchema>;
-            cacheDebug?: {
-              enabled: true;
-              radiusMiles: number;
-              nearestCandidateDistanceMiles: number | null;
-              selectedCandidateDistanceMiles: number | null;
-              candidateCount: number;
-            };
-          } = {
-            location: input.location,
-            radiusKm: input.radiusKm,
-            themes: input.themes,
-            source: 'cache',
-            options: parsedOptions.data.map((option) => ({
-              ...option,
-              stops: option.stops.map((stop) => {
-                if (stop.status !== 'resolved') return stop;
-                return {
-                  ...stop,
-                  suggestion: {
-                    ...stop.suggestion,
-                    imageUrl: rewritePhotoProxyUrl(req, stop.suggestion.imageUrl),
-                  },
-                };
-              }),
-            })),
-          };
+          const hydratedOptions = parsedOptions.data.map((option) => ({
+            ...option,
+            stops: option.stops.map((stop) => {
+              if (stop.status !== 'resolved') return stop;
+              return {
+                ...stop,
+                suggestion: {
+                  ...stop.suggestion,
+                  imageUrl: rewritePhotoProxyUrl(req, stop.suggestion.imageUrl),
+                },
+              };
+            }),
+          }));
 
-          if (debugEnabled) {
-            responsePayload.cacheDebug = {
-              enabled: true,
-              radiusMiles: TRIP_PLAN_CACHE_RADIUS_MILES,
-              nearestCandidateDistanceMiles:
-                typeof nearestCandidateDistanceKm === 'number'
-                  ? Number((nearestCandidateDistanceKm / KM_PER_MILE).toFixed(2))
-                  : null,
-              selectedCandidateDistanceMiles:
-                typeof cacheHitDistanceKm === 'number'
-                  ? Number((cacheHitDistanceKm / KM_PER_MILE).toFixed(2))
-                  : null,
-              candidateCount: cacheCandidates.length,
+          if (useSse) {
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache, no-transform',
+              'X-Accel-Buffering': 'no',
+            });
+            sendSse('header', {
+              location: input.location,
+              radiusKm: input.radiusKm,
+              themes: input.themes,
+              source: 'cache',
+            });
+            for (const option of hydratedOptions) {
+              sendSse('option', option);
+            }
+            sendSse('done', { degraded: false });
+            res.end();
+          } else {
+            const responsePayload: {
+              location: string;
+              radiusKm: number;
+              themes: string[];
+              source: 'cache';
+              options: z.infer<typeof plannedOptionsSchema>;
+              cacheDebug?: {
+                enabled: true;
+                radiusMiles: number;
+                nearestCandidateDistanceMiles: number | null;
+                selectedCandidateDistanceMiles: number | null;
+                candidateCount: number;
+              };
+            } = {
+              location: input.location,
+              radiusKm: input.radiusKm,
+              themes: input.themes,
+              source: 'cache',
+              options: hydratedOptions,
             };
+
+            if (debugEnabled) {
+              responsePayload.cacheDebug = {
+                enabled: true,
+                radiusMiles: TRIP_PLAN_CACHE_RADIUS_MILES,
+                nearestCandidateDistanceMiles:
+                  typeof nearestCandidateDistanceKm === 'number'
+                    ? Number((nearestCandidateDistanceKm / KM_PER_MILE).toFixed(2))
+                    : null,
+                selectedCandidateDistanceMiles:
+                  typeof cacheHitDistanceKm === 'number'
+                    ? Number((cacheHitDistanceKm / KM_PER_MILE).toFixed(2))
+                    : null,
+                candidateCount: cacheCandidates.length,
+              };
+            }
+
+            res.status(200).json(responsePayload);
           }
-
-          res.status(200).json(responsePayload);
           return;
         }
       }
@@ -963,6 +991,21 @@ export const createApp = () => {
         },
         'trip.plan.cache_miss',
       );
+
+      // Start SSE response before the AI call so the client knows we're working
+      if (useSse) {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          'X-Accel-Buffering': 'no',
+        });
+        sendSse('header', {
+          location: input.location,
+          radiusKm: input.radiusKm,
+          themes: input.themes,
+          source: 'ai',
+        });
+      }
 
       let plans;
       try {
@@ -985,77 +1028,93 @@ export const createApp = () => {
           },
         });
 
-        res.status(502).json({
-          error: 'AI_PLANNER_ERROR',
-          ...(process.env.NODE_ENV !== 'production'
-            ? {
-                diagnosticCode: aiError.code,
-                diagnosticStage: aiError.stage,
-              }
-            : {}),
-        });
+        if (useSse) {
+          sendSse('error', { code: 'AI_PLANNER_ERROR' });
+          res.end();
+        } else {
+          res.status(502).json({
+            error: 'AI_PLANNER_ERROR',
+            ...(process.env.NODE_ENV !== 'production'
+              ? {
+                  diagnosticCode: aiError.code,
+                  diagnosticStage: aiError.stage,
+                }
+              : {}),
+          });
+        }
         return;
       }
 
-      const options = await Promise.all(
-        plans.options.map(async (option) => {
-          let stopResults: Array<{
-            query: string;
-            suggestion?: {
-              id: string;
-              placeId: string;
-              title: string;
-              description: string;
-              distanceKm: number;
-              lat: number;
-              lng: number;
-              photoName?: string;
-            };
-            errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
-          }>;
+      // Resolve stops for each option concurrently and emit each as it resolves
+      const resolveOption = async (option: {
+        title: string;
+        rationale: string;
+        stops: string[];
+      }): Promise<PlannedOption> => {
+        let stopResults: Array<{
+          query: string;
+          suggestion?: {
+            id: string;
+            placeId: string;
+            title: string;
+            description: string;
+            distanceKm: number;
+            lat: number;
+            lng: number;
+            photoName?: string;
+          };
+          errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+        }>;
 
-          try {
-            stopResults = await googlePlacesService.resolvePlannedStops({
-              location: input.location,
-              radiusKm: input.radiusKm,
-              stopQueries: option.stops,
-            });
-          } catch (error) {
-            const placesError = toPlacesErrorMeta(error);
-            logError(requestLogger, 'places.trip-planner enrich failure', error, {
-              ...placesError,
-              optionTitle: option.title,
-            });
+        try {
+          stopResults = await googlePlacesService.resolvePlannedStops({
+            location: input.location,
+            radiusKm: input.radiusKm,
+            stopQueries: option.stops,
+          });
+        } catch (error) {
+          const placesError = toPlacesErrorMeta(error);
+          logError(requestLogger, 'places.trip-planner enrich failure', error, {
+            ...placesError,
+            optionTitle: option.title,
+          });
 
-            stopResults = option.stops.map((query) => ({
-              query,
-              errorCode: 'UPSTREAM_ERROR' as const,
-            }));
-          }
+          stopResults = option.stops.map((query) => ({
+            query,
+            errorCode: 'UPSTREAM_ERROR' as const,
+          }));
+        }
 
-          return {
-            title: option.title,
-            rationale: option.rationale,
-            stops: stopResults.map((stopResult) => {
-              if (!stopResult.suggestion) {
-                return {
-                  query: stopResult.query,
-                  status: 'unresolved' as const,
-                  errorCode: stopResult.errorCode ?? 'NOT_FOUND',
-                };
-              }
-
-              const { photoName, ...suggestion } = stopResult.suggestion;
+        return {
+          title: option.title,
+          rationale: option.rationale,
+          stops: stopResults.map((stopResult) => {
+            if (!stopResult.suggestion) {
               return {
                 query: stopResult.query,
-                status: 'resolved' as const,
-                suggestion: {
-                  ...suggestion,
-                  imageUrl: buildSuggestionImageUrl(req, photoName),
-                },
+                status: 'unresolved' as const,
+                errorCode: stopResult.errorCode ?? 'NOT_FOUND',
               };
-            }),
-          } satisfies PlannedOption;
+            }
+
+            const { photoName, ...suggestion } = stopResult.suggestion;
+            return {
+              query: stopResult.query,
+              status: 'resolved' as const,
+              suggestion: {
+                ...suggestion,
+                imageUrl: buildSuggestionImageUrl(req, photoName),
+              },
+            };
+          }),
+        } satisfies PlannedOption;
+      };
+
+      const options = await Promise.all(
+        plans.options.map(async (option) => {
+          const resolved = await resolveOption(option);
+          if (useSse) sendSse('option', resolved);
+          return resolved;
         }),
       );
 
@@ -1084,6 +1143,12 @@ export const createApp = () => {
             ),
           },
         });
+      }
+
+      if (useSse) {
+        sendSse('done', { degraded: plans.degraded ?? false });
+        res.end();
+        return;
       }
 
       const responsePayload: {
