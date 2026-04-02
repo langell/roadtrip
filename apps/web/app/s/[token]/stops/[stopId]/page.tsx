@@ -62,15 +62,13 @@ const SharedStopDetailPage = async ({ params }: Props) => {
       : `Stop ${waypointNum} of ${totalStops}`;
   const staticMapUrl = buildStaticMapUrl(stop.lat, stop.lng);
   const directionsUrl = buildDirectionsUrl(stop.lat, stop.lng, stop.name);
-  const backHref = `/s/${token}`;
-
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
       {/* ── Header ───────────────────────────────────────────── */}
       <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between bg-wayfarer-bg/80 px-4 backdrop-blur-xl md:px-6">
         <div className="flex items-center gap-3">
           <Link
-            href={backHref}
+            href={`/s/${token}`}
             className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-wayfarer-surface"
           >
             <svg
@@ -283,7 +281,7 @@ const SharedStopDetailPage = async ({ params }: Props) => {
                 Get Directions
               </a>
               <Link
-                href={backHref}
+                href={`/s/${token}`}
                 className="flex w-full items-center justify-center gap-3 rounded-xl bg-wayfarer-surface-deep py-4 px-6 font-display font-bold text-wayfarer-primary transition-transform hover:scale-[1.02] active:scale-95"
               >
                 <svg
