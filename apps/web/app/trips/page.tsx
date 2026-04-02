@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { requireAuth } from '../../lib/session';
 import { getMyTripsServer } from '../../lib/server-api-client';
 import Logo from '../../components/Logo';
@@ -59,6 +60,7 @@ const TripsPage = async () => {
   const rawTrips = await getMyTripsServer();
   const trips = await enrichTripsWithPhotos(rawTrips);
   const initials = getInitials(session.user.name, session.user.email);
+  const userImage = session.user.image ?? null;
 
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main">
@@ -71,12 +73,20 @@ const TripsPage = async () => {
           >
             Plan a Trip
           </Link>
-          <Link
-            href="/account"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-wayfarer-primary font-display text-sm font-bold text-white shadow-wayfarer-soft transition hover:opacity-85"
-            title="Account"
-          >
-            {initials}
+          <Link href="/account" title="Account">
+            {userImage ? (
+              <Image
+                src={userImage}
+                alt={session.user.name ?? 'Account'}
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-full object-cover shadow-wayfarer-soft transition hover:opacity-85"
+              />
+            ) : (
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-wayfarer-primary font-display text-sm font-bold text-white shadow-wayfarer-soft transition hover:opacity-85">
+                {initials}
+              </span>
+            )}
           </Link>
         </nav>
       </header>
