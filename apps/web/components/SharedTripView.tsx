@@ -3,11 +3,14 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { SharedPlan } from '../lib/api-client';
+import { savePlanOption } from '../lib/api-client';
 
 type Props = {
   plan: SharedPlan;
   shareToken: string;
+  isLoggedIn: boolean;
 };
 
 const formatDriveSegment = (min: number): string => {
@@ -43,13 +46,55 @@ const buildGoogleMapsUrl = (stops: SharedPlan['stops']): string => {
   return url.toString();
 };
 
-export default function SharedTripView({ plan, shareToken }: Props) {
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) {
+  const router = useRouter();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const stopCardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const handleSave = useCallback(async () => {
+    if (!isLoggedIn) {
+      router.push(`/sign-in?callbackUrl=/s/${shareToken}`);
+      return;
+    }
+    if (saveState === 'saving' || saveState === 'saved') return;
+    setSaveState('saving');
+
+    const first = sorted[0];
+    const result = await savePlanOption({
+      title: plan.name,
+      rationale: plan.rationale,
+      location: plan.location,
+      originLat: first?.lat ?? 0,
+      originLng: first?.lng ?? 0,
+      radiusKm: 50,
+      themes: plan.themes,
+      stops: sorted.map((s, i) => ({
+        placeId: s.placeId,
+        name: s.name,
+        lat: s.lat,
+        lng: s.lng,
+        notes: s.notes,
+        imageUrl: s.imageUrl,
+        order: i,
+      })),
+    });
+
+    if (result.saved) {
+      setSaveState('saved');
+    } else if (!result.saved && result.requiresAuth) {
+      router.push(`/sign-in?callbackUrl=/s/${shareToken}`);
+    } else {
+      setSaveState('error');
+      setTimeout(() => setSaveState('idle'), 3000);
+    }
+  }, [isLoggedIn, saveState, plan, sorted, shareToken, router]);
 
   const sorted = [...plan.stops].sort((a, b) => a.order - b.order);
   const totalDriveMin = sorted.reduce((sum, s) => sum + (s.driveTimeMin ?? 0), 0);
@@ -216,12 +261,72 @@ export default function SharedTripView({ plan, shareToken }: Props) {
         >
           HipTrip
         </Link>
-        <Link
-          href="/"
-          className="rounded-xl bg-wayfarer-primary px-5 py-2 font-display font-bold text-white transition-opacity hover:opacity-90 active:scale-95 text-sm"
-        >
-          Plan your own
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Save button */}
+          <button
+            onClick={() => void handleSave()}
+            title={saveState === 'saved' ? 'Saved to My Trips' : 'Save to My Trips'}
+            className={`flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95 ${
+              saveState === 'saved'
+                ? 'bg-wayfarer-primary text-white'
+                : saveState === 'error'
+                  ? 'bg-red-100 text-red-500'
+                  : 'bg-wayfarer-surface text-wayfarer-primary hover:bg-wayfarer-surface-deep'
+            }`}
+          >
+            {saveState === 'saving' ? (
+              <svg
+                className="h-4 w-4 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path
+                  d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : saveState === 'saved' ? (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 3a2 2 0 0 0-2 2v16l9-4 9 4V5a2 2 0 0 0-2-2H5Z" />
+              </svg>
+            ) : (
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Plan your own button */}
+          <Link
+            href="/"
+            title="Plan your own trip"
+            className="flex h-10 items-center gap-2 rounded-full bg-wayfarer-primary pl-4 pr-5 font-display text-sm font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
+          >
+            <svg
+              className="h-4 w-4 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+            </svg>
+            Plan your own
+          </Link>
+        </div>
       </header>
 
       {/* Main split layout */}
