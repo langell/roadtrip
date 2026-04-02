@@ -1,10 +1,9 @@
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { requireAuth } from '../../../../../lib/session';
-import { getTripDetailServer } from '../../../../../lib/server-api-client';
+import { getSharedTrip } from '../../../../../lib/api-client';
 
 type Props = {
-  params: Promise<{ id: string; stopId: string }>;
+  params: Promise<{ token: string; stopId: string }>;
 };
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -25,7 +24,6 @@ const buildStaticMapUrl = (lat: number, lng: number): string => {
     maptype: 'roadmap',
   });
   params.append('markers', `color:0x1B4332|${lat},${lng}`);
-  // Light map styles
   params.append('style', 'feature:poi|visibility:off');
   params.append('style', 'feature:transit|visibility:off');
   params.append('style', 'feature:road|element:geometry|color:0xffffff');
@@ -42,19 +40,16 @@ const formatDrive = (min: number | null): string | null => {
   return m === 0 ? `${h}h drive` : `${h}h ${m}m drive`;
 };
 
-const StopDetailPage = async ({ params }: Props) => {
-  const { id: tripId, stopId } = await params;
+const SharedStopDetailPage = async ({ params }: Props) => {
+  const { token, stopId } = await params;
 
-  await requireAuth(`/trips/${tripId}/stops/${stopId}`);
+  const plan = await getSharedTrip(token);
+  if (!plan) notFound();
 
-  const trip = await getTripDetailServer(tripId);
-  if (!trip) redirect('/trips');
-
-  const sorted = [...trip.stops].sort((a, b) => a.order - b.order);
+  const sorted = [...plan.stops].sort((a, b) => a.order - b.order);
   const waypointIndex = sorted.findIndex((s) => s.id === stopId);
   const stop = sorted[waypointIndex];
-  if (!stop) redirect(`/trips/${tripId}/map`);
-
+  if (waypointIndex === -1 || !stop) notFound();
   const waypointNum = waypointIndex + 1;
   const totalStops = sorted.length;
   const driveLabel = formatDrive(stop.driveTimeMin);
@@ -67,14 +62,13 @@ const StopDetailPage = async ({ params }: Props) => {
       : `Stop ${waypointNum} of ${totalStops}`;
   const staticMapUrl = buildStaticMapUrl(stop.lat, stop.lng);
   const directionsUrl = buildDirectionsUrl(stop.lat, stop.lng, stop.name);
-
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
       {/* ── Header ───────────────────────────────────────────── */}
       <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between bg-wayfarer-bg/80 px-4 backdrop-blur-xl md:px-6">
         <div className="flex items-center gap-3">
           <Link
-            href={`/trips/${tripId}/map`}
+            href={`/s/${token}`}
             className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-wayfarer-surface"
           >
             <svg
@@ -90,47 +84,28 @@ const StopDetailPage = async ({ params }: Props) => {
             </svg>
           </Link>
           <span className="font-display text-base font-extrabold tracking-tight text-wayfarer-primary">
-            {trip.name}
+            {plan.name}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <a
-            href={directionsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface"
-            title="Get Directions"
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface"
+          title="Get Directions"
+        >
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polygon points="3 11 22 2 13 21 11 13 3 11" />
-            </svg>
-          </a>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface">
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="18" cy="5" r="3" />
-              <circle cx="6" cy="12" r="3" />
-              <circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-            </svg>
-          </button>
-        </div>
+            <polygon points="3 11 22 2 13 21 11 13 3 11" />
+          </svg>
+        </a>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-20 md:px-8">
@@ -161,7 +136,7 @@ const StopDetailPage = async ({ params }: Props) => {
               )}
             </div>
 
-            {/* Floating metadata card — desktop only, hangs off the right */}
+            {/* Floating metadata card — desktop only */}
             <div className="hidden lg:absolute lg:-right-10 lg:bottom-10 lg:flex lg:w-60 lg:flex-col lg:gap-4 lg:rounded-3xl lg:bg-wayfarer-bg/90 lg:p-5 lg:shadow-wayfarer-ambient lg:backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wayfarer-primary-light/30">
@@ -207,7 +182,7 @@ const StopDetailPage = async ({ params }: Props) => {
             </div>
           </div>
 
-          {/* Inline metadata chips — mobile only, sits between image and title */}
+          {/* Inline metadata chips — mobile only */}
           <div className="flex items-center gap-3 lg:hidden">
             <span className="flex items-center gap-2 rounded-full bg-wayfarer-surface px-4 py-2 text-sm font-semibold text-wayfarer-text-main shadow-wayfarer-soft">
               <svg
@@ -247,7 +222,7 @@ const StopDetailPage = async ({ params }: Props) => {
               <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight text-wayfarer-primary md:text-5xl lg:text-6xl">
                 {stop.name}
               </h1>
-              {trip.location && (
+              {plan.location && (
                 <div className="flex items-center gap-2 text-wayfarer-text-muted">
                   <svg
                     className="h-4 w-4 shrink-0"
@@ -259,7 +234,7 @@ const StopDetailPage = async ({ params }: Props) => {
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
-                  <p className="text-sm font-medium">{trip.location}</p>
+                  <p className="text-sm font-medium">{plan.location}</p>
                 </div>
               )}
             </div>
@@ -274,13 +249,13 @@ const StopDetailPage = async ({ params }: Props) => {
                 </>
               ) : (
                 <p className="text-wayfarer-text-muted">
-                  Stop {waypointNum} of {totalStops} on {trip.name}.
+                  Stop {waypointNum} of {totalStops} on {plan.name}.
                 </p>
               )}
 
-              {trip.themes.length > 0 && (
+              {plan.themes.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {trip.themes.map((theme) => (
+                  {plan.themes.map((theme) => (
                     <span
                       key={theme}
                       className="rounded-full bg-wayfarer-primary-light/30 px-3 py-1 text-xs font-bold uppercase tracking-wider text-wayfarer-primary"
@@ -306,7 +281,7 @@ const StopDetailPage = async ({ params }: Props) => {
                 Get Directions
               </a>
               <Link
-                href={`/trips/${tripId}/map`}
+                href={`/s/${token}`}
                 className="flex w-full items-center justify-center gap-3 rounded-xl bg-wayfarer-surface-deep py-4 px-6 font-display font-bold text-wayfarer-primary transition-transform hover:scale-[1.02] active:scale-95"
               >
                 <svg
@@ -318,7 +293,7 @@ const StopDetailPage = async ({ params }: Props) => {
                 >
                   <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 </svg>
-                View on Trip Map
+                View Full Trip
               </Link>
             </div>
           </div>
@@ -334,7 +309,7 @@ const StopDetailPage = async ({ params }: Props) => {
             <div className="space-y-3">
               <div className="flex justify-between border-b border-wayfarer-accent/20 pb-3 text-sm">
                 <span className="text-wayfarer-text-muted">Trip</span>
-                <span className="font-bold text-wayfarer-text-main">{trip.name}</span>
+                <span className="font-bold text-wayfarer-text-main">{plan.name}</span>
               </div>
               <div className="flex justify-between border-b border-wayfarer-accent/20 pb-3 text-sm">
                 <span className="text-wayfarer-text-muted">Waypoint</span>
@@ -349,9 +324,9 @@ const StopDetailPage = async ({ params }: Props) => {
                 </div>
               )}
             </div>
-            {trip.themes.length > 0 && (
+            {plan.themes.length > 0 && (
               <p className="mt-5 text-xs italic text-wayfarer-text-muted">
-                {trip.themes.join(' · ')}
+                {plan.themes.join(' · ')}
               </p>
             )}
           </div>
@@ -396,7 +371,7 @@ const StopDetailPage = async ({ params }: Props) => {
           </div>
         </section>
 
-        {/* ── Adjacent stops ────────────────────────────────── */}
+        {/* ── Other stops on this trip ──────────────────────── */}
         {totalStops > 1 && (
           <section className="mt-8">
             <h3 className="mb-4 font-display text-lg font-bold text-wayfarer-text-main">
@@ -411,7 +386,7 @@ const StopDetailPage = async ({ params }: Props) => {
                   return (
                     <Link
                       key={s.id}
-                      href={`/trips/${tripId}/stops/${s.id}`}
+                      href={`/s/${token}/stops/${s.id}`}
                       className="group relative aspect-square overflow-hidden rounded-2xl bg-wayfarer-surface-deep"
                     >
                       {s.imageUrl ? (
@@ -441,4 +416,4 @@ const StopDetailPage = async ({ params }: Props) => {
   );
 };
 
-export default StopDetailPage;
+export default SharedStopDetailPage;

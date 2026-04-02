@@ -1,15 +1,10 @@
-import { redirect } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { auth, signOut } from '../../auth';
+import { signOut } from '../../auth';
+import { requireAuth } from '../../lib/session';
 
 const AccountPage = async () => {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect('/sign-in?callbackUrl=/account');
-  }
-
+  const session = await requireAuth('/account');
   const { name, email, image } = session.user;
   const initials = (name ?? email ?? '?')
     .split(' ')

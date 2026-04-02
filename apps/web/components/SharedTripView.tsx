@@ -7,6 +7,7 @@ import type { SharedPlan } from '../lib/api-client';
 
 type Props = {
   plan: SharedPlan;
+  shareToken: string;
 };
 
 const formatDriveSegment = (min: number): string => {
@@ -42,7 +43,7 @@ const buildGoogleMapsUrl = (stops: SharedPlan['stops']): string => {
   return url.toString();
 };
 
-export default function SharedTripView({ plan }: Props) {
+export default function SharedTripView({ plan, shareToken }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
@@ -377,7 +378,7 @@ export default function SharedTripView({ plan }: Props) {
                               </p>
                             )}
                             <Link
-                              href={`/sign-in?callbackUrl=/trips/${plan.tripId}/stops/${stop.id}`}
+                              href={`/s/${shareToken}/stops/${stop.id}`}
                               onClick={(e) => e.stopPropagation()}
                               className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-wayfarer-primary/70 transition-colors hover:text-wayfarer-primary"
                             >

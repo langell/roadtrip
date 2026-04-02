@@ -51,5 +51,5 @@ export default async function SharedTripPage({ params }: Props) {
     );
   }
 
-  return <SharedTripView plan={plan} />;
+  return <SharedTripView plan={plan} shareToken={token} />;
 }
