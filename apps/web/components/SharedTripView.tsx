@@ -58,6 +58,9 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const stopCardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const sorted = [...plan.stops].sort((a, b) => a.order - b.order);
+  const totalDriveMin = sorted.reduce((sum, s) => sum + (s.driveTimeMin ?? 0), 0);
+
   const handleSave = useCallback(async () => {
     if (!isLoggedIn) {
       router.push(`/sign-in?callbackUrl=/s/${shareToken}`);
@@ -95,9 +98,6 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
       setTimeout(() => setSaveState('idle'), 3000);
     }
   }, [isLoggedIn, saveState, plan, sorted, shareToken, router]);
-
-  const sorted = [...plan.stops].sort((a, b) => a.order - b.order);
-  const totalDriveMin = sorted.reduce((sum, s) => sum + (s.driveTimeMin ?? 0), 0);
 
   useEffect(() => {
     if (typeof window.google?.maps?.importLibrary === 'function') {
