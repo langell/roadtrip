@@ -600,6 +600,7 @@ describe('HTTP server', () => {
     expect(prismaMock.tripPlanCache.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         location: 'Carmel By The Sea, CA',
+        locationKey: 'carmel by the sea',
         radiusKm: 120,
         themesKey: 'culture|scenic',
         maxOptions: 2,
@@ -687,6 +688,254 @@ describe('HTTP server', () => {
     expect(response.body.source).toBe('ai');
     expect(generatePlans).toHaveBeenCalledTimes(1);
     expect(prismaMock.tripPlanCache.update).not.toHaveBeenCalled();
+  });
+
+  it('serves cache hit when stored radiusKm is within ±25% of requested radius', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([
+      {
+        id: 'cache-radius',
+        centerLat: 36.56,
+        centerLng: -121.92,
+        radiusKm: 100, // stored radius — 100 is within ±25% of requested 120 (range: 90–150)
+        themesKey: 'culture|scenic',
+        maxOptions: 2,
+        options: [
+          {
+            title: 'Radius Fuzzy Hit',
+            rationale: 'Should be served despite different radius.',
+            stops: [
+              {
+                query: 'Point Lobos',
+                status: 'resolved',
+                suggestion: {
+                  id: 'stop-pl',
+                  placeId: 'place-pl',
+                  title: 'Point Lobos',
+                  description: 'Carmel, CA',
+                  distanceKm: 5,
+                  lat: 36.52,
+                  lng: -121.94,
+                },
+              },
+            ],
+          },
+        ],
+        validOptions: 1,
+        engagementScore: 3,
+        updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+        expiresAt: new Date('2026-04-10T00:00:00.000Z'),
+      },
+    ]);
+
+    const app = createApp();
+    const response = await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('cache');
+    expect(generatePlans).not.toHaveBeenCalled();
+  });
+
+  it('queries cache with radius range (±25%) rather than exact match', async () => {
+    geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+    prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+    generatePlans.mockResolvedValue({ options: [] });
+
+    const app = createApp();
+    await request(app)
+      .post('/trips/plan')
+      .send({
+        location: 'Carmel By The Sea, CA',
+        radiusKm: 120,
+        themes: ['scenic', 'culture'],
+        maxOptions: 2,
+      });
+
+    expect(prismaMock.tripPlanCache.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          radiusKm: { gte: 90, lte: 150 },
+        }),
+      }),
+    );
+  });
+
+  describe('SSE streaming (Accept: text/event-stream)', () => {
+    function parseSseEvents(text: string): Array<{ event: string; data: unknown }> {
+      return text
+        .split('\n\n')
+        .filter((block) => block.trim())
+        .map((block) => {
+          const lines = block.split('\n');
+          let event = '';
+          let data = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) event = line.slice(7).trim();
+            else if (line.startsWith('data: ')) data = line.slice(6).trim();
+          }
+          return { event, data: data ? (JSON.parse(data) as unknown) : null };
+        })
+        .filter((e) => e.event);
+    }
+
+    it('streams cache hit as SSE header + option + done events', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([
+        {
+          id: 'cache-sse',
+          centerLat: 36.56,
+          centerLng: -121.92,
+          radiusKm: 120,
+          themesKey: 'culture|scenic',
+          maxOptions: 2,
+          options: [
+            {
+              title: 'Streamed Cache Hit',
+              rationale: 'From cache via SSE.',
+              stops: [
+                {
+                  query: 'Bixby Bridge',
+                  status: 'resolved',
+                  suggestion: {
+                    id: 'stop-a',
+                    placeId: 'place-a',
+                    title: 'Bixby Bridge',
+                    description: 'Big Sur, CA',
+                    distanceKm: 12,
+                    lat: 36.3715,
+                    lng: -121.9013,
+                  },
+                },
+              ],
+            },
+          ],
+          validOptions: 1,
+          engagementScore: 5,
+          updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+          expiresAt: new Date('2026-04-10T00:00:00.000Z'),
+        },
+      ]);
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/plan')
+        .set('Accept', 'text/event-stream')
+        .send({
+          location: 'Carmel By The Sea, CA',
+          radiusKm: 120,
+          themes: ['scenic', 'culture'],
+          maxOptions: 2,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/event-stream');
+
+      const events = parseSseEvents(response.text);
+      expect(events[0]).toMatchObject({ event: 'header', data: { source: 'cache' } });
+      expect(events[1]).toMatchObject({
+        event: 'option',
+        data: { title: 'Streamed Cache Hit' },
+      });
+      expect(events[2]).toMatchObject({ event: 'done', data: { degraded: false } });
+      expect(generatePlans).not.toHaveBeenCalled();
+    });
+
+    it('streams AI generation as SSE header + options + done events', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+      generatePlans.mockResolvedValue({
+        options: [
+          {
+            title: 'SSE Route A',
+            rationale: 'First streamed option.',
+            stops: ['Stop One'],
+          },
+          {
+            title: 'SSE Route B',
+            rationale: 'Second streamed option.',
+            stops: ['Stop Two'],
+          },
+        ],
+      });
+      resolvePlannedStops
+        .mockResolvedValueOnce([
+          {
+            query: 'Stop One',
+            suggestion: {
+              id: 's1',
+              placeId: 'p1',
+              title: 'Stop One',
+              description: 'Desc',
+              distanceKm: 5,
+              lat: 1,
+              lng: 1,
+            },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            query: 'Stop Two',
+            suggestion: {
+              id: 's2',
+              placeId: 'p2',
+              title: 'Stop Two',
+              description: 'Desc',
+              distanceKm: 6,
+              lat: 2,
+              lng: 2,
+            },
+          },
+        ]);
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/plan')
+        .set('Accept', 'text/event-stream')
+        .send({
+          location: 'Carmel By The Sea, CA',
+          radiusKm: 120,
+          themes: ['scenic', 'culture'],
+          maxOptions: 2,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/event-stream');
+
+      const events = parseSseEvents(response.text);
+      const types = events.map((e) => e.event);
+      expect(types[0]).toBe('header');
+      expect(types.filter((t) => t === 'option')).toHaveLength(2);
+      expect(types.at(-1)).toBe('done');
+      expect((events[0].data as Record<string, unknown>).source).toBe('ai');
+    });
+
+    it('streams error event when AI generation fails', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
+      prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
+      generatePlans.mockRejectedValue(new Error('AI unavailable'));
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/plan')
+        .set('Accept', 'text/event-stream')
+        .send({
+          location: 'Carmel By The Sea, CA',
+          radiusKm: 120,
+          themes: ['scenic', 'culture'],
+          maxOptions: 2,
+        });
+
+      expect(response.status).toBe(200);
+      const events = parseSseEvents(response.text);
+      expect(events.some((e) => e.event === 'error')).toBe(true);
+    });
   });
 
   it('rejects invalid trip plan payloads', async () => {
