@@ -468,7 +468,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
                     </div>
 
                     {/* Drive-time row between stops */}
-                    {!isLast && driveToNext && !nextItemIsSponsored && (
+                    {!isLast && !!driveToNext && !nextItemIsSponsored && (
                       <div className="mb-2 ml-4 flex items-center gap-3 py-1 pl-10">
                         <svg
                           className="h-4 w-4 shrink-0 text-wayfarer-primary-light"
