@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
-import { auth } from '../auth';
+import { getSession } from '../lib/session';
 import AuthSessionProvider from '../components/session-provider';
 import GoogleMapsScriptLoader from '../components/GoogleMapsScriptLoader';
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
@@ -19,13 +19,7 @@ export const metadata: Metadata = {
 };
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
-  let session = null;
-
-  try {
-    session = await auth();
-  } catch {
-    session = null;
-  }
+  const session = await getSession();
 
   return (
     <html lang="en">

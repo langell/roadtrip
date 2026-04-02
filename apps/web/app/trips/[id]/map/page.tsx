@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { auth } from '../../../../auth';
+import { requireAuth } from '../../../../lib/session';
 import {
   getTripDetailServer,
   getTripSponsoredStopServer,
@@ -13,10 +13,7 @@ type Props = {
 const TripMapPage = async ({ params }: Props) => {
   const { id } = await params;
 
-  const session = await auth();
-  if (!session?.user) {
-    redirect(`/sign-in?callbackUrl=/trips/${id}/map`);
-  }
+  await requireAuth(`/trips/${id}/map`);
 
   const [trip, sponsored] = await Promise.all([
     getTripDetailServer(id),

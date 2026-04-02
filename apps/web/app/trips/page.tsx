@@ -1,15 +1,9 @@
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '../../auth';
+import { requireAuth } from '../../lib/session';
 import { getMyTripsServer } from '../../lib/server-api-client';
 
 const TripsPage = async () => {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect('/sign-in?callbackUrl=/trips');
-  }
-
+  await requireAuth('/trips');
   const trips = await getMyTripsServer();
 
   return (

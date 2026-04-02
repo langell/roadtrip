@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { auth } from '../auth';
+import { getSession } from '../lib/session';
 import { getDiscoverFeed, type DiscoverStop } from '../lib/api-client';
 import AuthControls from '../components/auth-controls';
 import TrendingRouteCard from '../components/TrendingRouteCard';
@@ -381,7 +381,7 @@ const LandingView = () => (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const HomePage = async () => {
-  const session = await auth();
+  const session = await getSession();
 
   if (session?.user) {
     return <DiscoverView name={session.user.name} />;

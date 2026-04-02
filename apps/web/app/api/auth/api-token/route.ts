@@ -15,7 +15,7 @@ export async function GET() {
   const userId = session?.user?.id ?? session?.user?.email ?? undefined;
 
   if (!userId) {
-    return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    return NextResponse.json({});
   }
 
   const secret = getAuthSecret();

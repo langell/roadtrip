@@ -3,11 +3,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import type { SharedPlan } from '../lib/api-client';
 
 type Props = {
   plan: SharedPlan;
+  shareToken: string;
 };
 
 const formatDriveSegment = (min: number): string => {
@@ -43,15 +43,13 @@ const buildGoogleMapsUrl = (stops: SharedPlan['stops']): string => {
   return url.toString();
 };
 
-export default function SharedTripView({ plan }: Props) {
+export default function SharedTripView({ plan, shareToken }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
   const stopCardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const { data: session } = useSession();
-  const isLoggedIn = !!session?.user;
 
   const sorted = [...plan.stops].sort((a, b) => a.order - b.order);
   const totalDriveMin = sorted.reduce((sum, s) => sum + (s.driveTimeMin ?? 0), 0);
@@ -380,11 +378,7 @@ export default function SharedTripView({ plan }: Props) {
                               </p>
                             )}
                             <Link
-                              href={
-                                isLoggedIn
-                                  ? `/trips/${plan.tripId}/stops/${stop.id}`
-                                  : `/sign-in?callbackUrl=/trips/${plan.tripId}/stops/${stop.id}`
-                              }
+                              href={`/s/${shareToken}/stops/${stop.id}`}
                               onClick={(e) => e.stopPropagation()}
                               className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-wayfarer-primary/70 transition-colors hover:text-wayfarer-primary"
                             >
