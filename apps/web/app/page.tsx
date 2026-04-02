@@ -4,6 +4,7 @@ import { getDiscoverFeed, type DiscoverStop } from '../lib/api-client';
 import AuthControls from '../components/auth-controls';
 import TrendingRouteCard from '../components/TrendingRouteCard';
 import PlaceCard from '../components/PlaceCard';
+import Logo from '../components/Logo';
 
 const injectSponsored = (
   organic: DiscoverStop[],
@@ -32,12 +33,7 @@ const DiscoverView = async ({ name }: { name: string | null | undefined }) => {
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between bg-wayfarer-bg/90 px-6 backdrop-blur-sm md:px-10">
-        <Link
-          href="/"
-          className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary"
-        >
-          HipTrip
-        </Link>
+        <Logo />
         <nav className="flex items-center gap-6">
           <Link
             href="/planner"
@@ -143,9 +139,7 @@ const DiscoverView = async ({ name }: { name: string | null | undefined }) => {
 const LandingView = () => (
   <div className="bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
     <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between bg-transparent px-6 md:px-10">
-      <p className="font-display text-2xl font-black uppercase tracking-[0.2em] text-wayfarer-primary">
-        HipTrip
-      </p>
+      <Logo />
       <div className="flex items-center gap-4">
         <AuthControls variant="nav" />
       </div>

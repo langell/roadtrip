@@ -1,8 +1,9 @@
 import { Suspense } from 'react';
-import Link from 'next/link';
 import { Surface } from '@roadtrip/ui';
 import TripPlanner from '../../components/trip-planner';
 import AuthControls from '../../components/auth-controls';
+import Logo from '../../components/Logo';
+import Link from 'next/link';
 
 type PlannerPageProps = {
   searchParams: Promise<{ location?: string }>;
@@ -14,12 +15,7 @@ const PlannerPage = async ({ searchParams }: PlannerPageProps) => {
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between bg-wayfarer-bg/90 px-6 backdrop-blur-sm md:px-10">
-        <Link
-          href="/"
-          className="font-display text-2xl font-extrabold uppercase tracking-[0.2em] text-wayfarer-primary"
-        >
-          HipTrip
-        </Link>
+        <Logo />
         <nav className="flex items-center gap-6">
           <Link
             href="/trips"
