@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSharedTrip } from '../../../../../lib/api-client';
+import { reverseGeocode } from '../../../../../lib/geocode';
 
 type Props = {
   params: Promise<{ token: string; stopId: string }>;
@@ -55,6 +56,7 @@ const SharedStopDetailPage = async ({ params }: Props) => {
   const waypointNum = waypointIndex + 1;
   const totalStops = sorted.length;
   const driveLabel = formatDrive(stop.driveTimeMin);
+  const stopLocation = await reverseGeocode(stop.lat, stop.lng);
   const isFirst = waypointIndex === 0;
   const isLast = waypointIndex === totalStops - 1;
   const stopLabel = isFirst
@@ -275,7 +277,7 @@ const SharedStopDetailPage = async ({ params }: Props) => {
               <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight text-wayfarer-primary md:text-5xl lg:text-6xl">
                 {stop.name}
               </h1>
-              {plan.location && (
+              {stopLocation && (
                 <div className="flex items-center gap-2 text-wayfarer-text-muted">
                   <svg
                     className="h-4 w-4 shrink-0"
@@ -287,7 +289,7 @@ const SharedStopDetailPage = async ({ params }: Props) => {
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
-                  <p className="text-sm font-medium">{plan.location}</p>
+                  <p className="text-sm font-medium">{stopLocation}</p>
                 </div>
               )}
             </div>
