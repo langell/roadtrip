@@ -92,14 +92,29 @@ export default function GooglePlacesAutocomplete({
       // Only apply location restriction when we have real coordinates (not 0,0 fallback)
       const validBias = bias && (bias.lat !== 0 || bias.lng !== 0) ? bias : null;
 
+      // Convert circle to LatLngBounds — strictBounds only works reliably with bounds,
+      // not with location+radius (Google treats location+radius as a soft bias regardless).
+      let boundsParam: typeof window.google.maps.LatLngBounds.prototype | undefined;
+      if (validBias) {
+        const latDelta = validBias.radiusMeters / 111_000;
+        const lngDelta =
+          validBias.radiusMeters / (111_000 * Math.cos((validBias.lat * Math.PI) / 180));
+        boundsParam = new window.google.maps.LatLngBounds(
+          new window.google.maps.LatLng(
+            validBias.lat - latDelta,
+            validBias.lng - lngDelta,
+          ),
+          new window.google.maps.LatLng(
+            validBias.lat + latDelta,
+            validBias.lng + lngDelta,
+          ),
+        );
+      }
+
       const requestParams = {
         input: inputValue,
         ...(types.length > 0 && { types }),
-        ...(validBias && {
-          location: new window.google.maps.LatLng(validBias.lat, validBias.lng),
-          radius: validBias.radiusMeters,
-          strictBounds: true,
-        }),
+        ...(boundsParam && { bounds: boundsParam, strictBounds: true }),
       };
 
       const handleResults = (predictions: PlacePrediction[] | null, status: string) => {

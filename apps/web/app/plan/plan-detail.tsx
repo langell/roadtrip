@@ -532,11 +532,19 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
                     }}
                     placeholder="Search for a place…"
                     placeTypes={[]}
-                    locationBias={{
-                      lat: draft.originLat,
-                      lng: draft.originLng,
-                      radiusMeters: draft.radiusKm * 1000,
-                    }}
+                    locationBias={(() => {
+                      // Centre search on the midpoint of existing stops, not the trip origin,
+                      // and use a tighter radius so results are local to the actual route.
+                      const pts =
+                        stops.length > 0
+                          ? stops
+                          : [{ lat: draft.originLat, lng: draft.originLng }];
+                      const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
+                      const lng = pts.reduce((s, p) => s + p.lng, 0) / pts.length;
+                      // Half the trip radius, capped at 60 km (~37 mi)
+                      const radiusMeters = Math.min(draft.radiusKm * 500, 60_000);
+                      return { lat, lng, radiusMeters };
+                    })()}
                   />
                 </div>
                 <button
