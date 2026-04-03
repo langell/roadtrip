@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
@@ -48,6 +48,17 @@ export default function GooglePlacesAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInteracted = useRef(false);
 
+  // Refs so the debounced callback always reads the latest prop values
+  // without needing to be recreated every render.
+  const locationBiasRef = useRef(locationBias);
+  const placeTypesRef = useRef(placeTypes);
+  useEffect(() => {
+    locationBiasRef.current = locationBias;
+  });
+  useEffect(() => {
+    placeTypesRef.current = placeTypes;
+  });
+
   useEffect(() => {
     if (!window.google && !document.getElementById('google-maps-script')) return;
     if (window.google?.maps?.places) {
@@ -63,90 +74,63 @@ export default function GooglePlacesAutocomplete({
     }
   }, []);
 
-  // Fetch suggestions with debounce
-  const fetchSuggestions = useMemo(
-    () =>
-      debounce((inputValue: string) => {
-        if (!scriptLoaded || !inputValue) {
-          setSuggestions([]);
-          setShowSuggestions(false);
-          setLoading(false);
-          setError(null);
-          return;
-        }
-        setLoading(true);
+  const runQuery = useCallback(
+    (inputValue: string) => {
+      if (!scriptLoaded || !inputValue) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setLoading(false);
         setError(null);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let service: any = null;
-        if (window.google && window.google.maps && window.google.maps.places) {
-          if (window.google.maps.importLibrary) {
-            void window.google.maps.importLibrary('places').then(() => {
-              service = new window.google.maps.places.AutocompleteService();
-              // Only call if google is defined
+        return;
+      }
 
-              if (
-                typeof window !== 'undefined' &&
-                window.google &&
-                window.google.maps &&
-                window.google.maps.places
-              ) {
-                service.getPlacePredictions(
-                  {
-                    input: inputValue,
-                    ...(placeTypes.length > 0 && { types: placeTypes }),
-                    ...(locationBias && {
-                      location: new window.google.maps.LatLng(
-                        locationBias.lat,
-                        locationBias.lng,
-                      ),
-                      radius: locationBias.radiusMeters,
-                    }),
-                  },
-                  (predictions: PlacePrediction[] | null, status: string) => {
-                    setLoading(false);
-                    if (status === 'OK' && predictions) {
-                      setSuggestions(predictions);
-                      setShowSuggestions(true);
-                    } else {
-                      setSuggestions([]);
-                      setShowSuggestions(true);
-                      if (status !== 'ZERO_RESULTS') setError('No results found.');
-                    }
-                  },
-                );
-              }
-            });
-          } else {
-            service = new window.google.maps.places.AutocompleteService();
-            service.getPlacePredictions(
-              {
-                input: inputValue,
-                types: placeTypes,
-                ...(locationBias && {
-                  location: new window.google.maps.LatLng(
-                    locationBias.lat,
-                    locationBias.lng,
-                  ),
-                  radius: locationBias.radiusMeters,
-                }),
-              },
-              (predictions: PlacePrediction[], status: string) => {
-                setLoading(false);
-                if (status === 'OK' && predictions) {
-                  setSuggestions(predictions);
-                  setShowSuggestions(true);
-                } else {
-                  setSuggestions([]);
-                  setShowSuggestions(true);
-                  if (status !== 'ZERO_RESULTS') setError('No results found.');
-                }
-              },
-            );
-          }
+      setLoading(true);
+      setError(null);
+
+      const bias = locationBiasRef.current;
+      const types = placeTypesRef.current;
+
+      const requestParams = {
+        input: inputValue,
+        ...(types.length > 0 && { types }),
+        ...(bias && {
+          location: new window.google.maps.LatLng(bias.lat, bias.lng),
+          radius: bias.radiusMeters,
+          strictBounds: true,
+        }),
+      };
+
+      const handleResults = (predictions: PlacePrediction[] | null, status: string) => {
+        setLoading(false);
+        if (status === 'OK' && predictions) {
+          setSuggestions(predictions);
+          setShowSuggestions(true);
+        } else {
+          setSuggestions([]);
+          setShowSuggestions(true);
+          if (status !== 'ZERO_RESULTS') setError('No results found.');
         }
-      }, 250),
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const callService = (svc: any) =>
+        svc.getPlacePredictions(requestParams, handleResults);
+
+      if (window.google?.maps?.importLibrary) {
+        void window.google.maps.importLibrary('places').then(() => {
+          if (window.google?.maps?.places) {
+            callService(new window.google.maps.places.AutocompleteService());
+          }
+        });
+      } else if (window.google?.maps?.places) {
+        callService(new window.google.maps.places.AutocompleteService());
+      }
+    },
     [scriptLoaded],
   );
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchSuggestions = useCallback(debounce(runQuery, 250), [runQuery]);
 
   useEffect(() => {
     if (!hasInteracted.current) return;
