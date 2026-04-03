@@ -89,13 +89,15 @@ export default function GooglePlacesAutocomplete({
 
       const bias = locationBiasRef.current;
       const types = placeTypesRef.current;
+      // Only apply location restriction when we have real coordinates (not 0,0 fallback)
+      const validBias = bias && (bias.lat !== 0 || bias.lng !== 0) ? bias : null;
 
       const requestParams = {
         input: inputValue,
         ...(types.length > 0 && { types }),
-        ...(bias && {
-          location: new window.google.maps.LatLng(bias.lat, bias.lng),
-          radius: bias.radiusMeters,
+        ...(validBias && {
+          location: new window.google.maps.LatLng(validBias.lat, validBias.lng),
+          radius: validBias.radiusMeters,
           strictBounds: true,
         }),
       };
