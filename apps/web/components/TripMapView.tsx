@@ -510,6 +510,21 @@ export default function TripMapView({ trip, sponsored }: Props) {
 
 // ── Sponsored card ──────────────────────────────────────────────────────────
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+
+const recordAnalytics = (type: string, payload: Record<string, string>) => {
+  void getApiToken().then((token) => {
+    void fetch(`${API_BASE}/trpc/analytics.record`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ type, payload }),
+    });
+  });
+};
+
 function SponsoredCard({
   sponsored,
   tripId,
@@ -517,15 +532,12 @@ function SponsoredCard({
   sponsored: SponsoredStop;
   tripId: string;
 }) {
+  useEffect(() => {
+    recordAnalytics('sponsored_impression', { placeId: sponsored.placeId, tripId });
+  }, [sponsored.placeId, tripId]);
+
   const handleClick = () => {
-    void fetch('/api/trpc/analytics.record', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'sponsored_click',
-        payload: { placeId: sponsored.placeId, tripId },
-      }),
-    });
+    recordAnalytics('sponsored_click', { placeId: sponsored.placeId, tripId });
     if (sponsored.url) window.open(sponsored.url, '_blank', 'noopener,noreferrer');
   };
 

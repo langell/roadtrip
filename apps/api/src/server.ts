@@ -704,10 +704,42 @@ export const createApp = () => {
         return;
       }
 
-      // SponsoredPlace has no lat/lng in v1 — return the first active record.
-      // A future iteration can fetch coordinates via Place Details API and pick
-      // the one closest to the trip midpoint.
-      const best = sponsored[0];
+      // Pick the sponsor closest to the trip midpoint stop.
+      // Sponsors without lat/lng fall back to last place so geo-tagged sponsors
+      // always win over untagged ones.
+      const midStop = trip.stops[Math.floor(trip.stops.length / 2)];
+      const haversineKm = (
+        lat1: number,
+        lng1: number,
+        lat2: number,
+        lng2: number,
+      ): number => {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLng = ((lng2 - lng1) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+
+      const refLat = midStop?.lat ?? trip.originLat;
+      const refLng = midStop?.lng ?? trip.originLng;
+
+      const best = sponsored.sort((a, b) => {
+        const distA =
+          a.lat != null && a.lng != null
+            ? haversineKm(refLat, refLng, a.lat, a.lng)
+            : Infinity;
+        const distB =
+          b.lat != null && b.lng != null
+            ? haversineKm(refLat, refLng, b.lat, b.lng)
+            : Infinity;
+        return distA - distB;
+      })[0];
+
       if (!best) {
         res.json(null);
         return;
