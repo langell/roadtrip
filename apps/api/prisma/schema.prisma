@@ -60,6 +60,8 @@ model SponsoredPlace {
   imageUrl    String?
   url         String?
   active      Boolean  @default(true)
+  lat         Float?
+  lng         Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -1310,6 +1310,70 @@ describe('HTTP server', () => {
 
         expect(response.status).toBe(404);
       });
+
+      it('picks the sponsor closest to the trip midpoint when multiple are active', async () => {
+        // mockTrip has one stop at lat 45.88, lng -123.96 (Oregon coast)
+        // near: Portland area sponsor ~45.5, -122.7 (~130 km away)
+        // far:  Florida sponsor ~27.9, -82.5 (~3900 km away)
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+          {
+            id: 'sp-far',
+            placeId: 'place-fl',
+            title: 'Florida Resort',
+            description: 'Sun and sand',
+            imageUrl: null,
+            url: null,
+            active: true,
+            lat: 27.9,
+            lng: -82.5,
+          },
+          {
+            id: 'sp-near',
+            placeId: 'place-or',
+            title: 'Seaside Inn',
+            description: 'Right on the Oregon coast',
+            imageUrl: null,
+            url: null,
+            active: true,
+            lat: 45.99,
+            lng: -123.93,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('sp-near');
+      });
+
+      it('falls back to any active sponsor when none have lat/lng', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+          {
+            id: 'sp-untagged',
+            placeId: 'place-u',
+            title: 'Generic Sponsor',
+            description: 'No location set',
+            imageUrl: null,
+            url: null,
+            active: true,
+            lat: null,
+            lng: null,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('sp-untagged');
+      });
     });
 
     describe('GET /trips/cache/:id', () => {
