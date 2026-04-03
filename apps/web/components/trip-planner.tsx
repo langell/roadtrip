@@ -829,9 +829,21 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                     key={`${stop.query}-${stopIndex}`}
                     className="rounded-xl border border-wayfarer-surface p-3"
                   >
-                    <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
-                      Stop {stopIndex + 1}
-                    </p>
+                    <div className="mb-1 flex items-center gap-2">
+                      <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
+                        Stop {stopIndex + 1}
+                      </p>
+                      {stop.stopType === 'pit_stop' && (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">
+                          ⛽ Pit Stop
+                        </span>
+                      )}
+                      {stop.stopType === 'photo_op' && (
+                        <span className="rounded-full bg-sky-50 px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-700">
+                          📸 Photo Op
+                        </span>
+                      )}
+                    </div>
 
                     {stop.status === 'resolved' ? (
                       <div className="space-y-1">
