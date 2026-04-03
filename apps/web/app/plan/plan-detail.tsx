@@ -27,27 +27,37 @@ type EditableStop = {
 
 const KM_PER_MILE = 1.60934;
 
-const forwardGeocode = async (
-  description: string,
+/** Resolve lat/lng from a placeId using the Places Details API — more accurate than text geocoding. */
+const getPlaceCoords = (
+  placeId: string,
 ): Promise<{ lat: number; lng: number } | null> => {
-  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!mapsApiKey) return null;
-  try {
-    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-    url.searchParams.set('address', description);
-    url.searchParams.set('key', mapsApiKey);
-    const response = await fetch(url.toString(), { cache: 'no-store' });
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      status?: string;
-      results?: Array<{ geometry?: { location?: { lat: number; lng: number } } }>;
-    };
-    if (data.status !== 'OK') return null;
-    const loc = data.results?.[0]?.geometry?.location;
-    return loc ? { lat: loc.lat, lng: loc.lng } : null;
-  } catch {
-    return null;
-  }
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.google?.maps?.places) {
+      resolve(null);
+      return;
+    }
+    // PlacesService requires a DOM element
+    const el = document.createElement('div');
+    const service = new window.google.maps.places.PlacesService(el);
+    service.getDetails(
+      { placeId, fields: ['geometry'] },
+      (
+        result: {
+          geometry?: { location?: { lat: () => number; lng: () => number } };
+        } | null,
+        status: string,
+      ) => {
+        if (status === 'OK' && result?.geometry?.location) {
+          resolve({
+            lat: result.geometry.location.lat(),
+            lng: result.geometry.location.lng(),
+          });
+        } else {
+          resolve(null);
+        }
+      },
+    );
+  });
 };
 
 const resolvedStopsOnly = (stops: TripPlanOption['stops']): PlannedStopResolved[] =>
@@ -57,24 +67,21 @@ type PlanDetailProps = {
   draftKey: string | null;
 };
 
-// Bento card variant cycling: featured(8) + side(4) | horizontal(6) + accent(6) | detail(4) + wide(8) | repeat
-const VARIANTS = ['featured', 'side', 'horizontal', 'accent', 'detail', 'wide'] as const;
-type CardVariant = (typeof VARIANTS)[number];
-
-const COL_SPAN: Record<CardVariant, string> = {
-  featured: 'md:col-span-8',
-  side: 'md:col-span-4',
-  horizontal: 'md:col-span-6',
-  accent: 'md:col-span-6',
-  detail: 'md:col-span-4',
-  wide: 'md:col-span-8',
+const THEME_LABELS: Record<string, string> = {
+  nature: 'Nature',
+  history: 'History',
+  food: 'Food & Drink',
+  adventure: 'Adventure',
+  art: 'Arts & Culture',
+  family: 'Family',
+  scenic: 'Scenic',
+  quirky: 'Quirky',
 };
 
 const PlanDetail = ({ draftKey }: PlanDetailProps) => {
   const [draft, setDraft] = useState<TripDraft | null>(null);
   const [stops, setStops] = useState<EditableStop[]>([]);
   const [droppedCount, setDroppedCount] = useState(0);
-  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [savedTripId, setSavedTripId] = useState<string | null>(null);
@@ -108,7 +115,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
         })),
       );
     } catch {
-      // sessionStorage unavailable or corrupt
+      // localStorage unavailable or corrupt
     }
   }, [draftKey]);
 
@@ -141,7 +148,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
     setAddingStop(true);
     setAddError(null);
 
-    const coords = await forwardGeocode(addQuery);
+    const coords = await getPlaceCoords(addPlaceId);
     if (!coords) {
       setAddError('Could not resolve location. Try a more specific place name.');
       setAddingStop(false);
@@ -163,12 +170,13 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
     setAddingStop(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!draft || stops.length === 0) return;
-    setSaving(true);
     setSaveError(null);
+    // Show the post-save UI immediately; action buttons are disabled until tripId resolves
+    setSavedTripId('pending');
 
-    const result = await savePlanOption({
+    void savePlanOption({
       title: draft.plan.title,
       rationale: draft.plan.rationale,
       location: draft.location,
@@ -184,26 +192,26 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
         imageUrl: s.imageUrl,
         order: i,
       })),
-    });
-
-    setSaving(false);
-
-    if (result.saved) {
-      try {
-        if (draftKey) localStorage.removeItem(draftKey);
-      } catch {
-        // ignore
+    }).then((result) => {
+      if (result.saved) {
+        try {
+          if (draftKey) localStorage.removeItem(draftKey);
+        } catch {
+          // ignore
+        }
+        setSavedTripId(result.tripId);
+      } else if (result.requiresAuth) {
+        setSavedTripId(null);
+        setShowSignInModal(true);
+      } else {
+        setSavedTripId(null);
+        setSaveError(result.error ?? 'Save failed. Please try again.');
       }
-      setSavedTripId(result.tripId);
-    } else if (result.requiresAuth) {
-      setShowSignInModal(true);
-    } else {
-      setSaveError(result.error);
-    }
+    });
   };
 
   const handleShare = async () => {
-    if (!savedTripId) return;
+    if (!savedTripId || savedTripId === 'pending') return;
     setSharing(true);
     setShareFeedback(null);
 
@@ -254,413 +262,223 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
     : '/';
 
   const radiusMiles = Math.round(draft.radiusKm / KM_PER_MILE);
+  const isPending = savedTripId === 'pending';
 
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
-      {/* Header */}
-      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-20 bg-wayfarer-bg/80 backdrop-blur-xl">
-        <div className="flex items-center gap-4">
+      {/* ── Header ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 border-b border-wayfarer-accent/10 bg-wayfarer-bg/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-2xl items-center gap-4 px-4">
           <Link
             href="/#route-planner"
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-wayfarer-surface transition-colors active:scale-95 duration-200"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-wayfarer-surface"
             aria-label="Back to planner"
           >
-            <span className="text-wayfarer-primary text-lg leading-none">←</span>
+            <span className="text-lg leading-none text-wayfarer-primary">←</span>
           </Link>
-          <p className="text-[11px] font-body font-semibold text-wayfarer-secondary uppercase tracking-widest leading-none">
-            Suggested Stops
-          </p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-base font-extrabold leading-tight text-wayfarer-primary">
+              {draft.plan.title}
+            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-wayfarer-text-muted">
+              {draft.location} · {radiusMiles} mi
+            </p>
+          </div>
         </div>
       </header>
 
-      <main className="pt-24 pb-36 px-6 max-w-4xl mx-auto">
-        {/* Route context */}
-        <section className="mb-10">
-          <h2 className="font-display text-3xl font-extrabold text-wayfarer-primary mb-2 leading-tight">
-            {draft.plan.title}
-          </h2>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-wayfarer-text-muted font-body text-sm">
-            <span className="text-base">📍</span>
-            <span>{draft.location}</span>
-            <span className="opacity-40">•</span>
-            <span>{radiusMiles} mi radius</span>
-            <span className="opacity-40">•</span>
-            <span>
-              {stops.length} Stop{stops.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          {draft.plan.rationale && (
-            <p className="mt-3 font-body text-sm leading-relaxed text-wayfarer-text-muted max-w-2xl">
-              {draft.plan.rationale}
-            </p>
-          )}
-        </section>
-
-        {droppedCount > 0 && (
-          <div className="mb-8 rounded-2xl bg-wayfarer-surface px-5 py-4 font-body text-sm text-wayfarer-text-muted">
-            {droppedCount} stop{droppedCount > 1 ? 's were' : ' was'} unavailable and
-            removed from this plan.
+      <main className="mx-auto max-w-2xl px-4 pb-32 pt-6">
+        {/* ── Theme + rationale ──────────────────────── */}
+        {(draft.themes.length > 0 || draft.plan.rationale) && (
+          <div className="mb-6 space-y-3">
+            {draft.themes.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {draft.themes.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full bg-wayfarer-surface px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-wayfarer-primary"
+                  >
+                    {THEME_LABELS[t] ?? t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {draft.plan.rationale && (
+              <p className="text-sm leading-relaxed text-wayfarer-text-muted">
+                {draft.plan.rationale}
+              </p>
+            )}
           </div>
         )}
 
-        {stops.length === 0 ? (
-          <div className="rounded-3xl bg-wayfarer-surface p-10 text-center font-body text-sm text-wayfarer-text-muted mb-10">
-            No stops yet. Add some below or go back and choose a different plan.
+        {droppedCount > 0 && (
+          <div className="mb-4 rounded-2xl bg-wayfarer-surface px-4 py-3 text-xs text-wayfarer-text-muted">
+            {droppedCount} stop{droppedCount > 1 ? 's were' : ' was'} unavailable and
+            removed.
           </div>
-        ) : (
-          /* Bento grid */
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-10">
-            {stops.map((stop, idx) => {
-              const variant: CardVariant = VARIANTS[idx % VARIANTS.length];
-              const isFirst = idx === 0;
-              const isLast = idx === stops.length - 1;
+        )}
 
-              const lightControls = (
-                <div className="flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    aria-label="Move up"
-                    disabled={isFirst}
-                    onClick={() => handleMoveUp(stop.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary disabled:opacity-25"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Move down"
-                    disabled={isLast}
-                    onClick={() => handleMoveDown(stop.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary disabled:opacity-25"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Remove stop"
-                    onClick={() => handleRemove(stop.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-red-50 hover:text-red-500"
-                  >
-                    ✕
-                  </button>
+        {/* ── Stop list ──────────────────────────────── */}
+        {stops.length === 0 && (
+          <div className="mb-4 rounded-2xl bg-wayfarer-surface p-8 text-center text-sm text-wayfarer-text-muted">
+            No stops yet — add some below.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {stops.map((stop, idx) => (
+            <div key={stop.id} className="flex gap-4 rounded-2xl bg-wayfarer-surface p-4">
+              {/* Stop number */}
+              <div className="flex shrink-0 flex-col items-center gap-1.5 pt-0.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-wayfarer-primary font-display text-sm font-extrabold text-white">
+                  {idx + 1}
                 </div>
-              );
-
-              const darkControls = (
-                <div className="flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    aria-label="Move up"
-                    disabled={isFirst}
-                    onClick={() => handleMoveUp(stop.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-white/70 transition-colors hover:bg-white/20 disabled:opacity-25"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Move down"
-                    disabled={isLast}
-                    onClick={() => handleMoveDown(stop.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-white/70 transition-colors hover:bg-white/20 disabled:opacity-25"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Remove stop"
-                    onClick={() => handleRemove(stop.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-white/70 transition-colors hover:bg-white/20 hover:text-red-300"
-                  >
-                    ✕
-                  </button>
-                </div>
-              );
-
-              if (variant === 'featured') {
-                return (
+                {/* Vertical connector line */}
+                {idx < stops.length - 1 && (
                   <div
-                    key={stop.id}
-                    className={`${COL_SPAN.featured} group bg-wayfarer-surface rounded-3xl overflow-hidden`}
-                  >
-                    <div className="relative h-60 overflow-hidden bg-wayfarer-surface-deep">
-                      {stop.imageUrl ? (
-                        <img
-                          src={stop.imageUrl}
-                          alt={stop.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-wayfarer-primary/20 to-wayfarer-secondary/10" />
-                      )}
-                      <div className="absolute top-4 left-4 flex gap-2">
-                        <span className="px-3 py-1 bg-wayfarer-primary text-white font-body text-[10px] font-bold uppercase tracking-wider rounded-full">
-                          Stop {idx + 1}
-                        </span>
-                        {draft.themes[0] && (
-                          <span className="px-3 py-1 bg-white/90 backdrop-blur-md text-wayfarer-primary font-body text-[10px] font-bold uppercase tracking-wider rounded-full">
-                            {draft.themes[0]}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="font-display text-2xl font-bold text-wayfarer-primary mb-2">
-                        {stop.name}
-                      </h3>
-                      {stop.description && (
-                        <p className="text-wayfarer-text-muted font-body text-sm leading-relaxed">
-                          {stop.description}
-                        </p>
-                      )}
-                      <div className="mt-5 flex items-center justify-between">
-                        {lightControls}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
+                    className="w-px flex-1 bg-wayfarer-accent/20"
+                    style={{ minHeight: '12px' }}
+                  />
+                )}
+              </div>
 
-              if (variant === 'side') {
-                return (
-                  <div
-                    key={stop.id}
-                    className={`${COL_SPAN.side} bg-white rounded-3xl p-6 flex flex-col justify-between`}
-                  >
-                    <div>
-                      <span className="px-2 py-0.5 bg-wayfarer-surface text-wayfarer-primary font-body text-[10px] font-bold uppercase tracking-wider rounded-md">
-                        Stop {idx + 1}
-                      </span>
-                      <h3 className="font-display text-xl font-bold text-wayfarer-primary mt-3 leading-tight">
-                        {stop.name}
-                      </h3>
-                      {stop.description && (
-                        <p className="text-wayfarer-text-muted text-sm mt-2 leading-snug line-clamp-3">
-                          {stop.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="mt-6">
-                      {stop.imageUrl && (
-                        <div className="w-full h-24 rounded-2xl overflow-hidden mb-4 bg-wayfarer-surface-deep">
-                          <img
-                            src={stop.imageUrl}
-                            alt={stop.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        </div>
-                      )}
-                      {lightControls}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (variant === 'horizontal') {
-                return (
-                  <div
-                    key={stop.id}
-                    className={`${COL_SPAN.horizontal} bg-wayfarer-surface rounded-3xl p-6`}
-                  >
-                    <div className="flex gap-4">
-                      <div className="w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-wayfarer-surface-deep">
-                        {stop.imageUrl && (
-                          <img
-                            src={stop.imageUrl}
-                            alt={stop.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        )}
-                      </div>
-                      <div className="flex flex-col justify-between flex-1 min-w-0">
-                        <div>
-                          <span className="text-[10px] font-bold text-wayfarer-secondary uppercase tracking-widest font-body">
-                            Stop {idx + 1}
-                          </span>
-                          <h3 className="font-display text-lg font-bold text-wayfarer-primary leading-tight">
-                            {stop.name}
-                          </h3>
-                          {stop.description && (
-                            <p className="text-sm text-wayfarer-text-muted mt-1 leading-relaxed line-clamp-2">
-                              {stop.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex justify-end">{lightControls}</div>
-                  </div>
-                );
-              }
-
-              if (variant === 'accent') {
-                return (
-                  <div
-                    key={stop.id}
-                    className={`${COL_SPAN.accent} bg-wayfarer-primary text-white rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden`}
-                  >
-                    <div className="absolute inset-0 opacity-10 pointer-events-none bg-gradient-to-br from-white via-transparent to-transparent" />
-                    <div className="relative z-10">
-                      <span className="px-2 py-0.5 bg-white/20 backdrop-blur-md text-white font-body text-[10px] font-bold uppercase tracking-wider rounded-md">
-                        Stop {idx + 1}
-                      </span>
-                      <h3 className="font-display text-xl font-bold mt-3">{stop.name}</h3>
-                      {stop.description && (
-                        <p className="text-white/70 text-sm mt-2 leading-snug line-clamp-3">
-                          {stop.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="relative z-10 mt-6 flex items-center justify-between">
-                      {darkControls}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (variant === 'detail') {
-                return (
-                  <div
-                    key={stop.id}
-                    className={`${COL_SPAN.detail} bg-wayfarer-surface rounded-3xl p-5`}
-                  >
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-wayfarer-surface-deep flex items-center justify-center font-display text-sm font-bold text-wayfarer-primary shrink-0">
-                        {idx + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="font-display font-bold text-wayfarer-primary leading-tight truncate">
-                          {stop.name}
-                        </h4>
-                      </div>
-                    </div>
-                    {stop.description && (
-                      <p className="text-xs text-wayfarer-text-muted leading-relaxed mb-4 line-clamp-2">
-                        {stop.description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between bg-wayfarer-bg px-3 py-2 rounded-xl">
-                      <span className="text-xs font-bold text-wayfarer-text-muted uppercase tracking-wider">
-                        Stop {idx + 1}
-                      </span>
-                      {lightControls}
-                    </div>
-                  </div>
-                );
-              }
-
-              // wide (variant === 'wide')
-              return (
-                <div
-                  key={stop.id}
-                  className={`${COL_SPAN.wide} bg-wayfarer-surface rounded-3xl overflow-hidden flex flex-col md:flex-row`}
-                >
-                  <div className="md:w-1/2 p-8 flex flex-col justify-center">
-                    <span className="text-[10px] font-bold text-wayfarer-secondary uppercase tracking-widest font-body mb-2">
-                      Stop {idx + 1}
-                    </span>
-                    <h3 className="font-display text-2xl font-extrabold text-wayfarer-primary mb-3 leading-tight">
+              {/* Content */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-3">
+                  {/* Text */}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display font-bold leading-snug text-wayfarer-text-main">
                       {stop.name}
-                    </h3>
+                    </p>
                     {stop.description && (
-                      <p className="text-wayfarer-text-muted text-sm leading-relaxed mb-6">
+                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-wayfarer-text-muted">
                         {stop.description}
                       </p>
                     )}
-                    <div className="mt-auto">{lightControls}</div>
                   </div>
-                  <div className="md:w-1/2 h-52 md:h-auto overflow-hidden bg-wayfarer-surface-deep">
-                    {stop.imageUrl && (
+
+                  {/* Thumbnail */}
+                  {stop.imageUrl && (
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-wayfarer-surface-deep">
                       <img
                         src={stop.imageUrl}
                         alt={stop.name}
-                        className="w-full h-full object-cover"
+                        className="h-full w-full object-cover"
                         loading="lazy"
                       />
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
 
-        {/* Add a stop */}
-        <section className="rounded-2xl bg-wayfarer-surface p-6">
-          <p className="mb-4 font-body text-xs font-bold uppercase tracking-[0.18em] text-wayfarer-primary">
-            Add a stop
-          </p>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <GooglePlacesAutocomplete
-                value={addQuery}
-                onChange={(val) => {
-                  setAddQuery(val);
-                  setAddPlaceId(null);
-                }}
-                onSelect={(val) => setAddQuery(val)}
-                onSelectWithPlaceId={(description, placeId) => {
-                  setAddQuery(description);
-                  setAddPlaceId(placeId);
-                }}
-                placeholder="Search for a place…"
-                placeTypes={[]}
-                locationBias={{
-                  lat: draft.originLat,
-                  lng: draft.originLng,
-                  radiusMeters: draft.radiusKm * 1000,
-                }}
-              />
+                {/* Controls */}
+                <div className="mt-3 flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Move up"
+                    disabled={idx === 0}
+                    onClick={() => handleMoveUp(stop.id)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary disabled:opacity-25"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Move down"
+                    disabled={idx === stops.length - 1}
+                    onClick={() => handleMoveDown(stop.id)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary disabled:opacity-25"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Remove stop"
+                    onClick={() => handleRemove(stop.id)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-red-50 hover:text-red-500"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              disabled={!addQuery.trim() || !addPlaceId || addingStop}
-              onClick={() => void handleAddStop()}
-              className="flex-shrink-0 rounded-xl bg-wayfarer-primary px-5 py-2 font-body text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-            >
-              {addingStop ? 'Adding…' : 'Add'}
-            </button>
+          ))}
+
+          {/* ── Add a stop ─────────────────────────────── */}
+          <div className="rounded-2xl border-2 border-dashed border-wayfarer-accent/30 p-4 transition-colors focus-within:border-wayfarer-primary/40">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-wayfarer-text-muted">
+              Add a stop
+            </p>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <GooglePlacesAutocomplete
+                  value={addQuery}
+                  onChange={(val) => {
+                    setAddQuery(val);
+                    setAddPlaceId(null);
+                  }}
+                  onSelect={(val) => setAddQuery(val)}
+                  onSelectWithPlaceId={(description, placeId) => {
+                    setAddQuery(description);
+                    setAddPlaceId(placeId);
+                  }}
+                  placeholder="Search for a place…"
+                  placeTypes={[]}
+                  locationBias={{
+                    lat: draft.originLat,
+                    lng: draft.originLng,
+                    radiusMeters: draft.radiusKm * 1000,
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={!addQuery.trim() || !addPlaceId || addingStop}
+                onClick={() => void handleAddStop()}
+                className="shrink-0 rounded-xl bg-wayfarer-primary px-5 py-2 font-body text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40"
+              >
+                {addingStop ? '…' : 'Add'}
+              </button>
+            </div>
+            {addError && <p className="mt-2 text-xs text-red-500">{addError}</p>}
           </div>
-          {addError && <p className="mt-2 font-body text-xs text-red-500">{addError}</p>}
-        </section>
+        </div>
       </main>
 
-      {/* Save error toast */}
+      {/* ── Save error toast ────────────────────────── */}
       {saveError && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-40 bg-red-50 text-red-600 px-5 py-3 rounded-2xl font-body text-sm shadow-wayfarer-ambient whitespace-nowrap">
+        <div className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-red-50 px-5 py-3 font-body text-sm text-red-600 shadow-wayfarer-ambient">
           {saveError}
         </div>
       )}
 
-      {/* FAB — save / post-save share */}
+      {/* ── FAB — save / post-save actions ─────────── */}
       {savedTripId ? (
-        <div className="fixed bottom-8 right-8 z-40 flex flex-col items-end gap-2">
+        <div className="fixed bottom-8 right-4 z-40 flex flex-col items-end gap-2 sm:right-8">
           <button
             type="button"
-            disabled={sharing}
+            disabled={sharing || isPending}
             onClick={() => void handleShare()}
-            className="h-14 px-6 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-70"
+            className="h-12 px-5 rounded-full bg-wayfarer-surface text-wayfarer-primary shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm transition hover:opacity-80 disabled:opacity-40"
           >
-            <span className="text-base leading-none">↗</span>
-            <span>{sharing ? 'Sharing…' : 'Share trip'}</span>
+            <span>↗</span>
+            <span>{sharing ? 'Sharing…' : 'Share'}</span>
           </button>
-          <Link
-            href={`/trips/${savedTripId}/map`}
-            className="h-10 px-5 bg-wayfarer-primary text-white rounded-full shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm hover:opacity-90 transition-opacity"
-          >
-            <span>🗺 View Map</span>
-          </Link>
-          <Link
-            href="/trips"
-            className="h-10 px-5 bg-wayfarer-surface text-wayfarer-primary rounded-full shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm hover:opacity-80 transition-opacity"
-          >
-            <span>✓ Saved — View my trips</span>
-          </Link>
+          {savedTripId !== 'pending' ? (
+            <Link
+              href={`/trips/${savedTripId}/map`}
+              className="h-12 px-5 rounded-full bg-wayfarer-primary text-white shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm hover:opacity-90 transition-opacity"
+            >
+              <span>🗺</span>
+              <span>View Map</span>
+            </Link>
+          ) : (
+            <div className="h-12 px-5 rounded-full bg-wayfarer-primary text-white shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm opacity-70">
+              <span className="animate-pulse">⏳</span>
+              <span>Saving…</span>
+            </div>
+          )}
           {shareFeedback && (
-            <p className="text-xs font-body text-wayfarer-text-muted bg-wayfarer-surface px-4 py-2 rounded-full shadow-wayfarer-soft max-w-[220px] text-center">
+            <p className="rounded-full bg-wayfarer-surface px-4 py-2 text-center font-body text-xs text-wayfarer-text-muted shadow-wayfarer-soft">
               {shareFeedback}
             </p>
           )}
@@ -668,16 +486,16 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
       ) : (
         <button
           type="button"
-          disabled={saving || stops.length === 0}
-          onClick={() => void handleSave()}
-          className="fixed bottom-8 right-8 z-40 h-14 px-6 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-40"
+          disabled={stops.length === 0}
+          onClick={() => handleSave()}
+          className="fixed bottom-8 right-4 z-40 h-14 px-6 sm:right-8 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-40"
         >
           <span className="text-base leading-none">🗺</span>
-          <span>{saving ? 'Saving…' : 'Save trip'}</span>
+          <span>Save trip</span>
         </button>
       )}
 
-      {/* Sign-in modal */}
+      {/* ── Sign-in modal ──────────────────────────── */}
       {showSignInModal && (
         <div
           role="dialog"
