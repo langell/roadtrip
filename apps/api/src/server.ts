@@ -708,23 +708,6 @@ export const createApp = () => {
       // Sponsors without lat/lng fall back to last place so geo-tagged sponsors
       // always win over untagged ones.
       const midStop = trip.stops[Math.floor(trip.stops.length / 2)];
-      const haversineKm = (
-        lat1: number,
-        lng1: number,
-        lat2: number,
-        lng2: number,
-      ): number => {
-        const R = 6371;
-        const dLat = ((lat2 - lat1) * Math.PI) / 180;
-        const dLng = ((lng2 - lng1) * Math.PI) / 180;
-        const a =
-          Math.sin(dLat / 2) ** 2 +
-          Math.cos((lat1 * Math.PI) / 180) *
-            Math.cos((lat2 * Math.PI) / 180) *
-            Math.sin(dLng / 2) ** 2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      };
-
       const refLat = midStop?.lat ?? trip.originLat;
       const refLng = midStop?.lng ?? trip.originLng;
 
@@ -1488,6 +1471,118 @@ export const createApp = () => {
   );
 
   app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }));
+
+  // ── Admin endpoints ──────────────────────────────────────────────────────
+  // Protected by ADMIN_USER_IDS env var (comma-separated list of user IDs).
+
+  const requireAdmin = (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    void (async () => {
+      const userId = await getRequestUserId(req);
+      if (!userId) {
+        res.status(401).json({ error: 'UNAUTHORIZED' });
+        return;
+      }
+      const allowed = (env.ADMIN_USER_IDS ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!allowed.includes(userId)) {
+        res.status(403).json({ error: 'FORBIDDEN' });
+        return;
+      }
+      res.locals.userId = userId;
+      next();
+    })();
+  };
+
+  const sponsorSchema = z.object({
+    title: z.string().min(1),
+    description: z.string().min(1),
+    url: z.string().url().optional().nullable(),
+    imageUrl: z.string().url().optional().nullable(),
+    lat: z.number().min(-90).max(90).optional().nullable(),
+    lng: z.number().min(-180).max(180).optional().nullable(),
+    active: z.boolean().optional(),
+  });
+
+  app.get(
+    '/admin/sponsors',
+    requireAdmin,
+    withAsyncHandler(async (_req, res) => {
+      const sponsors = await prisma.sponsoredPlace.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+      res.json(sponsors);
+    }),
+  );
+
+  app.post(
+    '/admin/sponsors',
+    requireAdmin,
+    withAsyncHandler(async (req, res) => {
+      const parsed = sponsorSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_BODY' });
+        return;
+      }
+      const { title, description, url, imageUrl, lat, lng, active } = parsed.data;
+      const sponsor = await prisma.sponsoredPlace.create({
+        data: {
+          placeId: randomBytes(8).toString('hex'),
+          title,
+          description,
+          url: url ?? null,
+          imageUrl: imageUrl ?? null,
+          lat: lat ?? null,
+          lng: lng ?? null,
+          active: active ?? true,
+        },
+      });
+      res.status(201).json(sponsor);
+    }),
+  );
+
+  app.patch(
+    '/admin/sponsors/:id',
+    requireAdmin,
+    withAsyncHandler(async (req, res) => {
+      const { id } = req.params;
+      const parsed = sponsorSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_BODY' });
+        return;
+      }
+      const existing = await prisma.sponsoredPlace.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+      const sponsor = await prisma.sponsoredPlace.update({
+        where: { id },
+        data: parsed.data,
+      });
+      res.json(sponsor);
+    }),
+  );
+
+  app.delete(
+    '/admin/sponsors/:id',
+    requireAdmin,
+    withAsyncHandler(async (req, res) => {
+      const { id } = req.params;
+      const existing = await prisma.sponsoredPlace.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+      await prisma.sponsoredPlace.delete({ where: { id } });
+      res.status(204).send();
+    }),
+  );
 
   return app;
 };
