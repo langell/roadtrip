@@ -36,7 +36,6 @@ const getPlaceCoords = (
       resolve(null);
       return;
     }
-    // PlacesService requires a DOM element
     const el = document.createElement('div');
     const service = new window.google.maps.places.PlacesService(el);
     service.getDetails(
@@ -77,6 +76,91 @@ const THEME_LABELS: Record<string, string> = {
   scenic: 'Scenic',
   quirky: 'Quirky',
 };
+
+// ── SVG icons ──────────────────────────────────────────────
+const IconChevronUp = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+  </svg>
+);
+const IconChevronDown = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+  </svg>
+);
+const IconX = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+const IconPin = () => (
+  <svg className="h-3 w-3 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+    <path
+      fillRule="evenodd"
+      d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-2.006 3.699-4.92 3.699-8.327a8 8 0 10-16 0c0 3.407 1.755 6.321 3.7 8.327a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.144.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+const IconPlus = () => (
+  <svg
+    className="h-4 w-4"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+const IconShare = () => (
+  <svg
+    className="h-4 w-4"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"
+    />
+  </svg>
+);
+const IconMap = () => (
+  <svg
+    className="h-4 w-4"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"
+    />
+  </svg>
+);
 
 const PlanDetail = ({ draftKey }: PlanDetailProps) => {
   const [draft, setDraft] = useState<TripDraft | null>(null);
@@ -173,7 +257,6 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
   const handleSave = () => {
     if (!draft || stops.length === 0) return;
     setSaveError(null);
-    // Show the post-save UI immediately; action buttons are disabled until tripId resolves
     setSavedTripId('pending');
 
     void savePlanOption({
@@ -226,12 +309,12 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: draft?.plan.title ?? 'My Road Trip',
+          title: draft?.plan.title ?? 'My HipTrip',
           url: result.shareUrl,
         });
         return;
       } catch {
-        // user cancelled or share failed — fall through to clipboard
+        // user cancelled — fall through to clipboard
       }
     }
 
@@ -266,219 +349,249 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
 
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
-      {/* ── Header ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-wayfarer-accent/10 bg-wayfarer-bg/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-2xl items-center gap-4 px-4">
+      {/* ── Sticky header ──────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-wayfarer-bg/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4">
           <Link
             href="/#route-planner"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-wayfarer-surface"
             aria-label="Back to planner"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface hover:text-wayfarer-primary"
           >
-            <span className="text-lg leading-none text-wayfarer-primary">←</span>
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+              />
+            </svg>
           </Link>
+
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-extrabold leading-tight text-wayfarer-primary">
+            <p className="truncate font-display text-sm font-extrabold leading-none text-wayfarer-text-main">
               {draft.plan.title}
             </p>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-wayfarer-text-muted">
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-wayfarer-text-muted">
               {draft.location} · {radiusMiles} mi
             </p>
           </div>
+
+          <span className="shrink-0 rounded-full bg-wayfarer-surface px-2.5 py-1 text-[11px] font-bold text-wayfarer-primary">
+            {stops.length} stop{stops.length !== 1 ? 's' : ''}
+          </span>
         </div>
+        {/* thin green rule */}
+        <div className="h-px bg-gradient-to-r from-transparent via-wayfarer-primary/20 to-transparent" />
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 pb-32 pt-6">
-        {/* ── Theme + rationale ──────────────────────── */}
-        {(draft.themes.length > 0 || draft.plan.rationale) && (
-          <div className="mb-6 space-y-3">
-            {draft.themes.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {draft.themes.map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-full bg-wayfarer-surface px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-wayfarer-primary"
-                  >
-                    {THEME_LABELS[t] ?? t}
-                  </span>
-                ))}
-              </div>
-            )}
-            {draft.plan.rationale && (
-              <p className="text-sm leading-relaxed text-wayfarer-text-muted">
-                {draft.plan.rationale}
-              </p>
-            )}
-          </div>
-        )}
+      <main className="mx-auto max-w-2xl px-4 pb-36 pt-5">
+        {/* ── Trip meta ──────────────────────────────────── */}
+        <div className="mb-6">
+          {draft.themes.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {draft.themes.map((t) => (
+                <span
+                  key={t}
+                  className="rounded-full bg-wayfarer-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-wayfarer-primary"
+                >
+                  {THEME_LABELS[t] ?? t}
+                </span>
+              ))}
+            </div>
+          )}
+          {draft.plan.rationale && (
+            <p className="text-sm leading-relaxed text-wayfarer-text-muted">
+              {draft.plan.rationale}
+            </p>
+          )}
+        </div>
 
         {droppedCount > 0 && (
-          <div className="mb-4 rounded-2xl bg-wayfarer-surface px-4 py-3 text-xs text-wayfarer-text-muted">
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
             {droppedCount} stop{droppedCount > 1 ? 's were' : ' was'} unavailable and
-            removed.
+            removed from this plan.
           </div>
         )}
 
-        {/* ── Stop list ──────────────────────────────── */}
         {stops.length === 0 && (
-          <div className="mb-4 rounded-2xl bg-wayfarer-surface p-8 text-center text-sm text-wayfarer-text-muted">
-            No stops yet — add some below.
+          <div className="mb-4 rounded-2xl bg-wayfarer-surface p-10 text-center text-sm text-wayfarer-text-muted">
+            No stops yet — add one below.
           </div>
         )}
 
-        <div className="space-y-3">
+        {/* ── Stop list ──────────────────────────────────── */}
+        <div>
           {stops.map((stop, idx) => (
-            <div key={stop.id} className="flex gap-4 rounded-2xl bg-wayfarer-surface p-4">
-              {/* Stop number */}
-              <div className="flex shrink-0 flex-col items-center gap-1.5 pt-0.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-wayfarer-primary font-display text-sm font-extrabold text-white">
+            <div key={stop.id}>
+              {/* Connector between cards */}
+              {idx > 0 && (
+                <div className="ml-[35px] h-3 w-0.5 bg-gradient-to-b from-wayfarer-primary/30 to-wayfarer-primary/10" />
+              )}
+
+              <div className="group flex gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.06]">
+                {/* Number badge */}
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-wayfarer-primary font-display text-sm font-extrabold text-white shadow-sm">
                   {idx + 1}
                 </div>
-                {/* Vertical connector line */}
-                {idx < stops.length - 1 && (
-                  <div
-                    className="w-px flex-1 bg-wayfarer-accent/20"
-                    style={{ minHeight: '12px' }}
-                  />
-                )}
-              </div>
 
-              {/* Content */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start gap-3">
-                  {/* Text */}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-display font-bold leading-snug text-wayfarer-text-main">
-                      {stop.name}
-                    </p>
-                    {stop.description && (
-                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-wayfarer-text-muted">
-                        {stop.description}
+                {/* Content */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-[15px] font-bold leading-snug text-wayfarer-text-main">
+                        {stop.name}
                       </p>
+                      {stop.description && (
+                        <div className="mt-1 flex items-center gap-1 text-wayfarer-text-muted">
+                          <IconPin />
+                          <p className="truncate text-xs leading-relaxed">
+                            {stop.description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {stop.imageUrl && (
+                      <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-wayfarer-surface-deep">
+                        <img
+                          src={stop.imageUrl}
+                          alt={stop.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      </div>
                     )}
                   </div>
 
-                  {/* Thumbnail */}
-                  {stop.imageUrl && (
-                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-wayfarer-surface-deep">
-                      <img
-                        src={stop.imageUrl}
-                        alt={stop.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
+                  {/* Controls */}
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        aria-label="Move up"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveUp(stop.id)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface hover:text-wayfarer-primary disabled:opacity-20"
+                      >
+                        <IconChevronUp />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move down"
+                        disabled={idx === stops.length - 1}
+                        onClick={() => handleMoveDown(stop.id)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface hover:text-wayfarer-primary disabled:opacity-20"
+                      >
+                        <IconChevronDown />
+                      </button>
                     </div>
-                  )}
-                </div>
 
-                {/* Controls */}
-                <div className="mt-3 flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Move up"
-                    disabled={idx === 0}
-                    onClick={() => handleMoveUp(stop.id)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary disabled:opacity-25"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Move down"
-                    disabled={idx === stops.length - 1}
-                    onClick={() => handleMoveDown(stop.id)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-wayfarer-surface-deep hover:text-wayfarer-primary disabled:opacity-25"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Remove stop"
-                    onClick={() => handleRemove(stop.id)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-wayfarer-text-muted transition-colors hover:bg-red-50 hover:text-red-500"
-                  >
-                    ✕
-                  </button>
+                    <button
+                      type="button"
+                      aria-label="Remove stop"
+                      onClick={() => handleRemove(stop.id)}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-wayfarer-text-muted transition-colors hover:bg-red-50 hover:text-red-500"
+                    >
+                      <IconX />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
 
           {/* ── Add a stop ─────────────────────────────── */}
-          <div className="rounded-2xl border-2 border-dashed border-wayfarer-accent/30 p-4 transition-colors focus-within:border-wayfarer-primary/40">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-wayfarer-text-muted">
-              Add a stop
-            </p>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <GooglePlacesAutocomplete
-                  value={addQuery}
-                  onChange={(val) => {
-                    setAddQuery(val);
-                    setAddPlaceId(null);
-                  }}
-                  onSelect={(val) => setAddQuery(val)}
-                  onSelectWithPlaceId={(description, placeId) => {
-                    setAddQuery(description);
-                    setAddPlaceId(placeId);
-                  }}
-                  placeholder="Search for a place…"
-                  placeTypes={[]}
-                  locationBias={{
-                    lat: draft.originLat,
-                    lng: draft.originLng,
-                    radiusMeters: draft.radiusKm * 1000,
-                  }}
-                />
+          <div className={stops.length > 0 ? 'mt-3' : ''}>
+            <div className="rounded-2xl border-2 border-dashed border-wayfarer-accent/50 p-4 transition-colors focus-within:border-wayfarer-primary/50">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-wayfarer-accent text-wayfarer-text-muted">
+                  <IconPlus />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-widest text-wayfarer-text-muted">
+                  Add a stop
+                </p>
               </div>
-              <button
-                type="button"
-                disabled={!addQuery.trim() || !addPlaceId || addingStop}
-                onClick={() => void handleAddStop()}
-                className="shrink-0 rounded-xl bg-wayfarer-primary px-5 py-2 font-body text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40"
-              >
-                {addingStop ? '…' : 'Add'}
-              </button>
+
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <GooglePlacesAutocomplete
+                    value={addQuery}
+                    onChange={(val) => {
+                      setAddQuery(val);
+                      setAddPlaceId(null);
+                    }}
+                    onSelect={(val) => setAddQuery(val)}
+                    onSelectWithPlaceId={(description, placeId) => {
+                      setAddQuery(description);
+                      setAddPlaceId(placeId);
+                    }}
+                    placeholder="Search for a place…"
+                    placeTypes={[]}
+                    locationBias={{
+                      lat: draft.originLat,
+                      lng: draft.originLng,
+                      radiusMeters: draft.radiusKm * 1000,
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={!addQuery.trim() || !addPlaceId || addingStop}
+                  onClick={() => void handleAddStop()}
+                  className="shrink-0 rounded-xl bg-wayfarer-primary px-5 font-body text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40"
+                >
+                  {addingStop ? '…' : 'Add'}
+                </button>
+              </div>
+
+              {addError && <p className="mt-2 text-xs text-red-500">{addError}</p>}
             </div>
-            {addError && <p className="mt-2 text-xs text-red-500">{addError}</p>}
           </div>
         </div>
       </main>
 
-      {/* ── Save error toast ────────────────────────── */}
+      {/* ── Save error toast ────────────────────────────── */}
       {saveError && (
-        <div className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-red-50 px-5 py-3 font-body text-sm text-red-600 shadow-wayfarer-ambient">
+        <div className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-xl bg-red-50 px-5 py-3 font-body text-sm text-red-600 shadow-wayfarer-ambient ring-1 ring-red-100">
           {saveError}
         </div>
       )}
 
-      {/* ── FAB — save / post-save actions ─────────── */}
+      {/* ── FAB ─────────────────────────────────────────── */}
       {savedTripId ? (
-        <div className="fixed bottom-8 right-4 z-40 flex flex-col items-end gap-2 sm:right-8">
+        <div className="fixed bottom-6 right-4 z-40 flex flex-col items-end gap-2 sm:right-6">
           <button
             type="button"
             disabled={sharing || isPending}
             onClick={() => void handleShare()}
-            className="h-12 px-5 rounded-full bg-wayfarer-surface text-wayfarer-primary shadow-wayfarer-soft flex items-center gap-2 font-body font-semibold text-sm transition hover:opacity-80 disabled:opacity-40"
+            className="flex h-11 items-center gap-2 rounded-full bg-white px-5 font-body text-sm font-semibold text-wayfarer-primary shadow-wayfarer-ambient ring-1 ring-black/[0.06] transition hover:shadow-wayfarer-soft disabled:opacity-40"
           >
-            <span>↗</span>
+            <IconShare />
             <span>{sharing ? 'Sharing…' : 'Share'}</span>
           </button>
+
           {savedTripId !== 'pending' ? (
             <Link
               href={`/trips/${savedTripId}/map`}
-              className="h-12 px-5 rounded-full bg-wayfarer-primary text-white shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm hover:opacity-90 transition-opacity"
+              className="flex h-14 items-center gap-2 rounded-full bg-wayfarer-primary px-6 font-body text-sm font-bold text-white shadow-[0_8px_24px_rgba(27,67,50,0.35)] transition hover:opacity-90"
             >
-              <span>🗺</span>
+              <IconMap />
               <span>View Map</span>
             </Link>
           ) : (
-            <div className="h-12 px-5 rounded-full bg-wayfarer-primary text-white shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm opacity-70">
-              <span className="animate-pulse">⏳</span>
+            <div className="flex h-14 items-center gap-2 rounded-full bg-wayfarer-primary px-6 font-body text-sm font-bold text-white opacity-80 shadow-[0_8px_24px_rgba(27,67,50,0.25)]">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               <span>Saving…</span>
             </div>
           )}
+
           {shareFeedback && (
-            <p className="rounded-full bg-wayfarer-surface px-4 py-2 text-center font-body text-xs text-wayfarer-text-muted shadow-wayfarer-soft">
+            <p className="rounded-full bg-white px-4 py-2 text-center font-body text-xs text-wayfarer-text-muted shadow-wayfarer-soft ring-1 ring-black/[0.06]">
               {shareFeedback}
             </p>
           )}
@@ -488,14 +601,14 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
           type="button"
           disabled={stops.length === 0}
           onClick={() => handleSave()}
-          className="fixed bottom-8 right-4 z-40 h-14 px-6 sm:right-8 bg-wayfarer-primary text-white rounded-full shadow-[0_8px_24px_rgba(27,67,50,0.35)] flex items-center gap-2 font-body font-bold text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-40"
+          className="fixed bottom-6 right-4 z-40 flex h-14 items-center gap-2 rounded-full bg-wayfarer-primary px-6 font-body text-sm font-bold text-white shadow-[0_8px_24px_rgba(27,67,50,0.35)] transition-all active:scale-95 hover:opacity-90 disabled:opacity-40 sm:right-6"
         >
-          <span className="text-base leading-none">🗺</span>
+          <IconMap />
           <span>Save trip</span>
         </button>
       )}
 
-      {/* ── Sign-in modal ──────────────────────────── */}
+      {/* ── Sign-in modal ────────────────────────────────── */}
       {showSignInModal && (
         <div
           role="dialog"
@@ -514,7 +627,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
               Sign in to save
             </p>
             <p className="mb-6 font-body text-sm text-wayfarer-text-muted">
-              Your trip is ready to save. Create a free account to keep it.
+              Your trip is ready. Create a free account to keep it.
             </p>
             <Link
               href={`/sign-in?callbackUrl=${encodeURIComponent(signInCallbackUrl)}`}
