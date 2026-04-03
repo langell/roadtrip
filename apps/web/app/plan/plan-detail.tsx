@@ -457,7 +457,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
                     </div>
 
                     {stop.imageUrl && (
-                      <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-wayfarer-surface-deep">
+                      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-wayfarer-surface-deep">
                         <img
                           src={stop.imageUrl}
                           alt={stop.name}

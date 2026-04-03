@@ -93,7 +93,7 @@ export default function GooglePlacesAutocomplete({
                 service.getPlacePredictions(
                   {
                     input: inputValue,
-                    types: placeTypes,
+                    ...(placeTypes.length > 0 && { types: placeTypes }),
                     ...(locationBias && {
                       location: new window.google.maps.LatLng(
                         locationBias.lat,
