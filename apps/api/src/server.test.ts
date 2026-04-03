@@ -84,6 +84,22 @@ vi.mock('./services/ai-trip-planner-service.js', () => ({
   },
 }));
 
+const generateDescriptions = vi.fn();
+vi.mock('./services/ai-stop-description-service.js', () => ({
+  AiStopDescriptionError: class AiStopDescriptionError extends Error {
+    constructor(
+      code: string,
+      readonly stage: string,
+    ) {
+      super(code);
+      this.name = 'AiStopDescriptionError';
+    }
+  },
+  aiStopDescriptionService: {
+    generateDescriptions,
+  },
+}));
+
 const { createApp, startServer, registerSignalHandlers } = await import('./server.js');
 
 describe('HTTP server', () => {
@@ -97,6 +113,7 @@ describe('HTTP server', () => {
     resolvePlannedStops.mockReset();
     geocodeLocation.mockReset();
     generatePlans.mockReset();
+    generateDescriptions.mockReset();
     prismaMock.trip.findMany.mockReset();
     prismaMock.trip.findFirst.mockReset();
     prismaMock.trip.findUnique.mockReset();
@@ -1388,6 +1405,93 @@ describe('HTTP server', () => {
       expect(response.status).toBe(200);
       expect(response.body.trendingRoutes).toHaveLength(1);
       expect(response.body.trendingRoutes[0].cacheId).toBe('cache-1');
+    });
+  });
+
+  describe('POST /trips/save-plan', () => {
+    const savePlanBody = {
+      title: 'Big Sur Loop',
+      rationale: 'Coastal beauty',
+      location: 'Carmel, CA',
+      originLat: 36.55,
+      originLng: -121.92,
+      radiusKm: 100,
+      themes: ['scenic', 'nature'],
+      stops: [
+        { placeId: 'p1', name: 'Bixby Bridge', lat: 36.37, lng: -121.9, order: 0 },
+        { placeId: 'p2', name: 'Point Lobos', lat: 36.51, lng: -121.94, order: 1 },
+      ],
+    };
+
+    it('writes AI-generated descriptions to stop notes on save', async () => {
+      generateDescriptions.mockResolvedValue({
+        'Bixby Bridge': 'A soaring arch over a rugged canyon.',
+        'Point Lobos': 'Twisted cypress trees frame the Pacific.',
+      });
+      prismaMock.trip.create.mockResolvedValue({ id: 'trip-new', stops: [] });
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/save-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(savePlanBody);
+
+      expect(response.status).toBe(201);
+      expect(generateDescriptions).toHaveBeenCalledWith({
+        stops: ['Bixby Bridge', 'Point Lobos'],
+        location: 'Carmel, CA',
+        themes: ['scenic', 'nature'],
+      });
+      expect(prismaMock.trip.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            stops: {
+              create: expect.arrayContaining([
+                expect.objectContaining({
+                  name: 'Bixby Bridge',
+                  notes: 'A soaring arch over a rugged canyon.',
+                }),
+                expect.objectContaining({
+                  name: 'Point Lobos',
+                  notes: 'Twisted cypress trees frame the Pacific.',
+                }),
+              ]),
+            },
+          }),
+        }),
+      );
+    });
+
+    it('saves trip successfully even when AI description service throws', async () => {
+      generateDescriptions.mockRejectedValue(new Error('AI_REQUEST_FAILED'));
+      prismaMock.trip.create.mockResolvedValue({ id: 'trip-new', stops: [] });
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/save-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(savePlanBody);
+
+      expect(response.status).toBe(201);
+      expect(prismaMock.trip.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            stops: {
+              create: expect.arrayContaining([
+                expect.objectContaining({ name: 'Bixby Bridge', notes: undefined }),
+                expect.objectContaining({ name: 'Point Lobos', notes: undefined }),
+              ]),
+            },
+          }),
+        }),
+      );
+    });
+
+    it('returns 401 for unauthenticated POST /trips/save-plan', async () => {
+      const app = createApp();
+      const response = await request(app).post('/trips/save-plan').send(savePlanBody);
+      expect(response.status).toBe(401);
+      expect(generateDescriptions).not.toHaveBeenCalled();
     });
   });
 });

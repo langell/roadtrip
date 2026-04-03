@@ -22,6 +22,7 @@ import {
   aiTripPlannerService,
   AiTripPlannerError,
 } from './services/ai-trip-planner-service.js';
+import { aiStopDescriptionService } from './services/ai-stop-description-service.js';
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
 import { requireAuth } from './lib/require-auth.js';
@@ -1324,6 +1325,24 @@ export const createApp = () => {
       }
 
       const input = parsed.data;
+      const requestLogger = getRequestLogger(res);
+
+      // Generate AI descriptions for all stops — fire-and-forget on failure so
+      // the save never fails because of the AI call.
+      let descriptions: Record<string, string> = {};
+      try {
+        descriptions = await aiStopDescriptionService.generateDescriptions({
+          stops: input.stops.map((s) => s.name),
+          location: input.location,
+          themes: input.themes,
+        });
+      } catch (error) {
+        logError(requestLogger, 'ai.stop-descriptions failure', error, {
+          location: input.location,
+          stopCount: input.stops.length,
+        });
+      }
+
       const trip = await prisma.trip.create({
         data: {
           userId,
@@ -1343,7 +1362,7 @@ export const createApp = () => {
               order: stop.order,
               lat: stop.lat,
               lng: stop.lng,
-              notes: stop.notes,
+              notes: descriptions[stop.name] ?? stop.notes,
               imageUrl: stop.imageUrl,
             })),
           },
