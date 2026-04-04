@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Logo from './Logo';
+import ProfileDropdown from './ProfileDropdown';
 import type { TripDetail, SponsoredStop, TripDetailStop } from '../lib/api-client';
 
 const getApiToken = async (): Promise<string | undefined> => {
@@ -273,6 +274,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
           >
             New Trip
           </Link>
+          <ProfileDropdown />
         </div>
       </header>
 

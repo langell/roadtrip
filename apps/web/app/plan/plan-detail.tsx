@@ -27,36 +27,78 @@ type EditableStop = {
 
 const KM_PER_MILE = 1.60934;
 
-/** Resolve lat/lng from a placeId using the Places Details API — more accurate than text geocoding. */
-const getPlaceCoords = (
-  placeId: string,
-): Promise<{ lat: number; lng: number } | null> => {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !window.google?.maps?.places) {
-      resolve(null);
-      return;
+/** Haversine distance in km between two lat/lng points. */
+const haversineKm = (
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+) => {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const sin2 =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) *
+      Math.cos((b.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(sin2), Math.sqrt(1 - sin2));
+};
+
+/**
+ * Find the insertion index that minimises the increase in total route length.
+ * Tries every position 0..stops.length and picks the cheapest.
+ */
+const optimalInsertIndex = (
+  stops: { lat: number; lng: number }[],
+  point: { lat: number; lng: number },
+): number => {
+  if (stops.length === 0) return 0;
+  if (stops.length === 1) {
+    // Insert before or after the single stop — pick whichever keeps the origin closer
+    return 1;
+  }
+  let bestIndex = stops.length; // default: append
+  let bestCost = Infinity;
+  for (let i = 0; i <= stops.length; i++) {
+    const prev = stops[i - 1];
+    const next = stops[i];
+    const cost =
+      (prev ? haversineKm(prev, point) : 0) +
+      (next ? haversineKm(point, next) : 0) -
+      (prev && next ? haversineKm(prev, next) : 0);
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestIndex = i;
     }
-    const el = document.createElement('div');
-    const service = new window.google.maps.places.PlacesService(el);
-    service.getDetails(
-      { placeId, fields: ['geometry'] },
-      (
-        result: {
-          geometry?: { location?: { lat: () => number; lng: () => number } };
-        } | null,
-        status: string,
-      ) => {
-        if (status === 'OK' && result?.geometry?.location) {
-          resolve({
-            lat: result.geometry.location.lat(),
-            lng: result.geometry.location.lng(),
-          });
-        } else {
-          resolve(null);
-        }
-      },
-    );
-  });
+  }
+  return bestIndex;
+};
+
+/** Resolve lat/lng + photo URL from a placeId using the new Places JS API (importLibrary). */
+const getPlaceDetails = async (
+  placeId: string,
+): Promise<{ lat: number; lng: number; imageUrl?: string } | null> => {
+  if (typeof window === 'undefined' || !window.google?.maps?.importLibrary) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { Place } = (await window.google.maps.importLibrary('places')) as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    const place = new Place({ id: placeId }) as {
+      fetchFields: (opts: { fields: string[] }) => Promise<void>;
+      location: { lat: () => number; lng: () => number } | null;
+      photos: { getURI: (opts: { maxWidth: number }) => string }[] | undefined;
+    };
+    await place.fetchFields({ fields: ['location', 'photos'] });
+    const loc = place.location;
+    if (!loc) return null;
+    const imageUrl = place.photos?.[0]?.getURI({ maxWidth: 800 });
+    return {
+      lat: loc.lat(),
+      lng: loc.lng(),
+      ...(imageUrl ? { imageUrl } : {}),
+    };
+  } catch {
+    return null;
+  }
 };
 
 const resolvedStopsOnly = (stops: TripPlanOption['stops']): PlannedStopResolved[] =>
@@ -232,8 +274,8 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
     setAddingStop(true);
     setAddError(null);
 
-    const coords = await getPlaceCoords(addPlaceId);
-    if (!coords) {
+    const details = await getPlaceDetails(addPlaceId);
+    if (!details) {
       setAddError('Could not resolve location. Try a more specific place name.');
       setAddingStop(false);
       return;
@@ -244,11 +286,17 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
       placeId: addPlaceId,
       name: addQuery,
       description: '',
-      lat: coords.lat,
-      lng: coords.lng,
+      lat: details.lat,
+      lng: details.lng,
+      ...(details.imageUrl ? { imageUrl: details.imageUrl } : {}),
     };
 
-    setStops((prev) => [...prev, newStop]);
+    setStops((prev) => {
+      const idx = optimalInsertIndex(prev, details);
+      const next = [...prev];
+      next.splice(idx, 0, newStop);
+      return next;
+    });
     setAddQuery('');
     setAddPlaceId(null);
     setAddingStop(false);
