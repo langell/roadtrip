@@ -679,6 +679,26 @@ export const createApp = () => {
   );
 
   app.get(
+    '/users/me',
+    requireAuth,
+    withAsyncHandler(async (_req, res) => {
+      const userId = res.locals.userId as string;
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        res.status(404).json({ error: 'NOT_FOUND' });
+        return;
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        role: user.role,
+      });
+    }),
+  );
+
+  app.get(
     '/trips/:id/sponsored-stop',
     requireAuth,
     withAsyncHandler(async (req, res) => {
@@ -727,6 +747,63 @@ export const createApp = () => {
         res.json(null);
         return;
       }
+      // If the best sponsor is already a stop on this trip, try the next closest instead.
+      const tripPlaceIds = new Set(trip.stops.map((s) => s.placeId));
+      const picked =
+        best.placeId && tripPlaceIds.has(best.placeId)
+          ? (sponsored.find((s) => !tripPlaceIds.has(s.placeId)) ?? best)
+          : best;
+
+      res.json({
+        id: picked.id,
+        placeId: picked.placeId,
+        title: picked.title,
+        description: picked.description,
+        imageUrl: picked.imageUrl ?? undefined,
+        url: picked.url ?? undefined,
+        lat: picked.lat ?? undefined,
+        lng: picked.lng ?? undefined,
+      });
+    }),
+  );
+
+  // Sponsored stop for the planner (no trip yet) — query by lat/lng.
+  app.get(
+    '/sponsored-stop/nearby',
+    requireAuth,
+    withAsyncHandler(async (req, res) => {
+      const latRaw = req.query.lat;
+      const lngRaw = req.query.lng;
+      const lat = typeof latRaw === 'string' ? parseFloat(latRaw) : NaN;
+      const lng = typeof lngRaw === 'string' ? parseFloat(lngRaw) : NaN;
+      if (isNaN(lat) || isNaN(lng)) {
+        res.status(400).json({ error: 'INVALID_COORDS' });
+        return;
+      }
+
+      const MAX_SPONSOR_RADIUS_KM = 200;
+
+      const sponsored = await prisma.sponsoredPlace.findMany({ where: { active: true } });
+      if (sponsored.length === 0) {
+        res.json(null);
+        return;
+      }
+
+      const best = sponsored
+        .map((s) => ({
+          sponsor: s,
+          distKm:
+            s.lat != null && s.lng != null
+              ? haversineKm(lat, lng, s.lat, s.lng)
+              : Infinity,
+        }))
+        .filter(({ distKm }) => distKm <= MAX_SPONSOR_RADIUS_KM)
+        .sort((a, b) => a.distKm - b.distKm)[0]?.sponsor;
+
+      if (!best) {
+        res.json(null);
+        return;
+      }
       res.json({
         id: best.id,
         placeId: best.placeId,
@@ -734,6 +811,8 @@ export const createApp = () => {
         description: best.description,
         imageUrl: best.imageUrl ?? undefined,
         url: best.url ?? undefined,
+        lat: best.lat ?? undefined,
+        lng: best.lng ?? undefined,
       });
     }),
   );
@@ -1486,11 +1565,8 @@ export const createApp = () => {
         res.status(401).json({ error: 'UNAUTHORIZED' });
         return;
       }
-      const allowed = (env.ADMIN_USER_IDS ?? '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (!allowed.includes(userId)) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user || user.role !== 'ADMIN') {
         res.status(403).json({ error: 'FORBIDDEN' });
         return;
       }
@@ -1500,6 +1576,7 @@ export const createApp = () => {
   };
 
   const sponsorSchema = z.object({
+    placeId: z.string().min(1).optional(),
     title: z.string().min(1),
     description: z.string().min(1),
     url: z.string().url().optional().nullable(),
@@ -1529,10 +1606,19 @@ export const createApp = () => {
         res.status(400).json({ error: 'INVALID_BODY' });
         return;
       }
-      const { title, description, url, imageUrl, lat, lng, active } = parsed.data;
+      const {
+        placeId: providedPlaceId,
+        title,
+        description,
+        url,
+        imageUrl,
+        lat,
+        lng,
+        active,
+      } = parsed.data;
       const sponsor = await prisma.sponsoredPlace.create({
         data: {
-          placeId: randomBytes(8).toString('hex'),
+          placeId: providedPlaceId ?? randomBytes(8).toString('hex'),
           title,
           description,
           url: url ?? null,

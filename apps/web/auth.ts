@@ -7,6 +7,16 @@ const authSecret = [process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET].find(
   (value) => value && value.trim().length > 0,
 );
 
+const mintApiToken = async (userId: string, secret: string): Promise<string> =>
+  new SignJWT({})
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer('roadtrip-web')
+    .setAudience('roadtrip-api')
+    .setSubject(userId)
+    .setIssuedAt()
+    .setExpirationTime('15m')
+    .sign(new TextEncoder().encode(secret));
+
 const toLogText = (value: unknown): string => {
   if (typeof value === 'string') {
     return value;
@@ -53,15 +63,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, profile }) {
+    async jwt({ token, trigger, profile }) {
       if (profile?.sub) {
         token.sub = profile.sub;
+      }
+      // Fetch role from API on first sign-in or when session is refreshed
+      const shouldFetchRole =
+        trigger === 'signIn' || trigger === 'update' || token.role === undefined;
+      if (shouldFetchRole && token.sub) {
+        const secret =
+          authSecret ??
+          (process.env.NODE_ENV === 'development'
+            ? 'roadtrip-dev-auth-secret-change-me'
+            : undefined);
+        const apiBaseUrl =
+          process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+        if (secret) {
+          try {
+            const apiToken = await mintApiToken(token.sub, secret);
+            const res = await fetch(`${apiBaseUrl}/users/me`, {
+              headers: { authorization: `Bearer ${apiToken}` },
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { role?: string };
+              token.role = data.role === 'ADMIN' ? 'ADMIN' : 'USER';
+            }
+          } catch {
+            token.role = token.role ?? 'USER';
+          }
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.role = (token.role ?? 'USER') as 'USER' | 'ADMIN';
       }
       return session;
     },
@@ -77,14 +114,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           : undefined);
       if (!secret) return;
       try {
-        const token = await new SignJWT({})
-          .setProtectedHeader({ alg: 'HS256' })
-          .setIssuer('roadtrip-web')
-          .setAudience('roadtrip-api')
-          .setSubject(userId)
-          .setIssuedAt()
-          .setExpirationTime('15m')
-          .sign(new TextEncoder().encode(secret));
+        const token = await mintApiToken(userId, secret);
         const apiBaseUrl =
           process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
         await fetch(`${apiBaseUrl}/users/me`, {

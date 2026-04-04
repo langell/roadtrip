@@ -304,6 +304,27 @@ export type SponsoredStop = {
   description: string;
   imageUrl?: string;
   url?: string;
+  lat?: number;
+  lng?: number;
+};
+
+export const getNearbySponsored = async (
+  lat: number,
+  lng: number,
+): Promise<SponsoredStop | null> => {
+  try {
+    const url = new URL(`${apiBaseUrl}/sponsored-stop/nearby`);
+    url.searchParams.set('lat', String(lat));
+    url.searchParams.set('lng', String(lng));
+    const response = await fetch(url.toString(), {
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as SponsoredStop | null;
+  } catch {
+    return null;
+  }
 };
 
 export const getTripDetail = async (tripId: string): Promise<TripDetail | null> => {

@@ -42,3 +42,18 @@ export const requireAuth = async (callbackUrl: string): Promise<AuthedSession> =
   }
   return session as AuthedSession;
 };
+
+/**
+ * Ensures the current request is authenticated AND has the ADMIN role.
+ * Redirects to `/sign-in` if unauthenticated, or `/` if not an admin.
+ */
+export const requireAdmin = async (): Promise<AuthedSession> => {
+  const session = await auth();
+  if (!session?.user) {
+    redirect('/sign-in?callbackUrl=/admin');
+  }
+  if (session.user.role !== 'ADMIN') {
+    redirect('/');
+  }
+  return session as AuthedSession;
+};

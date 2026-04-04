@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
-import { streamTripPlans, type TripPlanOption } from '../lib/api-client';
+import {
+  streamTripPlans,
+  getNearbySponsored,
+  type TripPlanOption,
+  type SponsoredStop,
+} from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const LOCATION_STORAGE_KEY = 'hiptrip:location';
@@ -22,10 +27,56 @@ type RecentSearch = {
 const KM_PER_MILE = 1.60934;
 const MIN_RADIUS_MILES = 10;
 const MAX_RADIUS_MILES = 300;
+// Max distance a sponsor can be from the search origin before we suppress the card
+const MAX_SPONSOR_RADIUS_KM = 200;
+
 const LOADING_MESSAGES = [
   'Scanning local standouts and hidden gems…',
   'Balancing your selected themes into unique route options…',
   'Resolving places and enriching each stop with details…',
+];
+
+type InfoCard = { icon: string; title: string; body: string; highlight: string };
+const INFO_CARDS: InfoCard[] = [
+  {
+    icon: '🧠',
+    title: 'AI-Curated Routes',
+    body: 'HipTrip uses AI to build itineraries tailored to your themes — scenic drives, foodie stops, hidden gems — not just whatever ranks highest on a search engine.',
+    highlight:
+      'Routes are generated fresh for your exact location and radius, every time.',
+  },
+  {
+    icon: '📍',
+    title: 'Every Stop Has a Story',
+    body: 'Each place comes with curated descriptions and real photos so you know exactly what to expect before you arrive — no surprises, just great experiences.',
+    highlight:
+      'Tap any stop on your saved trip to see full details, directions, and photos.',
+  },
+  {
+    icon: '🎯',
+    title: 'Themes That Actually Match',
+    body: "Whether you want scenic overlooks, craft breweries, family-friendly stops, or local sports venues — HipTrip matches places to what you actually care about, not just what's most popular.",
+    highlight: 'Mix multiple themes to find stops that check more than one box.',
+  },
+  {
+    icon: '🗺️',
+    title: 'Plan Once, Go Anywhere',
+    body: 'Save your favorite option, share a link with travel companions, and pull up the full itinerary at any point during your trip — all from your phone.',
+    highlight:
+      'Share a trip link and your travel companions get the full route, no app needed.',
+  },
+  {
+    icon: '⛽',
+    title: 'Smart Pit-Stops Built In',
+    body: 'Enable Smart Pit-Stops to automatically weave in fuel, restrooms, and snack breaks at logical points along the route — no more mid-trip scrambles.',
+    highlight: 'Toggle "Smart Pit-Stops" in the filter panel before you search.',
+  },
+  {
+    icon: '📸',
+    title: 'Never Miss the Shot',
+    body: 'Photo Ops mode surfaces the most photogenic pullouts, overlooks, and landmarks along your route — ideal when the journey matters as much as the destination.',
+    highlight: 'Enable "Photo Ops" in filters to add camera-ready stops to your plan.',
+  },
 ];
 
 const planSourceBadgeMode = process.env.NEXT_PUBLIC_TRIP_PLAN_SOURCE_BADGE ?? 'dev';
@@ -158,6 +209,18 @@ const reverseGeocodeLocation = async (
 const toTitleCase = (value: string) =>
   value.replace(/\b\w/g, (char) => char.toUpperCase());
 
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 const forwardGeocode = async (
   address: string,
 ): Promise<{ lat: number; lng: number } | null> => {
@@ -202,6 +265,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [loadingCardIndex, setLoadingCardIndex] = useState(0);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [planOptions, setPlanOptions] = useState<TripPlanOption[]>([]);
@@ -216,7 +280,9 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(
     null,
   );
+  const [sponsored, setSponsored] = useState<SponsoredStop | null>(null);
   const hasRequestedInitialLocation = useRef(false);
+  const loadingHeroRef = useRef<HTMLDivElement>(null);
 
   // Restore saved location, last plan results, and recent searches on mount
   useEffect(() => {
@@ -324,6 +390,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     setPlanSource(null);
     setPlanDegraded(false);
     setPlanOptions([]);
+    setSponsored(null);
     localStorage.removeItem(PLAN_RESULTS_STORAGE_KEY);
     setLastUsedModifiers({
       smartPitstops: filters.smartPitstops,
@@ -365,6 +432,22 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
           onDone: ({ degraded }) => {
             setIsStreaming(false);
             setPlanDegraded(degraded);
+            // Fetch nearest sponsored stop in background once we have coords
+            const coords = originCoords;
+            if (coords && coords.lat !== 0 && coords.lng !== 0) {
+              void getNearbySponsored(coords.lat, coords.lng).then((stop) => {
+                if (!stop) return;
+                if (
+                  stop.lat != null &&
+                  stop.lng != null &&
+                  haversineKm(coords.lat, coords.lng, stop.lat, stop.lng) >
+                    MAX_SPONSOR_RADIUS_KM
+                ) {
+                  return;
+                }
+                setSponsored(stop);
+              });
+            }
             try {
               localStorage.setItem(
                 PLAN_RESULTS_STORAGE_KEY,
@@ -404,6 +487,27 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     return () => {
       window.clearInterval(intervalId);
     };
+  }, [loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingCardIndex(0);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setLoadingCardIndex((current) => (current + 1) % INFO_CARDS.length);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [loading]);
+
+  useEffect(() => {
+    if (loading && loadingHeroRef.current) {
+      loadingHeroRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, [loading]);
 
   const requestCurrentLocation = (mode: 'auto' | 'manual') => {
@@ -736,44 +840,83 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
           </div>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div ref={loadingHeroRef} className="grid gap-4 md:grid-cols-2">
           {loading
             ? [
                 <article
                   key="loading-hero"
-                  className="md:col-span-2 rounded-card bg-white p-6 shadow-wayfarer-soft"
+                  className="md:col-span-2 rounded-card bg-white shadow-wayfarer-ambient overflow-hidden flex flex-col"
+                  style={{ minHeight: '420px' }}
                 >
-                  <p className="mb-2 font-body text-[11px] uppercase tracking-[0.14em] text-wayfarer-secondary">
-                    Building your journey
-                  </p>
-                  <h3 className="font-display text-xl font-semibold text-wayfarer-primary">
-                    Crafting something special for you
-                  </h3>
-                  <p className="mt-2 font-body text-sm text-wayfarer-text-muted">
-                    {LOADING_MESSAGES[loadingMessageIndex]}
-                  </p>
+                  <style>{`@keyframes cardFadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-                  <div className="mt-4 flex items-center gap-2" aria-hidden>
-                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-wayfarer-primary" />
-                    <span
-                      className="h-2.5 w-2.5 animate-bounce rounded-full bg-wayfarer-secondary"
-                      style={{ animationDelay: '120ms' }}
-                    />
-                    <span
-                      className="h-2.5 w-2.5 animate-bounce rounded-full bg-wayfarer-primary-light"
-                      style={{ animationDelay: '240ms' }}
-                    />
+                  {/* Top status bar */}
+                  <div className="flex items-center justify-between border-b border-wayfarer-surface px-6 py-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-wayfarer-primary opacity-60" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-wayfarer-primary" />
+                      </span>
+                      <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-wayfarer-primary">
+                        Building your journey
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {selectedThemes.map((theme) => (
+                        <span
+                          key={`loading-theme-${theme}`}
+                          className="rounded-full bg-wayfarer-surface px-2.5 py-1 font-body text-[11px] font-semibold text-wayfarer-secondary"
+                        >
+                          {themeLabelMap[theme].icon} {themeLabelMap[theme].label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {selectedThemes.map((theme) => (
-                      <span
-                        key={`loading-theme-${theme}`}
-                        className="rounded-full bg-wayfarer-surface px-3 py-1 font-body text-xs font-semibold text-wayfarer-secondary"
+                  {/* Card content — slides on change */}
+                  <div className="flex flex-1 flex-col px-6 py-8">
+                    <div
+                      key={loadingCardIndex}
+                      className="flex flex-1 flex-col"
+                      style={{ animation: 'cardFadeSlide 0.45s ease forwards' }}
+                    >
+                      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-wayfarer-surface text-3xl">
+                        {INFO_CARDS[loadingCardIndex].icon}
+                      </div>
+                      <h3 className="font-display text-2xl font-extrabold leading-snug text-wayfarer-primary">
+                        {INFO_CARDS[loadingCardIndex].title}
+                      </h3>
+                      <p
+                        className="mt-3 font-body text-sm leading-relaxed text-wayfarer-text-muted"
+                        style={{ maxWidth: '56ch' }}
                       >
-                        {themeLabelMap[theme].icon} {themeLabelMap[theme].label}
+                        {INFO_CARDS[loadingCardIndex].body}
+                      </p>
+                      <div className="mt-5 inline-flex items-start gap-2 rounded-xl bg-wayfarer-surface px-4 py-3">
+                        <span className="mt-0.5 text-sm">💡</span>
+                        <p className="font-body text-xs font-semibold leading-relaxed text-wayfarer-text-main">
+                          {INFO_CARDS[loadingCardIndex].highlight}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Progress + status */}
+                    <div className="mt-8 flex items-center gap-3">
+                      {INFO_CARDS.map((_, i) => (
+                        <span
+                          key={i}
+                          className="rounded-full bg-wayfarer-primary transition-all duration-500"
+                          style={{
+                            height: '5px',
+                            width: i === loadingCardIndex ? '28px' : '5px',
+                            opacity: i === loadingCardIndex ? 1 : 0.2,
+                          }}
+                        />
+                      ))}
+                      <span className="ml-1 animate-pulse font-body text-xs text-wayfarer-text-muted">
+                        {LOADING_MESSAGES[loadingMessageIndex]}
                       </span>
-                    ))}
+                    </div>
                   </div>
                 </article>,
                 ...Array.from({ length: 2 }).map((_, index) => (
@@ -790,6 +933,85 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                 )),
               ]
             : null}
+
+          {sponsored && planOptions.length > 0 && (
+            <div className="rounded-card border border-wayfarer-tertiary-fixed/40 bg-wayfarer-tertiary-fixed/10 p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="rounded bg-wayfarer-tertiary-fixed px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-wayfarer-tertiary-fixed-dark">
+                  Sponsored
+                </span>
+                <span className="font-body text-xs text-wayfarer-text-muted">
+                  Along your route
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                {sponsored.imageUrl ? (
+                  <img
+                    src={sponsored.imageUrl}
+                    alt={sponsored.title}
+                    className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-wayfarer-tertiary-fixed/30 text-wayfarer-tertiary-fixed-dark">
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z" />
+                    </svg>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-display text-base font-extrabold text-wayfarer-primary">
+                    {sponsored.title}
+                  </p>
+                  <p className="text-xs leading-relaxed text-wayfarer-text-muted">
+                    {sponsored.description}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                {sponsored.url && (
+                  <a
+                    href={sponsored.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 rounded-xl border border-wayfarer-primary py-2 text-center text-sm font-semibold text-wayfarer-primary transition hover:bg-wayfarer-primary hover:text-white"
+                  >
+                    Learn More
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl bg-wayfarer-primary py-2 text-sm font-bold text-white transition hover:opacity-90"
+                  onClick={() => {
+                    if (!sponsored.lat || !sponsored.lng) return;
+                    const syntheticStop = {
+                      query: sponsored.title,
+                      status: 'resolved' as const,
+                      stopType: 'attraction' as const,
+                      suggestion: {
+                        id: sponsored.placeId,
+                        placeId: sponsored.placeId,
+                        title: sponsored.title,
+                        description: sponsored.description,
+                        distanceKm: 0,
+                        lat: sponsored.lat,
+                        lng: sponsored.lng,
+                        imageUrl: sponsored.imageUrl,
+                      },
+                    };
+                    setPlanOptions((prev) =>
+                      prev.map((opt) => ({
+                        ...opt,
+                        stops: [syntheticStop, ...opt.stops],
+                      })),
+                    );
+                    setSponsored(null);
+                  }}
+                >
+                  + Add to Plan
+                </button>
+              </div>
+            </div>
+          )}
 
           {planOptions.map((option, index) => (
             <article
