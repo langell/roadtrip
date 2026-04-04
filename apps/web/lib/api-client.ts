@@ -358,6 +358,20 @@ export const getTripSponsoredStop = async (
   }
 };
 
+export type HotelResult = {
+  placeId: string;
+  name: string;
+  vicinity: string;
+  lat: number;
+  lng: number;
+  rating: number | null;
+  reviewCount: number | null;
+  priceLevel: 1 | 2 | 3 | 4 | null;
+  photoUrl: string | null;
+  expediaUrl: string;
+  bookingUrl: string;
+};
+
 export type TrendingRoute = {
   cacheId: string;
   location: string;

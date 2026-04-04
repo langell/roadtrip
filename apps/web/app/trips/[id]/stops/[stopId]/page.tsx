@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { requireAuth } from '../../../../../lib/session';
 import { getTripDetailServer } from '../../../../../lib/server-api-client';
+import { NearbyHotels } from '../../../../../components/NearbyHotels';
 import { reverseGeocode } from '../../../../../lib/geocode';
 
 type Props = {
@@ -457,6 +458,9 @@ const StopDetailPage = async ({ params }: Props) => {
             </div>
           </div>
         </section>
+
+        {/* ── Nearby hotels ────────────────────────────────── */}
+        <NearbyHotels lat={stop.lat} lng={stop.lng} stopName={stop.name} />
 
         {/* ── Adjacent stops ────────────────────────────────── */}
         {totalStops > 1 && (

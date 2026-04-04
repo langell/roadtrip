@@ -42,6 +42,9 @@ const schema = z.object({
   NEXTAUTH_SECRET: z.string().min(1).optional(),
   // Comma-separated list of user IDs that can access admin endpoints
   ADMIN_USER_IDS: z.string().optional(),
+  // Affiliate partner IDs for hotel monetization
+  EXPEDIA_AFFILIATE_ID: z.string().min(1).optional(),
+  BOOKING_AFFILIATE_ID: z.string().min(1).optional(),
 });
 
 export const env = schema.parse(process.env);

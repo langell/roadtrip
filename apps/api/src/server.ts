@@ -23,6 +23,7 @@ import {
   AiTripPlannerError,
 } from './services/ai-trip-planner-service.js';
 import { aiStopDescriptionService } from './services/ai-stop-description-service.js';
+import { hotelSearchService } from './services/hotel-search-service.js';
 import { prisma } from './lib/prisma.js';
 import { getRequestUserId } from './lib/request-auth.js';
 import { requireAuth } from './lib/require-auth.js';
@@ -814,6 +815,33 @@ export const createApp = () => {
         lat: best.lat ?? undefined,
         lng: best.lng ?? undefined,
       });
+    }),
+  );
+
+  // Public — no auth required (geo data only, no PII)
+  app.get(
+    '/hotels/nearby',
+    withAsyncHandler(async (req, res) => {
+      const requestLogger = getRequestLogger(res);
+      const latRaw = req.query.lat;
+      const lngRaw = req.query.lng;
+      const radiusRaw = req.query.radiusKm;
+      const lat = typeof latRaw === 'string' ? parseFloat(latRaw) : NaN;
+      const lng = typeof lngRaw === 'string' ? parseFloat(lngRaw) : NaN;
+      const radiusKm = typeof radiusRaw === 'string' ? parseFloat(radiusRaw) : 15;
+
+      if (isNaN(lat) || isNaN(lng)) {
+        res.status(400).json({ error: 'INVALID_COORDS' });
+        return;
+      }
+
+      try {
+        const hotels = await hotelSearchService.searchNearby({ lat, lng, radiusKm });
+        res.json(hotels);
+      } catch (error) {
+        logError(requestLogger, 'hotels.nearby.failure', error, { lat, lng, radiusKm });
+        res.json([]);
+      }
     }),
   );
 
