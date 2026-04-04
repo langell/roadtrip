@@ -261,7 +261,7 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
           {/* Save button — outlined secondary pill */}
           <button
             onClick={() => void handleSave()}
-            className={`flex h-9 items-center gap-2 rounded-full border px-4 font-display text-sm font-bold transition-all active:scale-95 ${
+            className={`flex h-9 shrink-0 items-center gap-2 rounded-full border px-4 font-display text-sm font-bold whitespace-nowrap transition-all active:scale-95 ${
               saveState === 'saved'
                 ? 'border-wayfarer-primary bg-wayfarer-primary text-white'
                 : saveState === 'error'
@@ -303,7 +303,7 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
           {/* Plan your own button — filled primary pill */}
           <Link
             href="/"
-            className="flex h-9 items-center rounded-full bg-wayfarer-primary px-5 font-display text-sm font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
+            className="flex h-9 shrink-0 items-center rounded-full bg-wayfarer-primary px-5 font-display text-sm font-bold text-white whitespace-nowrap transition-opacity hover:opacity-90 active:scale-95"
           >
             Plan your own
           </Link>
