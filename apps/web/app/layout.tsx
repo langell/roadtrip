@@ -8,7 +8,7 @@ import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
 import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
-  title: 'HipTrip | Plan unforgettable drives',
+  title: 'HipTrip',
   description:
     'HipTrip surfaces curated attractions, optimizes routes, and helps you monetize curated travel content.',
   icons: {

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
+import ProfileDropdown from './ProfileDropdown';
 
 type AuthControlsProps = {
   variant?: 'default' | 'nav';
@@ -49,7 +50,7 @@ const AuthControls = ({ variant = 'default' }: AuthControlsProps) => {
       </Link>
     );
 
-    if (isNav) return avatar;
+    if (isNav) return <ProfileDropdown />;
 
     return (
       <div className="flex items-center justify-end gap-3">

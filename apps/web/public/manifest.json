@@ -1,6 +1,6 @@
 {
-  "name": "RoadTrip",
-  "short_name": "RoadTrip",
+  "name": "HipTrip",
+  "short_name": "HipTrip",
   "description": "Plan unforgettable road trips with curated stops and AI-powered routes.",
   "start_url": "/",
   "display": "standalone",
@@ -38,14 +38,14 @@
       "src": "/screenshots/mobile.png",
       "sizes": "390x844",
       "type": "image/png",
-      "label": "RoadTrip — plan your next road trip"
+      "label": "HipTrip — plan your next road trip"
     },
     {
       "src": "/screenshots/desktop.png",
       "sizes": "1280x800",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "RoadTrip — desktop view"
+      "label": "HipTrip — desktop view"
     }
   ]
 }

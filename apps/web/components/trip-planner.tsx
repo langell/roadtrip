@@ -1,16 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import MiniRouteMap from './MiniRouteMap';
 import { useRouter } from 'next/navigation';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 import { TripThemeSchema } from '@roadtrip/types';
 import { Button } from '@roadtrip/ui';
-import {
-  streamTripPlans,
-  type TripPlanOption,
-  type PlannedStopResolved,
-} from '../lib/api-client';
+import { streamTripPlans, type TripPlanOption } from '../lib/api-client';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const LOCATION_STORAGE_KEY = 'hiptrip:location';
@@ -810,18 +805,6 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
               <p className="font-body text-sm leading-relaxed text-wayfarer-text-muted">
                 {option.rationale}
               </p>
-
-              {(() => {
-                const pts = option.stops
-                  .filter((s): s is PlannedStopResolved => s.status === 'resolved')
-                  .map((s) => ({ lat: s.suggestion.lat, lng: s.suggestion.lng }));
-                return (
-                  <MiniRouteMap
-                    stops={pts}
-                    mapsKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''}
-                  />
-                );
-              })()}
 
               <ul className="mt-4 space-y-3">
                 {option.stops.map((stop, stopIndex) => (

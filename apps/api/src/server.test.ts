@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 
-vi.mock('./config/env.js', () => ({
-  env: {
+const { mockEnv } = vi.hoisted(() => {
+  const mockEnv = {
     LOG_LEVEL: 'info',
     PORT: 0,
     ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS: 60000,
@@ -10,8 +10,12 @@ vi.mock('./config/env.js', () => ({
     ANON_PHOTO_RATE_LIMIT_WINDOW_MS: 60000,
     ANON_PHOTO_RATE_LIMIT_MAX: 10,
     TRIP_PLAN_CACHE_TTL_DAYS: 30,
-  },
-}));
+    ADMIN_USER_IDS: undefined as string | undefined,
+  };
+  return { mockEnv };
+});
+
+vi.mock('./config/env.js', () => ({ env: mockEnv }));
 
 vi.mock('./types/context.js', () => ({
   createContext: () => ({ prisma: {}, userId: undefined }),
@@ -33,6 +37,10 @@ const prismaMock = {
   },
   sponsoredPlace: {
     findMany: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
 };
 vi.mock('./lib/prisma.js', () => ({
@@ -112,6 +120,7 @@ describe('HTTP server', () => {
     findStops.mockReset();
     resolvePlannedStops.mockReset();
     geocodeLocation.mockReset();
+    mockEnv.ADMIN_USER_IDS = undefined;
     generatePlans.mockReset();
     generateDescriptions.mockReset();
     prismaMock.trip.findMany.mockReset();
@@ -124,6 +133,10 @@ describe('HTTP server', () => {
     prismaMock.tripPlanCache.create.mockReset();
     prismaMock.tripPlanCache.update.mockReset();
     prismaMock.sponsoredPlace.findMany.mockReset();
+    prismaMock.sponsoredPlace.findUnique.mockReset();
+    prismaMock.sponsoredPlace.create.mockReset();
+    prismaMock.sponsoredPlace.update.mockReset();
+    prismaMock.sponsoredPlace.delete.mockReset();
   });
 
   afterEach(() => {
@@ -1556,6 +1569,139 @@ describe('HTTP server', () => {
       const response = await request(app).post('/trips/save-plan').send(savePlanBody);
       expect(response.status).toBe(401);
       expect(generateDescriptions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Admin sponsor endpoints', () => {
+    const mockSponsor = {
+      id: 'sp-1',
+      placeId: 'abc123',
+      title: 'Seaside Inn',
+      description: 'Right on the coast',
+      url: 'https://seaside.example.com',
+      imageUrl: null,
+      lat: 45.9,
+      lng: -123.9,
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('returns 401 for unauthenticated admin requests', async () => {
+      const app = createApp();
+      const res = await request(app).get('/admin/sponsors');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 when user is not in ADMIN_USER_IDS', async () => {
+      const app = createApp();
+      const res = await request(app)
+        .get('/admin/sponsors')
+        .set('authorization', 'Bearer user-1');
+      expect(res.status).toBe(403);
+    });
+
+    it('GET /admin/sponsors lists all sponsors for admin', async () => {
+      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.sponsoredPlace.findMany.mockResolvedValue([mockSponsor]);
+      const app = createApp();
+
+      const res = await request(app)
+        .get('/admin/sponsors')
+        .set('authorization', 'Bearer user-1');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].title).toBe('Seaside Inn');
+      mockEnv.ADMIN_USER_IDS = undefined;
+    });
+
+    it('POST /admin/sponsors creates a new sponsor', async () => {
+      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.sponsoredPlace.create.mockResolvedValue(mockSponsor);
+      const app = createApp();
+
+      const res = await request(app)
+        .post('/admin/sponsors')
+        .set('authorization', 'Bearer user-1')
+        .send({
+          title: 'Seaside Inn',
+          description: 'Right on the coast',
+          url: 'https://seaside.example.com',
+          lat: 45.9,
+          lng: -123.9,
+        });
+
+      expect(res.status).toBe(201);
+      expect(prismaMock.sponsoredPlace.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'Seaside Inn', lat: 45.9, lng: -123.9 }),
+        }),
+      );
+      mockEnv.ADMIN_USER_IDS = undefined;
+    });
+
+    it('PATCH /admin/sponsors/:id updates a sponsor', async () => {
+      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.sponsoredPlace.findUnique.mockResolvedValue(mockSponsor);
+      prismaMock.sponsoredPlace.update.mockResolvedValue({
+        ...mockSponsor,
+        active: false,
+      });
+      const app = createApp();
+
+      const res = await request(app)
+        .patch('/admin/sponsors/sp-1')
+        .set('authorization', 'Bearer user-1')
+        .send({ active: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.active).toBe(false);
+      mockEnv.ADMIN_USER_IDS = undefined;
+    });
+
+    it('PATCH /admin/sponsors/:id returns 404 for unknown sponsor', async () => {
+      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.sponsoredPlace.findUnique.mockResolvedValue(null);
+      const app = createApp();
+
+      const res = await request(app)
+        .patch('/admin/sponsors/bad-id')
+        .set('authorization', 'Bearer user-1')
+        .send({ active: false });
+
+      expect(res.status).toBe(404);
+      mockEnv.ADMIN_USER_IDS = undefined;
+    });
+
+    it('DELETE /admin/sponsors/:id removes a sponsor', async () => {
+      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.sponsoredPlace.findUnique.mockResolvedValue(mockSponsor);
+      prismaMock.sponsoredPlace.delete.mockResolvedValue(mockSponsor);
+      const app = createApp();
+
+      const res = await request(app)
+        .delete('/admin/sponsors/sp-1')
+        .set('authorization', 'Bearer user-1');
+
+      expect(res.status).toBe(204);
+      expect(prismaMock.sponsoredPlace.delete).toHaveBeenCalledWith({
+        where: { id: 'sp-1' },
+      });
+      mockEnv.ADMIN_USER_IDS = undefined;
+    });
+
+    it('DELETE /admin/sponsors/:id returns 404 for unknown sponsor', async () => {
+      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.sponsoredPlace.findUnique.mockResolvedValue(null);
+      const app = createApp();
+
+      const res = await request(app)
+        .delete('/admin/sponsors/bad-id')
+        .set('authorization', 'Bearer user-1');
+
+      expect(res.status).toBe(404);
+      mockEnv.ADMIN_USER_IDS = undefined;
     });
   });
 });

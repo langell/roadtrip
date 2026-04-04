@@ -40,6 +40,8 @@ const schema = z.object({
   CORS_ORIGIN: z.string().optional(),
   AUTH_SECRET: z.string().min(1).optional(),
   NEXTAUTH_SECRET: z.string().min(1).optional(),
+  // Comma-separated list of user IDs that can access admin endpoints
+  ADMIN_USER_IDS: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

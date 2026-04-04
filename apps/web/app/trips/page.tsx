@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { requireAuth } from '../../lib/session';
 import { getMyTripsServer } from '../../lib/server-api-client';
 import Logo from '../../components/Logo';
 import TripCardActions from '../../components/TripCardActions';
+import ProfileDropdown from '../../components/ProfileDropdown';
 import type { SavedTrip } from '../../lib/api-client';
 
 const MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -45,23 +45,10 @@ async function enrichTripsWithPhotos(trips: SavedTrip[]): Promise<TripWithPhoto[
   });
 }
 
-function getInitials(name?: string | null, email?: string | null): string {
-  const src = name ?? email ?? '?';
-  return src
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 const TripsPage = async () => {
-  const session = await requireAuth('/trips');
+  await requireAuth('/trips');
   const rawTrips = await getMyTripsServer();
   const trips = await enrichTripsWithPhotos(rawTrips);
-  const initials = getInitials(session.user.name, session.user.email);
-  const userImage = session.user.image ?? null;
-
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main">
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between bg-wayfarer-bg/90 px-6 backdrop-blur-sm md:px-10">
@@ -73,21 +60,7 @@ const TripsPage = async () => {
           >
             Plan a Trip
           </Link>
-          <Link href="/account" title="Account">
-            {userImage ? (
-              <Image
-                src={userImage}
-                alt={session.user.name ?? 'Account'}
-                width={36}
-                height={36}
-                className="h-9 w-9 rounded-full object-cover shadow-wayfarer-soft transition hover:opacity-85"
-              />
-            ) : (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-wayfarer-primary font-display text-sm font-bold text-white shadow-wayfarer-soft transition hover:opacity-85">
-                {initials}
-              </span>
-            )}
-          </Link>
+          <ProfileDropdown />
         </nav>
       </header>
 
