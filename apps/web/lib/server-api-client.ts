@@ -9,7 +9,7 @@
 
 import { SignJWT } from 'jose';
 import { auth } from '../auth';
-import type { SavedTrip, TripDetail, SponsoredStop } from './api-client';
+import type { SavedTrip, TripDetail, SponsoredStop, HotelResult } from './api-client';
 
 const API_TOKEN_ISSUER = 'roadtrip-web';
 const API_TOKEN_AUDIENCE = 'roadtrip-api';
@@ -63,6 +63,24 @@ export const getTripDetailServer = async (tripId: string): Promise<TripDetail | 
     return (await response.json()) as TripDetail;
   } catch {
     return null;
+  }
+};
+
+export const getNearbyHotelsServer = async (
+  lat: number,
+  lng: number,
+  radiusKm = 15,
+): Promise<HotelResult[]> => {
+  try {
+    const url = new URL(`${apiBaseUrl}/hotels/nearby`);
+    url.searchParams.set('lat', String(lat));
+    url.searchParams.set('lng', String(lng));
+    url.searchParams.set('radiusKm', String(radiusKm));
+    const response = await fetch(url.toString(), { cache: 'no-store' });
+    if (!response.ok) return [];
+    return (await response.json()) as HotelResult[];
+  } catch {
+    return [];
   }
 };
 

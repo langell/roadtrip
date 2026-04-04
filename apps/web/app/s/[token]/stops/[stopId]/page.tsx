@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSharedTrip } from '../../../../../lib/api-client';
 import { reverseGeocode } from '../../../../../lib/geocode';
+import { NearbyHotels } from '../../../../../components/NearbyHotels';
 
 type Props = {
   params: Promise<{ token: string; stopId: string }>;
@@ -432,6 +433,9 @@ const SharedStopDetailPage = async ({ params }: Props) => {
             </div>
           </div>
         </section>
+
+        {/* ── Nearby hotels ────────────────────────────────── */}
+        <NearbyHotels lat={stop.lat} lng={stop.lng} stopName={stop.name} />
 
         {/* ── Other stops on this trip ──────────────────────── */}
         {totalStops > 1 && (
