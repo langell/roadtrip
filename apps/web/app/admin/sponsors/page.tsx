@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import GooglePlacesAutocomplete from '../../../components/GooglePlacesAutocomplete';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 
@@ -19,6 +20,7 @@ type Sponsor = {
 };
 
 type FormState = {
+  placeId: string;
   title: string;
   description: string;
   url: string;
@@ -29,6 +31,7 @@ type FormState = {
 };
 
 const emptyForm = (): FormState => ({
+  placeId: '',
   title: '',
   description: '',
   url: '',
@@ -39,6 +42,7 @@ const emptyForm = (): FormState => ({
 });
 
 const sponsorToForm = (s: Sponsor): FormState => ({
+  placeId: s.placeId,
   title: s.title,
   description: s.description,
   url: s.url ?? '',
@@ -69,6 +73,38 @@ const authHeaders = async (): Promise<Record<string, string>> => {
     : { 'content-type': 'application/json' };
 };
 
+/** Fetch place details (name, address, coords, photo, website) from Google Places API */
+const fetchPlaceDetails = async (placeId: string): Promise<Partial<FormState>> => {
+  if (typeof window === 'undefined' || !window.google?.maps?.importLibrary) return {};
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { Place } = (await window.google.maps.importLibrary('places')) as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    const place = new Place({ id: placeId }) as {
+      fetchFields: (opts: { fields: string[] }) => Promise<void>;
+      displayName: string | null;
+      formattedAddress: string | null;
+      location: { lat: () => number; lng: () => number } | null;
+      photos: { getURI: (opts: { maxWidth: number }) => string }[] | undefined;
+      websiteURI: string | null;
+    };
+    await place.fetchFields({
+      fields: ['displayName', 'formattedAddress', 'location', 'photos', 'websiteURI'],
+    });
+    const result: Partial<FormState> = { placeId };
+    if (place.displayName) result.title = place.displayName;
+    if (place.location) {
+      result.lat = String(place.location.lat());
+      result.lng = String(place.location.lng());
+    }
+    if (place.photos?.[0]) result.imageUrl = place.photos[0].getURI({ maxWidth: 800 });
+    if (place.websiteURI) result.url = place.websiteURI;
+    return result;
+  } catch {
+    return {};
+  }
+};
+
 export default function AdminSponsorsPage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +115,8 @@ export default function AdminSponsorsPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [placeSearch, setPlaceSearch] = useState('');
+  const [fetchingPlace, setFetchingPlace] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -87,7 +125,7 @@ export default function AdminSponsorsPage() {
       const headers = await authHeaders();
       const res = await fetch(`${API_BASE}/admin/sponsors`, { headers });
       if (res.status === 401 || res.status === 403) {
-        setError('Access denied. Make sure your user ID is in ADMIN_USER_IDS.');
+        setError('Access denied.');
         return;
       }
       if (!res.ok) throw new Error('Failed to load');
@@ -105,21 +143,32 @@ export default function AdminSponsorsPage() {
 
   const openNew = () => {
     setForm(emptyForm());
+    setPlaceSearch('');
     setEditingId('new');
   };
 
   const openEdit = (s: Sponsor) => {
     setForm(sponsorToForm(s));
+    setPlaceSearch(s.title);
     setEditingId(s.id);
   };
 
   const cancel = () => setEditingId(null);
+
+  const handlePlaceSelect = async (description: string, placeId: string) => {
+    setPlaceSearch(description);
+    setFetchingPlace(true);
+    const details = await fetchPlaceDetails(placeId);
+    setForm((f) => ({ ...f, ...details }));
+    setFetchingPlace(false);
+  };
 
   const save = async () => {
     setSaving(true);
     try {
       const headers = await authHeaders();
       const body = {
+        placeId: form.placeId || undefined,
         title: form.title,
         description: form.description,
         url: form.url || null,
@@ -128,13 +177,11 @@ export default function AdminSponsorsPage() {
         lng: form.lng !== '' ? parseFloat(form.lng) : null,
         active: form.active,
       };
-
       const url =
         editingId === 'new'
           ? `${API_BASE}/admin/sponsors`
           : `${API_BASE}/admin/sponsors/${editingId}`;
       const method = editingId === 'new' ? 'POST' : 'PATCH';
-
       const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
       if (!res.ok) throw new Error('Save failed');
       setEditingId(null);
@@ -211,7 +258,6 @@ export default function AdminSponsorsPage() {
           <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>
         )}
 
-        {/* ── Sponsor list ───────────────────────────────── */}
         {!loading && !error && (
           <div className="space-y-3">
             {sponsors.length === 0 && (
@@ -242,11 +288,7 @@ export default function AdminSponsorsPage() {
                         {s.title}
                       </p>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          s.active
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-wayfarer-surface-deep text-wayfarer-text-muted'
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.active ? 'bg-green-100 text-green-700' : 'bg-wayfarer-surface-deep text-wayfarer-text-muted'}`}
                       >
                         {s.active ? 'Active' : 'Inactive'}
                       </span>
@@ -271,7 +313,6 @@ export default function AdminSponsorsPage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     onClick={() => void toggleActive(s)}
@@ -317,44 +358,96 @@ export default function AdminSponsorsPage() {
         {/* ── Create / Edit form ─────────────────────────── */}
         {editingId !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-3xl bg-wayfarer-bg p-8 shadow-wayfarer-ambient">
+            <div className="w-full max-w-lg rounded-3xl bg-wayfarer-bg p-8 shadow-wayfarer-ambient max-h-[90vh] overflow-y-auto">
               <h2 className="mb-6 font-display text-xl font-extrabold text-wayfarer-primary">
                 {editingId === 'new' ? 'New Sponsor' : 'Edit Sponsor'}
               </h2>
 
               <div className="space-y-4">
-                {field('Title *', 'title', 'text', 'e.g. Crater Lake Lodge')}
+                {/* Places search */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold uppercase tracking-wider text-wayfarer-text-muted">
-                    Description *
+                    Search Google Places
                   </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Short tagline shown on the ad card"
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, description: e.target.value }))
-                    }
-                    className="rounded-lg border border-wayfarer-accent/30 bg-wayfarer-surface px-3 py-2 text-sm text-wayfarer-text-main outline-none focus:border-wayfarer-primary focus:ring-1 focus:ring-wayfarer-primary"
-                  />
+                  <div className="relative">
+                    <GooglePlacesAutocomplete
+                      value={placeSearch}
+                      onChange={setPlaceSearch}
+                      onSelect={(val) => setPlaceSearch(val)}
+                      onSelectWithPlaceId={(desc, placeId) =>
+                        void handlePlaceSelect(desc, placeId)
+                      }
+                      placeholder="Search for a business or location…"
+                      placeTypes={[]}
+                    />
+                    {fetchingPlace && (
+                      <p className="mt-1 text-xs text-wayfarer-text-muted">
+                        Fetching details…
+                      </p>
+                    )}
+                  </div>
+                  {form.placeId && (
+                    <p className="text-[11px] text-wayfarer-text-muted">
+                      Place ID: {form.placeId}
+                    </p>
+                  )}
                 </div>
-                {field('Destination URL', 'url', 'url', 'https://example.com')}
-                {field('Image URL', 'imageUrl', 'url', 'https://example.com/photo.jpg')}
-                <div className="grid grid-cols-2 gap-3">
-                  {field('Latitude', 'lat', 'number', '45.52')}
-                  {field('Longitude', 'lng', 'number', '-122.68')}
+
+                <div className="border-t border-wayfarer-accent/20 pt-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-wayfarer-text-muted">
+                    Details (auto-filled or edit manually)
+                  </p>
+                  {field('Title *', 'title', 'text', 'e.g. Crater Lake Lodge')}
+                  <div className="mt-4 flex flex-col gap-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-wayfarer-text-muted">
+                      Description *
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Short tagline shown on the ad card"
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, description: e.target.value }))
+                      }
+                      className="rounded-lg border border-wayfarer-accent/30 bg-wayfarer-surface px-3 py-2 text-sm text-wayfarer-text-main outline-none focus:border-wayfarer-primary focus:ring-1 focus:ring-wayfarer-primary"
+                    />
+                  </div>
+                  <div className="mt-4">
+                    {field('Destination URL', 'url', 'url', 'https://example.com')}
+                  </div>
+                  <div className="mt-4">
+                    {field(
+                      'Image URL',
+                      'imageUrl',
+                      'url',
+                      'https://example.com/photo.jpg',
+                    )}
+                  </div>
+                  {form.imageUrl && (
+                    <img
+                      src={form.imageUrl}
+                      alt="Preview"
+                      className="mt-2 h-24 w-full rounded-xl object-cover"
+                    />
+                  )}
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {field('Latitude', 'lat', 'number', '45.52')}
+                    {field('Longitude', 'lng', 'number', '-122.68')}
+                  </div>
+                  <label className="mt-4 flex cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.active}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, active: e.target.checked }))
+                      }
+                      className="h-4 w-4 rounded accent-wayfarer-primary"
+                    />
+                    <span className="text-sm font-medium text-wayfarer-text-main">
+                      Active (show in trips)
+                    </span>
+                  </label>
                 </div>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={form.active}
-                    onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-                    className="h-4 w-4 rounded accent-wayfarer-primary"
-                  />
-                  <span className="text-sm font-medium text-wayfarer-text-main">
-                    Active (show in trips)
-                  </span>
-                </label>
               </div>
 
               <div className="mt-8 flex justify-end gap-3">

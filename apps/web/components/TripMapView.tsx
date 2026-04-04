@@ -238,13 +238,13 @@ export default function TripMapView({ trip, sponsored }: Props) {
     });
   }, [activeIdx]);
 
-  // Build list items — sponsored card after stop index 1
+  // Build list items — sponsored card always at the top
   const listItems: Array<
     { type: 'stop'; stop: TripDetailStop; idx: number } | { type: 'sponsored' }
   > = [];
+  if (sponsored) listItems.push({ type: 'sponsored' });
   sorted.forEach((stop, i) => {
     listItems.push({ type: 'stop', stop, idx: i });
-    if (i === 1 && sponsored) listItems.push({ type: 'sponsored' });
   });
 
   return (
@@ -361,7 +361,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
           {/* Scrollable stop list */}
           <div className="flex-1 overflow-y-auto px-8 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div className="space-y-0">
-              {listItems.map((item, itemIdx) => {
+              {listItems.map((item) => {
                 if (item.type === 'sponsored') {
                   return (
                     <SponsoredCard
@@ -378,8 +378,6 @@ export default function TripMapView({ trip, sponsored }: Props) {
                 const isLast = idx === sorted.length - 1;
                 const nextStop = sorted[idx + 1];
                 const driveToNext = nextStop?.driveTimeMin ?? null;
-                // Don't show drive row if sponsored card follows (it renders between stops 2 and 3)
-                const nextItemIsSponsored = listItems[itemIdx + 1]?.type === 'sponsored';
 
                 return (
                   <div key={stop.id}>
@@ -470,7 +468,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
                     </div>
 
                     {/* Drive-time row between stops */}
-                    {!isLast && !!driveToNext && !nextItemIsSponsored && (
+                    {!isLast && !!driveToNext && (
                       <div className="mb-2 ml-4 flex items-center gap-3 py-1 pl-10">
                         <svg
                           className="h-4 w-4 shrink-0 text-wayfarer-primary-light"
