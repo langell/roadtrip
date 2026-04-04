@@ -42,6 +42,9 @@ const prismaMock = {
     update: vi.fn(),
     delete: vi.fn(),
   },
+  user: {
+    findUnique: vi.fn(),
+  },
 };
 vi.mock('./lib/prisma.js', () => ({
   prisma: prismaMock,
@@ -121,6 +124,7 @@ describe('HTTP server', () => {
     resolvePlannedStops.mockReset();
     geocodeLocation.mockReset();
     mockEnv.ADMIN_USER_IDS = undefined;
+    prismaMock.user.findUnique.mockReset();
     generatePlans.mockReset();
     generateDescriptions.mockReset();
     prismaMock.trip.findMany.mockReset();
@@ -1593,7 +1597,8 @@ describe('HTTP server', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 403 when user is not in ADMIN_USER_IDS', async () => {
+    it('returns 403 when user does not have ADMIN role', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'USER' });
       const app = createApp();
       const res = await request(app)
         .get('/admin/sponsors')
@@ -1602,7 +1607,7 @@ describe('HTTP server', () => {
     });
 
     it('GET /admin/sponsors lists all sponsors for admin', async () => {
-      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
       prismaMock.sponsoredPlace.findMany.mockResolvedValue([mockSponsor]);
       const app = createApp();
 
@@ -1613,11 +1618,10 @@ describe('HTTP server', () => {
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].title).toBe('Seaside Inn');
-      mockEnv.ADMIN_USER_IDS = undefined;
     });
 
     it('POST /admin/sponsors creates a new sponsor', async () => {
-      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
       prismaMock.sponsoredPlace.create.mockResolvedValue(mockSponsor);
       const app = createApp();
 
@@ -1638,11 +1642,10 @@ describe('HTTP server', () => {
           data: expect.objectContaining({ title: 'Seaside Inn', lat: 45.9, lng: -123.9 }),
         }),
       );
-      mockEnv.ADMIN_USER_IDS = undefined;
     });
 
     it('PATCH /admin/sponsors/:id updates a sponsor', async () => {
-      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
       prismaMock.sponsoredPlace.findUnique.mockResolvedValue(mockSponsor);
       prismaMock.sponsoredPlace.update.mockResolvedValue({
         ...mockSponsor,
@@ -1657,11 +1660,10 @@ describe('HTTP server', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.active).toBe(false);
-      mockEnv.ADMIN_USER_IDS = undefined;
     });
 
     it('PATCH /admin/sponsors/:id returns 404 for unknown sponsor', async () => {
-      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
       prismaMock.sponsoredPlace.findUnique.mockResolvedValue(null);
       const app = createApp();
 
@@ -1671,11 +1673,10 @@ describe('HTTP server', () => {
         .send({ active: false });
 
       expect(res.status).toBe(404);
-      mockEnv.ADMIN_USER_IDS = undefined;
     });
 
     it('DELETE /admin/sponsors/:id removes a sponsor', async () => {
-      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
       prismaMock.sponsoredPlace.findUnique.mockResolvedValue(mockSponsor);
       prismaMock.sponsoredPlace.delete.mockResolvedValue(mockSponsor);
       const app = createApp();
@@ -1688,11 +1689,10 @@ describe('HTTP server', () => {
       expect(prismaMock.sponsoredPlace.delete).toHaveBeenCalledWith({
         where: { id: 'sp-1' },
       });
-      mockEnv.ADMIN_USER_IDS = undefined;
     });
 
     it('DELETE /admin/sponsors/:id returns 404 for unknown sponsor', async () => {
-      mockEnv.ADMIN_USER_IDS = 'user-1';
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
       prismaMock.sponsoredPlace.findUnique.mockResolvedValue(null);
       const app = createApp();
 
@@ -1701,7 +1701,6 @@ describe('HTTP server', () => {
         .set('authorization', 'Bearer user-1');
 
       expect(res.status).toBe(404);
-      mockEnv.ADMIN_USER_IDS = undefined;
     });
   });
 });
