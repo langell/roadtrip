@@ -20,6 +20,7 @@ import { sponsoredRouter } from './routes/sponsored-router.js';
 import { hotelsRouter } from './routes/hotels-router.js';
 import { adminRouter } from './routes/admin-router.js';
 import { jobsRouter } from './routes/jobs-router.js';
+import { analyticsRouter } from './routes/analytics-router.js';
 import { withAsyncHandler } from './lib/async-handler.js';
 
 export const createApp = () => {
@@ -76,6 +77,7 @@ export const createApp = () => {
   app.use('/hotels', hotelsRouter);
   app.use('/admin', adminRouter);
   app.use('/jobs', jobsRouter);
+  app.use('/analytics', analyticsRouter);
 
   // ── tRPC ─────────────────────────────────────────────────────────────────
   app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }));

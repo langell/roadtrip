@@ -15,6 +15,7 @@ import {
   type SponsoredStop,
 } from '../lib/api-client';
 import StopPreviewSheet, { type PreviewStop } from './StopPreviewSheet';
+import { recordEvent } from '../lib/analytics';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const LOCATION_STORAGE_KEY = 'hiptrip:location';
@@ -518,6 +519,11 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
       setLoading(false);
       setIsStreaming(false);
     }
+    recordEvent('trip_generate', {
+      location,
+      themes: selectedThemes,
+      radiusMiles: filters.radiusMiles,
+    });
   };
 
   useEffect(() => {
@@ -720,6 +726,8 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
       originLat: coords?.lat ?? 0,
       originLng: coords?.lng ?? 0,
     };
+
+    recordEvent('trip_save', { location, themes: selectedThemes });
 
     const key = `hiptrip:trip-draft:${Date.now()}`;
     try {
