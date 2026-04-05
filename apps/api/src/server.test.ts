@@ -482,6 +482,18 @@ describe('HTTP server', () => {
             lng: -121.9249,
           },
         },
+        {
+          query: 'Point Lobos',
+          suggestion: {
+            id: 'stop-c',
+            placeId: 'place-c',
+            title: 'Point Lobos State Natural Reserve',
+            description: 'Carmel, CA',
+            distanceKm: 4,
+            lat: 36.5152,
+            lng: -121.9433,
+          },
+        },
       ]);
 
     const app = createApp();

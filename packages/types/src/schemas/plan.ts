@@ -6,20 +6,23 @@ export const StopTypeSchema = z
   .optional()
   .transform((v) => v ?? null);
 
+export const PlannedSuggestionSchema = z.object({
+  id: z.string().min(1),
+  placeId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  distanceKm: z.number().positive(),
+  lat: z.number(),
+  lng: z.number(),
+  imageUrl: z.string().url().optional(),
+});
+
 export const PlannedStopResolvedSchema = z.object({
   query: z.string().min(1),
   status: z.literal('resolved'),
   stopType: StopTypeSchema,
-  suggestion: z.object({
-    id: z.string().min(1),
-    placeId: z.string().min(1),
-    title: z.string().min(1),
-    description: z.string().min(1),
-    distanceKm: z.number().positive(),
-    lat: z.number(),
-    lng: z.number(),
-    imageUrl: z.string().url().optional(),
-  }),
+  suggestion: PlannedSuggestionSchema,
+  alternatives: z.array(PlannedSuggestionSchema).optional(),
 });
 
 export const PlannedStopUnresolvedSchema = z.object({
@@ -41,6 +44,7 @@ export const PlannedOptionsSchema = z.array(PlannedOptionSchema).min(1);
 
 export type StopType = 'attraction' | 'pit_stop' | 'photo_op' | null;
 
+export type PlannedSuggestion = z.infer<typeof PlannedSuggestionSchema>;
 export type PlannedStopResolved = z.infer<typeof PlannedStopResolvedSchema>;
 export type PlannedStopUnresolved = z.infer<typeof PlannedStopUnresolvedSchema>;
 export type PlannedStop = PlannedStopResolved | PlannedStopUnresolved;

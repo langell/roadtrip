@@ -596,34 +596,49 @@ tripsRouter.post(
       'trip.plan.cache_miss',
     );
 
+    type RawStopResult = {
+      query: string;
+      suggestion?: {
+        id: string;
+        placeId: string;
+        title: string;
+        description: string;
+        distanceKm: number;
+        lat: number;
+        lng: number;
+        photoName?: string;
+      };
+      errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+    };
+
+    const toSuggestion = (sr: RawStopResult) => {
+      if (!sr.suggestion) return null;
+      const { photoName, ...rest } = sr.suggestion;
+      return { ...rest, imageUrl: buildSuggestionImageUrl(req, photoName) };
+    };
+
     // Helper: resolve a raw AI option to a PlannedOption with Places API enrichment
     const resolveOption = async (option: {
       title: string;
       rationale: string;
-      stops: { name: string; stopType: StopType }[];
+      stops: { name: string; alternatives: string[]; stopType: StopType }[];
     }): Promise<PlannedOption> => {
       const stopTypeByName = new Map(option.stops.map((s) => [s.name, s.stopType]));
+      const altsByPrimary = new Map(option.stops.map((s) => [s.name, s.alternatives]));
 
-      let stopResults: Array<{
-        query: string;
-        suggestion?: {
-          id: string;
-          placeId: string;
-          title: string;
-          description: string;
-          distanceKm: number;
-          lat: number;
-          lng: number;
-          photoName?: string;
-        };
-        errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
-      }>;
+      // Collect all queries: primaries + alternatives (flattened, guard against missing field)
+      const allQueries = [
+        ...option.stops.map((s) => s.name),
+        ...option.stops.flatMap((s) => s.alternatives ?? []),
+      ];
+      const uniqueQueries = Array.from(new Set(allQueries));
 
+      let allResults: RawStopResult[];
       try {
-        stopResults = await googlePlacesService.resolvePlannedStops({
+        allResults = await googlePlacesService.resolvePlannedStops({
           location: input.location,
           radiusKm: input.radiusKm,
-          stopQueries: option.stops.map((s) => s.name),
+          stopQueries: uniqueQueries,
         });
       } catch (error) {
         const placesError = toPlacesErrorMeta(error);
@@ -631,34 +646,41 @@ tripsRouter.post(
           ...placesError,
           optionTitle: option.title,
         });
-        stopResults = option.stops.map((s) => ({
-          query: s.name,
+        allResults = uniqueQueries.map((q) => ({
+          query: q,
           errorCode: 'UPSTREAM_ERROR' as const,
         }));
       }
 
+      const resultByQuery = new Map(allResults.map((r) => [r.query, r]));
+
       return {
         title: option.title,
         rationale: option.rationale,
-        stops: stopResults.map((stopResult) => {
-          const stopType = stopTypeByName.get(stopResult.query) ?? null;
-          if (!stopResult.suggestion) {
+        stops: option.stops.map((stop) => {
+          const stopType = stopTypeByName.get(stop.name) ?? null;
+          const primaryResult = resultByQuery.get(stop.name);
+          if (!primaryResult?.suggestion) {
             return {
-              query: stopResult.query,
+              query: stop.name,
               status: 'unresolved' as const,
               stopType,
-              errorCode: stopResult.errorCode ?? 'NOT_FOUND',
+              errorCode: primaryResult?.errorCode ?? 'NOT_FOUND',
             };
           }
-          const { photoName, ...suggestion } = stopResult.suggestion;
+          const primarySuggestion = toSuggestion(primaryResult)!;
+          const alternatives = (altsByPrimary.get(stop.name) ?? [])
+            .map((altName) =>
+              toSuggestion(resultByQuery.get(altName) ?? { query: altName }),
+            )
+            .filter((s): s is NonNullable<typeof s> => s !== null);
+
           return {
-            query: stopResult.query,
+            query: stop.name,
             status: 'resolved' as const,
             stopType,
-            suggestion: {
-              ...suggestion,
-              imageUrl: buildSuggestionImageUrl(req, photoName),
-            },
+            suggestion: primarySuggestion,
+            ...(alternatives.length > 0 ? { alternatives } : {}),
           };
         }),
       } satisfies PlannedOption;

@@ -8,20 +8,23 @@ export type TripIdea = {
 
 export type StopType = 'attraction' | 'pit_stop' | 'photo_op' | null;
 
+export type PlannedSuggestion = {
+  id: string;
+  placeId: string;
+  title: string;
+  description: string;
+  distanceKm: number;
+  lat: number;
+  lng: number;
+  imageUrl?: string;
+};
+
 export type PlannedStopResolved = {
   query: string;
   status: 'resolved';
   stopType: StopType;
-  suggestion: {
-    id: string;
-    placeId: string;
-    title: string;
-    description: string;
-    distanceKm: number;
-    lat: number;
-    lng: number;
-    imageUrl?: string;
-  };
+  suggestion: PlannedSuggestion;
+  alternatives?: PlannedSuggestion[];
 };
 
 export type PlannedStopUnresolved = {

@@ -10,6 +10,7 @@ import {
   getNearbySponsored,
   refinePlan,
   type TripPlanOption,
+  type PlannedStopResolved,
   type SponsoredStop,
 } from '../lib/api-client';
 
@@ -278,6 +279,32 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     smartPitstops: boolean;
     photoOps: boolean;
   } | null>(null);
+  // stopSwapIndex[`${optionIdx}-${stopIdx}`] = which suggestion is shown (0 = primary)
+  const [stopSwapIndex, setStopSwapIndex] = useState<Record<string, number>>({});
+
+  const getActiveStopSuggestion = (
+    stop: PlannedStopResolved,
+    optionIdx: number,
+    stopIdx: number,
+  ) => {
+    const key = `${optionIdx}-${stopIdx}`;
+    const swapIdx = stopSwapIndex[key] ?? 0;
+    if (swapIdx === 0) return stop.suggestion;
+    return stop.alternatives?.[swapIdx - 1] ?? stop.suggestion;
+  };
+
+  const cycleStopAlternative = (
+    optionIdx: number,
+    stopIdx: number,
+    totalAlts: number,
+  ) => {
+    const key = `${optionIdx}-${stopIdx}`;
+    setStopSwapIndex((prev) => ({
+      ...prev,
+      [key]: ((prev[key] ?? 0) + 1) % (totalAlts + 1),
+    }));
+  };
+
   const [refineStates, setRefineStates] = useState<
     Record<
       number,
@@ -641,14 +668,25 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     }));
   };
 
-  const handleSelectPlan = async (option: TripPlanOption) => {
+  const handleSelectPlan = async (option: TripPlanOption, optionIdx: number) => {
     let coords = originCoords;
     if (!coords) {
       coords = await forwardGeocode(location);
     }
 
+    // Apply any active stop swaps before saving
+    const resolvedOption: TripPlanOption = {
+      ...option,
+      stops: option.stops.map((stop, stopIdx) => {
+        if (stop.status !== 'resolved') return stop;
+        const activeSuggestion = getActiveStopSuggestion(stop, optionIdx, stopIdx);
+        if (activeSuggestion === stop.suggestion) return stop;
+        return { ...stop, suggestion: activeSuggestion };
+      }),
+    };
+
     const draft = {
-      plan: option,
+      plan: resolvedOption,
       location,
       radiusKm: Math.round(filters.radiusMiles * KM_PER_MILE),
       themes: selectedThemes as string[],
@@ -1186,33 +1224,71 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                       </div>
 
                       {stop.status === 'resolved' ? (
-                        <div className="space-y-1">
-                          {stop.suggestion.imageUrl ? (
-                            <img
-                              src={stop.suggestion.imageUrl}
-                              alt={stop.suggestion.title}
-                              className="mb-2 h-28 w-full rounded-lg object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
-                              No image available
+                        (() => {
+                          const activeSuggestion = getActiveStopSuggestion(
+                            stop,
+                            index,
+                            stopIndex,
+                          );
+                          const altCount = stop.alternatives?.length ?? 0;
+                          const swapKey = `${index}-${stopIndex}`;
+                          const swapIdx = stopSwapIndex[swapKey] ?? 0;
+                          const isSwapped = swapIdx > 0;
+                          return (
+                            <div className="space-y-1">
+                              {activeSuggestion.imageUrl ? (
+                                <img
+                                  src={activeSuggestion.imageUrl}
+                                  alt={activeSuggestion.title}
+                                  className="mb-2 h-28 w-full rounded-lg object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
+                                  No image available
+                                </div>
+                              )}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p
+                                    className={`font-body text-sm font-semibold ${isSwapped ? 'text-wayfarer-secondary' : 'text-wayfarer-primary'}`}
+                                  >
+                                    {activeSuggestion.title}
+                                    {isSwapped && (
+                                      <span className="ml-1 text-[10px] font-normal opacity-70">
+                                        alt
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="font-body text-sm text-wayfarer-text-muted">
+                                    {activeSuggestion.description}
+                                  </p>
+                                  <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
+                                    {Math.max(
+                                      1,
+                                      Math.round(
+                                        activeSuggestion.distanceKm / KM_PER_MILE,
+                                      ),
+                                    )}
+                                    mi away
+                                  </p>
+                                </div>
+                                {altCount > 0 && (
+                                  <button
+                                    type="button"
+                                    title="Try an alternative stop"
+                                    onClick={() =>
+                                      cycleStopAlternative(index, stopIndex, altCount)
+                                    }
+                                    className="mt-0.5 shrink-0 rounded-lg border border-wayfarer-surface p-1.5 text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary"
+                                  >
+                                    ⇄
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          )}
-                          <p className="font-body text-sm font-semibold text-wayfarer-primary">
-                            {stop.suggestion.title}
-                          </p>
-                          <p className="font-body text-sm text-wayfarer-text-muted">
-                            {stop.suggestion.description}
-                          </p>
-                          <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
-                            {Math.max(
-                              1,
-                              Math.round(stop.suggestion.distanceKm / KM_PER_MILE),
-                            )}
-                            mi away
-                          </p>
-                        </div>
+                          );
+                        })()
                       ) : (
                         <div className="space-y-1">
                           <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
@@ -1234,7 +1310,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                   <button
                     type="button"
                     className="w-full rounded-xl bg-wayfarer-primary px-4 py-3 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
-                    onClick={() => void handleSelectPlan(option)}
+                    onClick={() => void handleSelectPlan(option, index)}
                   >
                     Select this trip →
                   </button>

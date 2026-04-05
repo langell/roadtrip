@@ -8,6 +8,7 @@ export type StopType = z.infer<typeof StopTypeSchema>;
 
 const AiStopSchema = z.object({
   name: z.string().min(1),
+  alternatives: z.array(z.string()).max(2).default([]),
   stopType: StopTypeSchema,
 });
 
@@ -303,7 +304,7 @@ export class AiTripPlannerService {
     );
 
     const missingByOption = plans.options.map((option, index) => {
-      const corpus = [option.title, option.rationale, ...option.stops]
+      const corpus = [option.title, option.rationale, ...option.stops.map((s) => s.name)]
         .join(' ')
         .toLowerCase();
       const missingThemes = normalizedThemes.filter((theme) => {
@@ -471,10 +472,11 @@ export class AiTripPlannerService {
       'Output rules:',
       '- Return JSON only (no markdown, no prose, no code fences).',
       '- Use this exact schema:',
-      '{"options":[{"title":"...","rationale":"...","stops":[{"name":"Stop 1","stopType":"attraction"},{"name":"Stop 2","stopType":null}]}]}',
+      '{"options":[{"title":"...","rationale":"...","stops":[{"name":"Stop 1","alternatives":["Alt A","Alt B"],"stopType":"attraction"},{"name":"Stop 2","alternatives":[],"stopType":null}]}]}',
       '- `options` length must equal requested option count.',
       '- Each `stops` array must contain 2-8 stop objects.',
-      '- Each stop must have a `name` (non-empty string) and `stopType` ("attraction", "pit_stop", "photo_op", or null).',
+      '- Each stop must have a `name` (non-empty string), `alternatives` (array of 0-2 alternative place names), and `stopType` ("attraction", "pit_stop", "photo_op", or null).',
+      '- Alternatives should be similar in character to the primary stop but different venues.',
       '- Use stopType="attraction" for standard themed stops. Only use "pit_stop" or "photo_op" when those modifiers are active.',
       '- All other fields are required and must be non-empty strings.',
     ].join('\n');
