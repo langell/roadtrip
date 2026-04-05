@@ -351,6 +351,23 @@ const LandingView = () => (
           </div>
           <div className="space-y-2">
             <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
+              Support
+            </p>
+            <Link
+              href="/support"
+              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+            >
+              Contact Us
+            </Link>
+            <Link
+              href="/faq"
+              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+            >
+              FAQ
+            </Link>
+          </div>
+          <div className="space-y-2">
+            <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
               Legal
             </p>
             <Link
