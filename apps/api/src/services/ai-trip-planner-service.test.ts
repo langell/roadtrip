@@ -65,6 +65,11 @@ const ok = (body: string) => ({ ok: true, status: 200, body });
 const notFound = () => ({ ok: false, status: 404, body: '{}' });
 const serverError = () => ({ ok: false, status: 500, body: '{}' });
 
+const getCallUrl = (fetch: ReturnType<typeof mockFetch>, callIdx: number) => {
+  const urlArg = (fetch.mock.calls[callIdx] as [URL | string])[0];
+  return urlArg instanceof URL ? urlArg.href : String(urlArg);
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -625,11 +630,6 @@ describe('AiTripPlannerService', () => {
   });
 
   describe('two-tier model routing', () => {
-    const getCallUrl = (fetch: ReturnType<typeof mockFetch>, callIdx: number) => {
-      const urlArg = (fetch.mock.calls[callIdx] as [URL | string])[0];
-      return urlArg instanceof URL ? urlArg.href : String(urlArg);
-    };
-
     it('uses fast model (tier 1) for single-theme requests', async () => {
       const plans = validPlans(2);
       const fetch = mockFetch(ok(geminiBody(JSON.stringify(plans))));
@@ -702,6 +702,108 @@ describe('AiTripPlannerService', () => {
       expect(getCallUrl(fetch, 0)).toContain('gemini-2.0-flash');
       // Retry: tier 2 (full)
       expect(getCallUrl(fetch, 1)).toContain('gemini-2.5-pro');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // refinePlan
+  // -------------------------------------------------------------------------
+
+  describe('refinePlan', () => {
+    const existingOption = {
+      title: 'Coastal Loop',
+      rationale: 'A scenic coastal drive with great food.',
+      stops: [{ name: 'Big Sur Lookout' }, { name: 'Nepenthe Restaurant' }],
+    };
+
+    const refinedOptionJson = JSON.stringify({
+      title: 'Coastal Loop',
+      rationale: 'A scenic coastal drive with coffee.',
+      stops: [
+        { name: 'Big Sur Lookout', stopType: 'attraction' },
+        { name: 'Henry Miller Memorial Library', stopType: 'attraction' },
+      ],
+    });
+
+    it('returns a refined option using tier 1 model', async () => {
+      const fetch = mockFetch(ok(geminiBody(refinedOptionJson)));
+      const service = new AiTripPlannerService(fetch);
+
+      const result = await service.refinePlan({
+        existingOption,
+        instruction: 'swap Nepenthe for a coffee shop',
+        location: 'Big Sur, CA',
+        themes: ['scenic', 'foodie'],
+      });
+
+      expect(result.title).toBe('Coastal Loop');
+      expect(result.stops).toHaveLength(2);
+      expect(getCallUrl(fetch, 0)).toContain('gemini-2.0-flash');
+    });
+
+    it('throws AI_KEY_NOT_CONFIGURED when no API key', async () => {
+      mockEnv.GOOGLE_AI_API_KEY = undefined;
+      mockEnv.AI_GATEWAY_API_KEY = undefined;
+      const service = new AiTripPlannerService(vi.fn<typeof fetch>());
+
+      await expect(
+        service.refinePlan({
+          existingOption,
+          instruction: 'add a hike',
+          location: 'Big Sur, CA',
+          themes: ['scenic'],
+        }),
+      ).rejects.toMatchObject({ message: 'AI_KEY_NOT_CONFIGURED' });
+    });
+
+    it('preserves existing rationale when AI omits it', async () => {
+      const noRationale = JSON.stringify({
+        title: 'Updated Loop',
+        rationale: '',
+        stops: [
+          { name: 'Stop A', stopType: 'attraction' },
+          { name: 'Stop B', stopType: 'attraction' },
+        ],
+      });
+      const fetch = mockFetch(ok(geminiBody(noRationale)));
+      const service = new AiTripPlannerService(fetch);
+
+      const result = await service.refinePlan({
+        existingOption,
+        instruction: 'change the first stop',
+        location: 'Big Sur, CA',
+        themes: ['scenic'],
+      });
+
+      expect(result.rationale).toBe(existingOption.rationale);
+    });
+
+    it('throws AI_INVALID_RESPONSE on malformed JSON', async () => {
+      const fetch = mockFetch(ok(geminiBody('not-json')));
+      const service = new AiTripPlannerService(fetch);
+
+      await expect(
+        service.refinePlan({
+          existingOption,
+          instruction: 'add a stop',
+          location: 'Big Sur, CA',
+          themes: ['scenic'],
+        }),
+      ).rejects.toMatchObject({ message: 'AI_INVALID_RESPONSE', stage: 'parse' });
+    });
+
+    it('throws AI_REQUEST_FAILED on HTTP error', async () => {
+      const fetch = mockFetch(serverError());
+      const service = new AiTripPlannerService(fetch);
+
+      await expect(
+        service.refinePlan({
+          existingOption,
+          instruction: 'add a stop',
+          location: 'Big Sur, CA',
+          themes: ['scenic'],
+        }),
+      ).rejects.toMatchObject({ message: 'AI_REQUEST_FAILED' });
     });
   });
 });

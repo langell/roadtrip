@@ -80,6 +80,7 @@ vi.mock('./services/google-places-service.js', () => ({
 
 const generatePlans = vi.fn();
 const generatePlansStream = vi.fn();
+const refinePlan = vi.fn();
 vi.mock('./services/ai-trip-planner-service.js', () => ({
   AiTripPlannerError: class AiTripPlannerError extends Error {
     constructor(
@@ -94,6 +95,7 @@ vi.mock('./services/ai-trip-planner-service.js', () => ({
   aiTripPlannerService: {
     generatePlans,
     generatePlansStream,
+    refinePlan,
   },
 }));
 
@@ -129,6 +131,7 @@ describe('HTTP server', () => {
     prismaMock.user.findUnique.mockReset();
     generatePlans.mockReset();
     generatePlansStream.mockReset();
+    refinePlan.mockReset();
     generateDescriptions.mockReset();
     prismaMock.trip.findMany.mockReset();
     prismaMock.trip.findFirst.mockReset();
@@ -1577,6 +1580,140 @@ describe('HTTP server', () => {
       const response = await request(app).post('/trips/save-plan').send(savePlanBody);
       expect(response.status).toBe(401);
       expect(generateDescriptions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /trips/refine-plan', () => {
+    const refinePlanBody = {
+      location: 'Big Sur, CA',
+      themes: ['scenic', 'foodie'],
+      instruction: 'swap the brewery for a coffee shop',
+      planOption: {
+        title: 'Coastal Loop',
+        rationale: 'Scenic coastal drive.',
+        stops: [{ name: 'Bixby Bridge' }, { name: 'Nepenthe Restaurant' }],
+      },
+    };
+
+    const rawRefined = {
+      title: 'Coastal Loop',
+      rationale: 'Scenic coastal drive with coffee.',
+      stops: [
+        { name: 'Bixby Bridge', stopType: 'attraction' },
+        { name: 'Henry Miller Library', stopType: 'attraction' },
+      ],
+    };
+
+    const resolvedStops = [
+      {
+        query: 'Bixby Bridge',
+        suggestion: {
+          id: 'p1',
+          placeId: 'place-1',
+          title: 'Bixby Bridge',
+          description: 'Iconic arch bridge.',
+          distanceKm: 20,
+          lat: 36.37,
+          lng: -121.9,
+        },
+      },
+      {
+        query: 'Henry Miller Library',
+        suggestion: {
+          id: 'p2',
+          placeId: 'place-2',
+          title: 'Henry Miller Memorial Library',
+          description: 'Quirky arts gathering spot.',
+          distanceKm: 30,
+          lat: 36.16,
+          lng: -121.67,
+        },
+      },
+    ];
+
+    it('returns 200 with refined option on success', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockResolvedValue(rawRefined);
+      resolvePlannedStops.mockResolvedValue(resolvedStops);
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        title: 'Coastal Loop',
+        stops: expect.arrayContaining([expect.objectContaining({ status: 'resolved' })]),
+      });
+      expect(refinePlan).toHaveBeenCalledWith(
+        expect.objectContaining({ instruction: 'swap the brewery for a coffee shop' }),
+      );
+    });
+
+    it('returns 400 for missing instruction', async () => {
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send({ ...refinePlanBody, instruction: '' });
+
+      expect(response.status).toBe(400);
+      expect(refinePlan).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for instruction over 200 chars', async () => {
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send({ ...refinePlanBody, instruction: 'x'.repeat(201) });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 502 when AI service throws', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockRejectedValue(new Error('AI_REQUEST_FAILED'));
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(502);
+      expect(response.body).toMatchObject({ error: 'AI_PLANNER_ERROR' });
+    });
+
+    it('returns 200 with unresolved stops when Places API fails', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockResolvedValue(rawRefined);
+      resolvePlannedStops.mockRejectedValue(new Error('PLACES_ERROR'));
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(200);
+      expect(response.body.stops[0]).toMatchObject({ status: 'unresolved' });
+    });
+
+    it('allows unauthenticated requests within the anonymous limit', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockResolvedValue(rawRefined);
+      resolvePlannedStops.mockResolvedValue(resolvedStops);
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('x-forwarded-for', '10.0.0.1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(200);
     });
   });
 

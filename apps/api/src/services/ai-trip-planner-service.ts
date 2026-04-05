@@ -644,6 +644,122 @@ export class AiTripPlannerService {
     }
   }
 
+  private buildRefinePlanPrompt(input: {
+    existingOption: { title: string; rationale: string; stops: { name: string }[] };
+    instruction: string;
+    location: string;
+    themes: string[];
+  }): string {
+    const stopList = input.existingOption.stops
+      .map((s, i) => `  ${i + 1}. ${s.name}`)
+      .join('\n');
+    return [
+      'You are an expert regional road-trip designer.',
+      'The user wants to make a small edit to an existing trip plan.',
+      '',
+      'Existing plan:',
+      `Title: ${input.existingOption.title}`,
+      `Rationale: ${input.existingOption.rationale}`,
+      'Stops:',
+      stopList,
+      '',
+      `Location context: ${input.location}`,
+      `Themes: ${input.themes.join(', ')}`,
+      '',
+      `User instruction: "${input.instruction}"`,
+      '',
+      'Rules:',
+      '- Make the minimum change needed to satisfy the instruction.',
+      '- Change at most 1-2 stops. Preserve everything else.',
+      '- Keep the same themes and overall vibe.',
+      '- Use realistic place names the Places API can resolve.',
+      '- Update the title and rationale only if the edit materially changes the trip character.',
+      '',
+      'Output rules:',
+      '- Return JSON only (no markdown, no prose, no code fences).',
+      '- Use this exact schema:',
+      '{"title":"...","rationale":"...","stops":[{"name":"Stop 1","stopType":"attraction"},{"name":"Stop 2","stopType":null}]}',
+      '- `stops` must contain 2-8 stop objects.',
+      '- Each stop must have a `name` (non-empty string) and `stopType` ("attraction", "pit_stop", "photo_op", or null).',
+    ].join('\n');
+  }
+
+  async refinePlan(input: {
+    existingOption: { title: string; rationale: string; stops: { name: string }[] };
+    instruction: string;
+    location: string;
+    themes: string[];
+  }): Promise<z.infer<typeof AiTripOptionSchema>> {
+    const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
+    if (!apiKey) {
+      throw new AiTripPlannerError('AI_KEY_NOT_CONFIGURED', 'config');
+    }
+
+    const prompt = this.buildRefinePlanPrompt(input);
+    const model = env.GOOGLE_AI_MODEL_FAST;
+    const fallbackModel = env.GOOGLE_AI_MODEL;
+
+    const { responseBodyText } = await this.requestWithModelFallback({
+      prompt,
+      apiKey,
+      model,
+      fallbackModel,
+    });
+
+    // Parse a single option object (not wrapped in { options: [] })
+    let payload: {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    try {
+      payload = JSON.parse(responseBodyText) as typeof payload;
+    } catch (error) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: String(error),
+      });
+    }
+
+    const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: 'missing_candidates',
+      });
+    }
+
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(this.extractJsonText(rawText));
+    } catch (error) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        reason: String(error),
+      });
+    }
+
+    // Ensure rationale is present
+    if (
+      parsedJson &&
+      typeof parsedJson === 'object' &&
+      !(
+        'rationale' in parsedJson &&
+        typeof (parsedJson as Record<string, unknown>).rationale === 'string' &&
+        ((parsedJson as Record<string, unknown>).rationale as string).trim()
+      )
+    ) {
+      parsedJson = {
+        ...(parsedJson as Record<string, unknown>),
+        rationale: input.existingOption.rationale,
+      };
+    }
+
+    const parsed = AiTripOptionSchema.safeParse(parsedJson);
+    if (!parsed.success) {
+      throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
+        issues: parsed.error.issues,
+      });
+    }
+
+    return parsed.data;
+  }
+
   async generatePlans(input: {
     location: string;
     radiusKm: number;

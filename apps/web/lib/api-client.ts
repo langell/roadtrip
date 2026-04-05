@@ -241,6 +241,29 @@ export const deleteTrip = async (tripId: string): Promise<boolean> => {
   }
 };
 
+export const refinePlan = async (params: {
+  location: string;
+  themes: string[];
+  instruction: string;
+  planOption: { title: string; rationale: string; stops: { name: string }[] };
+}): Promise<TripPlanOption | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/refine-plan`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(await buildAuthHeaders()),
+      },
+      body: JSON.stringify(params),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as TripPlanOption;
+  } catch {
+    return null;
+  }
+};
+
 export type SharedPlan = {
   tripId: string;
   name: string;

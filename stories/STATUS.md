@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-039 `2026-04-plan-refinement.md` — POST /trips/refine-plan; refinePlan() AI service method (tier 1); inline refine UI with undo on each plan card.
 - 2026-04-05 — RT-038 `2026-04-personalization-from-saved-trips.md` — getUserPreferences() builds theme/stop/radius hint from saved trips; injected into AI prompt for authenticated users.
 
 - 2026-04-05 — RT-037 `2026-04-two-tier-model-routing.md` — Tier 1 (fast model) for initial <3-theme requests; Tier 2 (full model) for 3-theme + retries. GOOGLE_AI_MODEL_FAST env var.

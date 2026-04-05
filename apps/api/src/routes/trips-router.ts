@@ -233,6 +233,149 @@ tripsRouter.get(
   }),
 );
 
+// ── Refine plan (targeted AI edit of one option) ────────────────────────────
+
+const refinePlanSchema = z.object({
+  location: z.string().min(1),
+  themes: z.array(TripThemeSchema).min(1),
+  instruction: z.string().min(1).max(200),
+  planOption: z.object({
+    title: z.string().min(1),
+    rationale: z.string().min(1),
+    stops: z.array(z.object({ name: z.string().min(1) })).min(1),
+  }),
+});
+
+tripsRouter.post(
+  '/refine-plan',
+  withAsyncHandler(async (req, res) => {
+    const requestLogger = getRequestLogger(res);
+    const userId = await getRequestUserId(req);
+    const { allowAnonymousSuggestionRequest } = res.locals as {
+      allowAnonymousSuggestionRequest: (ip: string) => boolean;
+    };
+
+    if (!userId && !allowAnonymousSuggestionRequest(getRequesterIp(req))) {
+      res.status(429).json({ error: 'RATE_LIMITED' });
+      return;
+    }
+
+    const parsed = refinePlanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'INVALID_BODY' });
+      return;
+    }
+
+    const input = parsed.data;
+
+    let rawOption: {
+      title: string;
+      rationale: string;
+      stops: { name: string; stopType: StopType }[];
+    };
+    try {
+      rawOption = await aiTripPlannerService.refinePlan({
+        existingOption: input.planOption,
+        instruction: input.instruction,
+        location: input.location,
+        themes: input.themes,
+      });
+    } catch (error) {
+      const aiError = toAiPlannerErrorMeta(error);
+      logError(requestLogger, 'ai.refine-plan failure', error, {
+        ...aiError,
+        input: { location: input.location, themes: input.themes },
+      });
+      res.status(502).json({ error: 'AI_PLANNER_ERROR' });
+      return;
+    }
+
+    // Geocode origin for distance calculations in resolvePlannedStops
+    let origin: { lat: number; lng: number };
+    try {
+      origin = await googlePlacesService.geocodeLocation(input.location);
+    } catch (error) {
+      const placesError = toPlacesErrorMeta(error);
+      logError(requestLogger, 'places.refine-plan geocode failure', error, {
+        ...placesError,
+      });
+      res.status(502).json({ error: 'UPSTREAM_PLACES_ERROR' });
+      return;
+    }
+
+    const stopTypeByName = new Map(rawOption.stops.map((s) => [s.name, s.stopType]));
+
+    let stopResults: Array<{
+      query: string;
+      suggestion?: {
+        id: string;
+        placeId: string;
+        title: string;
+        description: string;
+        distanceKm: number;
+        lat: number;
+        lng: number;
+        photoName?: string;
+      };
+      errorCode?: 'NOT_FOUND' | 'UPSTREAM_ERROR';
+    }>;
+
+    try {
+      stopResults = await googlePlacesService.resolvePlannedStops({
+        location: input.location,
+        radiusKm: 200,
+        stopQueries: rawOption.stops.map((s) => s.name),
+      });
+    } catch (error) {
+      logError(requestLogger, 'places.refine-plan enrich failure', error, {});
+      stopResults = rawOption.stops.map((s) => ({
+        query: s.name,
+        errorCode: 'UPSTREAM_ERROR' as const,
+      }));
+    }
+
+    const refinedOption: PlannedOption = {
+      title: rawOption.title,
+      rationale: rawOption.rationale,
+      stops: stopResults.map((stopResult) => {
+        const stopType = stopTypeByName.get(stopResult.query) ?? null;
+        if (!stopResult.suggestion) {
+          return {
+            query: stopResult.query,
+            status: 'unresolved' as const,
+            stopType,
+            errorCode: stopResult.errorCode ?? 'NOT_FOUND',
+          };
+        }
+        const { photoName, ...suggestion } = stopResult.suggestion;
+        return {
+          query: stopResult.query,
+          status: 'resolved' as const,
+          stopType,
+          suggestion: {
+            ...suggestion,
+            imageUrl: buildSuggestionImageUrl(req, photoName),
+          },
+        };
+      }),
+    };
+
+    requestLogger.info(
+      {
+        location: input.location,
+        themes: input.themes,
+        stopCount: refinedOption.stops.length,
+      },
+      'ai.refine-plan success',
+    );
+
+    // suppress unused-var warning — origin is used for geocode validation above
+    void origin;
+
+    res.status(200).json(refinedOption);
+  }),
+);
+
 // ── Plan trip (AI + cache) ───────────────────────────────────────────────────
 
 const planTripSchema = z.object({
