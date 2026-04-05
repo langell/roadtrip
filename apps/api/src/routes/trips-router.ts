@@ -19,6 +19,7 @@ import { googlePlacesService } from '../services/google-places-service.js';
 import { aiTripPlannerService } from '../services/ai-trip-planner-service.js';
 import { aiStopDescriptionService } from '../services/ai-stop-description-service.js';
 import { normalizeLocationKey } from '../lib/normalize-location.js';
+import { getUserPreferences } from '../lib/user-preferences.js';
 
 const TRIP_PLAN_CACHE_RADIUS_MILES = 10;
 const KM_PER_MILE = 1.60934;
@@ -543,6 +544,11 @@ tripsRouter.post(
       });
     };
 
+    // ── Personalization: fetch user preferences for authenticated users ─────────
+    const userPreferences = userId
+      ? await getUserPreferences(userId).catch(() => null)
+      : null;
+
     // ── SSE path: stream from Gemini, resolve + emit each option as it arrives ──
     if (useSse) {
       res.writeHead(200, {
@@ -568,6 +574,7 @@ tripsRouter.post(
           themes: input.themes,
           maxOptions: input.maxOptions,
           modifiers: input.modifiers,
+          ...(userPreferences ? { userPreferences } : {}),
         })) {
           const p = resolveOption(rawOption)
             .then((resolved) => {
@@ -629,6 +636,7 @@ tripsRouter.post(
         themes: input.themes,
         maxOptions: input.maxOptions,
         modifiers: input.modifiers,
+        ...(userPreferences ? { userPreferences } : {}),
       });
     } catch (error) {
       const aiError = toAiPlannerErrorMeta(error);

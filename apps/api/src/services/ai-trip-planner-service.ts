@@ -434,12 +434,19 @@ export class AiTripPlannerService {
     themes: string[];
     maxOptions: 2 | 3;
     modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
+    userPreferences?: string;
   }): string {
     const themePrompt = this.buildThemePrompt(input.themes);
     const modifierPrompt = this.buildModifierPrompt(input.modifiers);
     return [
       'You are an expert regional road-trip designer.',
       'Create distinctly lovable itinerary options that feel surprising, local, and memorable.',
+      ...(input.userPreferences
+        ? [
+            '',
+            `User context: ${input.userPreferences} Weight suggestions toward these preferences but don't restrict creativity.`,
+          ]
+        : []),
       '',
       'Trip request:',
       `- Origin: ${input.location}`,
@@ -547,6 +554,7 @@ export class AiTripPlannerService {
     themes: string[];
     maxOptions: 2 | 3;
     modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
+    userPreferences?: string;
   }): AsyncGenerator<z.infer<typeof AiTripOptionSchema>> {
     const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
     if (!apiKey) throw new AiTripPlannerError('AI_KEY_NOT_CONFIGURED', 'config');
@@ -642,6 +650,7 @@ export class AiTripPlannerService {
     themes: string[];
     maxOptions: 2 | 3;
     modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
+    userPreferences?: string;
   }): Promise<AiTripPlans> {
     const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
     if (!apiKey) {
