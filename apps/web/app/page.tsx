@@ -6,6 +6,21 @@ import TrendingRouteCard from '../components/TrendingRouteCard';
 import PlaceCard from '../components/PlaceCard';
 import Logo from '../components/Logo';
 
+const HERO_IMAGE_URL =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuAdZLdf8nn9pGc50ZxckpxO-MI4Z43NG62UapCBUrflkzyOSIMOXQ91-z0gXPE_N4O12b2LD5COH98TcH8qwt54m6y-RDlLubcQbRMzpGiym0zMRsSyv12hfEARw_dGIswWfHhIX4IggfyOE9C4iy8aSmVsCqMfHWBH24pcVP8orhSzxgLaDPGlwnfYKci1hPHvQhd7-M4-Y93Pbm8O1c0dp2UURc8IjHOeoHgQLnx1v3r18vvONM6uPIikoZh3F_WDgZCUtH0akKA';
+
+const SCENIC_BYWAYS_IMAGE_URL =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuA9N2jnzWTz1IaMG2SlTDB38l567WNr8pvaWNXcH0DGDN2Ww3DNYsm5iQotL0Vr_r5iu-ULDISF8rX6mfcGmawnq_G3pYdg9xuhyKIEsvR4fXx1FARKn_6A_9BBaeWTusa6qjhDE530zH85Sd0y_ShdrGf5b4cK6RA7wMYcwbYk5zqwkZTXqsXZAUPv144v2EMuFKj5nXJ_WXZzwkk6RoQaVVcEzuX03-7k04fGCZU0kHB1ol-XVGJ8860u7inK_Oq6H-DLRxKuP7k';
+
+const JOURNAL_IMAGE_URL =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuDEz9xjmRvUmwmlDIS493_mzG6RnSZefLWcU7cYqK3BTiUi-TFV5GUmKeu7VpX7pF7_z91wsNITsbJXhyLwIhleVA4cHzhMu4DL9gmtzAqI4N3MFj3yRRidn4R1zH-ijChJuv7mz-70hVp02JZFR97-isXz-cVrzwS9bXAzg8o64i-WrRu9TfreiyRoylX5XmqChP8DKwGtUAkGFN57VGUJlwQbN5ToycJ3VKqi4kaP7OeMCts9epDiRQspPANbgJMYP7eJXZ7ss-g';
+
+const AVATAR_URLS = [
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuB8BBkd8_osUL7aawpk3wbcnXai8z38lWyDj-NPBdiTjwWiwXujli8HIPgRvkjSzrXHAZ-ZyNN__oNTiB5FK_Ff3dN1l4NfHbgi7QILGy0coj3ua4SlGIp189N3FmY4aPyYWLZ_4VDoJqo8G0R-NUNjSACZzPZdPxP12gjkIYRJmG8Nb7n6xCHWa8qVUHZlgrlWx52kABw06L4l2ZdXblJrXw7vl6ao7NEqXnqYH5VjBTSR7mwLqkeO9z1PtOwPekU9FUZo5xO9MAI',
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuCTlZu_QT98M2K0eFajKECqFKisPnQ9WPX-SM7aNQPH7q2wcV7r2z5c9aEkigQOhycg9BktisugoHX9QTuvbY0Db4Goax_Fz6QF7syE3mWOOBgKeEB4qoDeH7ife3v6NPnycCP1dnjU09NL3vdLqILomgmuNkj6VzZdW6vDiW38qWz9VzCjvcRQ7kJh8ZP6_oMjJFD6VXsQail-DLXRUcFSUEoQpbY7pzD1PGwuyCZicgMd2NnMpCxpDWi88Ueu4L7PQVYFaBMoibQ',
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuB5PkvVC8dYTEvjBLQO7VJrLCerlPzvufI7yjdnWPREOfzrVCxozbggHTZb-zwoQxXA21Fe4Y0LTx_O4ckO4WvH8IYvuYDx_zWPvyKNZQNLN6Fg5T3LG1iq05QrRU6-bA5gxxs-F6PHpu2DuUZPnvtiOsrEbkyyKHqgsD9wW-StRxVty6Wv2tszoN5BvqbbDiqLMe0_yYgibf_ZnGxrcm5r8lSySE8vn5FH7soXm-glZuGwn7xyVLxvlNDYCj6LUlvrQoF4zKEXM2M',
+];
+
 const injectSponsored = (
   organic: DiscoverStop[],
   sponsored: DiscoverStop[],
@@ -55,7 +70,7 @@ const DiscoverView = async ({ name }: { name: string | null | undefined }) => {
         {/* Hero */}
         <section className="relative h-72 w-full overflow-hidden md:h-96">
           <img
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdZLdf8nn9pGc50ZxckpxO-MI4Z43NG62UapCBUrflkzyOSIMOXQ91-z0gXPE_N4O12b2LD5COH98TcH8qwt54m6y-RDlLubcQbRMzpGiym0zMRsSyv12hfEARw_dGIswWfHhIX4IggfyOE9C4iy8aSmVsCqMfHWBH24pcVP8orhSzxgLaDPGlwnfYKci1hPHvQhd7-M4-Y93Pbm8O1c0dp2UURc8IjHOeoHgQLnx1v3r18vvONM6uPIikoZh3F_WDgZCUtH0akKA"
+            src={HERO_IMAGE_URL}
             alt="Scenic mountain road"
             className="h-full w-full object-cover"
           />
@@ -151,7 +166,7 @@ const LandingView = () => (
         <img
           alt="Scenic mountain road"
           className="absolute inset-0 h-full w-full object-cover"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdZLdf8nn9pGc50ZxckpxO-MI4Z43NG62UapCBUrflkzyOSIMOXQ91-z0gXPE_N4O12b2LD5COH98TcH8qwt54m6y-RDlLubcQbRMzpGiym0zMRsSyv12hfEARw_dGIswWfHhIX4IggfyOE9C4iy8aSmVsCqMfHWBH24pcVP8orhSzxgLaDPGlwnfYKci1hPHvQhd7-M4-Y93Pbm8O1c0dp2UURc8IjHOeoHgQLnx1v3r18vvONM6uPIikoZh3F_WDgZCUtH0akKA"
+          src={HERO_IMAGE_URL}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-wayfarer-bg/20 to-wayfarer-bg" />
       </section>
@@ -197,17 +212,17 @@ const LandingView = () => (
               <img
                 alt="User"
                 className="h-10 w-10 rounded-full border-2 border-wayfarer-bg object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8BBkd8_osUL7aawpk3wbcnXai8z38lWyDj-NPBdiTjwWiwXujli8HIPgRvkjSzrXHAZ-ZyNN__oNTiB5FK_Ff3dN1l4NfHbgi7QILGy0coj3ua4SlGIp189N3FmY4aPyYWLZ_4VDoJqo8G0R-NUNjSACZzPZdPxP12gjkIYRJmG8Nb7n6xCHWa8qVUHZlgrlWx52kABw06L4l2ZdXblJrXw7vl6ao7NEqXnqYH5VjBTSR7mwLqkeO9z1PtOwPekU9FUZo5xO9MAI"
+                src={AVATAR_URLS[0]}
               />
               <img
                 alt="User"
                 className="h-10 w-10 rounded-full border-2 border-wayfarer-bg object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTlZu_QT98M2K0eFajKECqFKisPnQ9WPX-SM7aNQPH7q2wcV7r2z5c9aEkigQOhycg9BktisugoHX9QTuvbY0Db4Goax_Fz6QF7syE3mWOOBgKeEB4qoDeH7ife3v6NPnycCP1dnjU09NL3vdLqILomgmuNkj6VzZdW6vDiW38qWz9VzCjvcRQ7kJh8ZP6_oMjJFD6VXsQail-DLXRUcFSUEoQpbY7pzD1PGwuyCZicgMd2NnMpCxpDWi88Ueu4L7PQVYFaBMoibQ"
+                src={AVATAR_URLS[1]}
               />
               <img
                 alt="User"
                 className="h-10 w-10 rounded-full border-2 border-wayfarer-bg object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5PkvVC8dYTEvjBLQO7VJrLCerlPzvufI7yjdnWPREOfzrVCxozbggHTZb-zwoQxXA21Fe4Y0LTx_O4ckO4WvH8IYvuYDx_zWPvyKNZQNLN6Fg5T3LG1iq05QrRU6-bA5gxxs-F6PHpu2DuUZPnvtiOsrEbkyyKHqgsD9wW-StRxVty6Wv2tszoN5BvqbbDiqLMe0_yYgibf_ZnGxrcm5r8lSySE8vn5FH7soXm-glZuGwn7xyVLxvlNDYCj6LUlvrQoF4zKEXM2M"
+                src={AVATAR_URLS[2]}
               />
             </div>
             <div className="text-sm">
@@ -242,7 +257,7 @@ const LandingView = () => (
             <div className="absolute bottom-0 right-0 h-full w-2/3 opacity-40 transition-transform duration-700 group-hover:scale-105">
               <img
                 className="h-full w-full rounded-tl-[4rem] object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9N2jnzWTz1IaMG2SlTDB38l567WNr8pvaWNXcH0DGDN2Ww3DNYsm5iQotL0Vr_r5iu-ULDISF8rX6mfcGmawnq_G3pYdg9xuhyKIEsvR4fXx1FARKn_6A_9BBaeWTusa6qjhDE530zH85Sd0y_ShdrGf5b4cK6RA7wMYcwbYk5zqwkZTXqsXZAUPv144v2EMuFKj5nXJ_WXZzwkk6RoQaVVcEzuX03-7k04fGCZU0kHB1ol-XVGJ8860u7inK_Oq6H-DLRxKuP7k"
+                src={SCENIC_BYWAYS_IMAGE_URL}
                 alt="Mountain lake"
               />
             </div>
@@ -295,7 +310,7 @@ const LandingView = () => (
             <div className="-rotate-3 h-32 w-full max-w-48 overflow-hidden rounded-2xl border-4 border-white shadow-wayfarer-soft transition-transform hover:rotate-0 md:w-48">
               <img
                 className="h-full w-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEz9xjmRvUmwmlDIS493_mzG6RnSZefLWcU7cYqK3BTiUi-TFV5GUmKeu7VpX7pF7_z91wsNITsbJXhyLwIhleVA4cHzhMu4DL9gmtzAqI4N3MFj3yRRidn4R1zH-ijChJuv7mz-70hVp02JZFR97-isXz-cVrzwS9bXAzg8o64i-WrRu9TfreiyRoylX5XmqChP8DKwGtUAkGFN57VGUJlwQbN5ToycJ3VKqi4kaP7OeMCts9epDiRQspPANbgJMYP7eJXZ7ss-g"
+                src={JOURNAL_IMAGE_URL}
                 alt="Journey journal polaroid"
               />
             </div>

@@ -22,6 +22,7 @@ vi.mock('./types/context.js', () => ({
 }));
 
 const prismaMock = {
+  $queryRaw: vi.fn(),
   trip: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -79,6 +80,8 @@ vi.mock('./services/google-places-service.js', () => ({
 }));
 
 const generatePlans = vi.fn();
+const generatePlansStream = vi.fn();
+const refinePlan = vi.fn();
 vi.mock('./services/ai-trip-planner-service.js', () => ({
   AiTripPlannerError: class AiTripPlannerError extends Error {
     constructor(
@@ -92,6 +95,8 @@ vi.mock('./services/ai-trip-planner-service.js', () => ({
   },
   aiTripPlannerService: {
     generatePlans,
+    generatePlansStream,
+    refinePlan,
   },
 }));
 
@@ -126,6 +131,8 @@ describe('HTTP server', () => {
     mockEnv.ADMIN_USER_IDS = undefined;
     prismaMock.user.findUnique.mockReset();
     generatePlans.mockReset();
+    generatePlansStream.mockReset();
+    refinePlan.mockReset();
     generateDescriptions.mockReset();
     prismaMock.trip.findMany.mockReset();
     prismaMock.trip.findFirst.mockReset();
@@ -136,6 +143,7 @@ describe('HTTP server', () => {
     prismaMock.tripPlanCache.findUnique.mockReset();
     prismaMock.tripPlanCache.create.mockReset();
     prismaMock.tripPlanCache.update.mockReset();
+    prismaMock.$queryRaw.mockReset();
     prismaMock.sponsoredPlace.findMany.mockReset();
     prismaMock.sponsoredPlace.findUnique.mockReset();
     prismaMock.sponsoredPlace.create.mockReset();
@@ -474,6 +482,18 @@ describe('HTTP server', () => {
             distanceKm: 5,
             lat: 36.5397,
             lng: -121.9249,
+          },
+        },
+        {
+          query: 'Point Lobos',
+          suggestion: {
+            id: 'stop-c',
+            placeId: 'place-c',
+            title: 'Point Lobos State Natural Reserve',
+            description: 'Carmel, CA',
+            distanceKm: 4,
+            lat: 36.5152,
+            lng: -121.9433,
           },
         },
       ]);
@@ -893,19 +913,17 @@ describe('HTTP server', () => {
     it('streams AI generation as SSE header + options + done events', async () => {
       geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
       prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
-      generatePlans.mockResolvedValue({
-        options: [
-          {
-            title: 'SSE Route A',
-            rationale: 'First streamed option.',
-            stops: [{ name: 'Stop One', stopType: 'attraction' }],
-          },
-          {
-            title: 'SSE Route B',
-            rationale: 'Second streamed option.',
-            stops: [{ name: 'Stop Two', stopType: 'attraction' }],
-          },
-        ],
+      generatePlansStream.mockImplementation(async function* () {
+        yield {
+          title: 'SSE Route A',
+          rationale: 'First streamed option.',
+          stops: [{ name: 'Stop One', stopType: 'attraction' }],
+        };
+        yield {
+          title: 'SSE Route B',
+          rationale: 'Second streamed option.',
+          stops: [{ name: 'Stop Two', stopType: 'attraction' }],
+        };
       });
       resolvePlannedStops
         .mockResolvedValueOnce([
@@ -962,7 +980,10 @@ describe('HTTP server', () => {
     it('streams error event when AI generation fails', async () => {
       geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
       prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
-      generatePlans.mockRejectedValue(new Error('AI unavailable'));
+      generatePlansStream.mockImplementation(async function* () {
+        yield* []; // satisfy require-yield; throws before yielding anything
+        throw new Error('AI unavailable');
+      });
 
       const app = createApp();
       const response = await request(app)
@@ -1269,9 +1290,9 @@ describe('HTTP server', () => {
         ],
       };
 
-      it('returns the first active sponsored place', async () => {
+      it('returns the nearest active sponsored place via geo query', async () => {
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+        prismaMock.$queryRaw.mockResolvedValue([
           {
             id: 'sp-1',
             placeId: 'place-x',
@@ -1279,7 +1300,8 @@ describe('HTTP server', () => {
             description: 'Nice',
             imageUrl: null,
             url: 'https://lodge.example.com',
-            active: true,
+            lat: 45.88,
+            lng: -123.96,
           },
         ]);
 
@@ -1294,11 +1316,12 @@ describe('HTTP server', () => {
           title: 'Crater Lodge',
           placeId: 'place-x',
         });
+        expect(prismaMock.$queryRaw).toHaveBeenCalled();
       });
 
       it('returns null when no sponsored places are active', async () => {
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+        prismaMock.$queryRaw.mockResolvedValue([]);
 
         const app = createApp();
         const response = await request(app)
@@ -1328,23 +1351,11 @@ describe('HTTP server', () => {
         expect(response.status).toBe(404);
       });
 
-      it('picks the sponsor closest to the trip midpoint when multiple are active', async () => {
-        // mockTrip has one stop at lat 45.88, lng -123.96 (Oregon coast)
-        // near: Portland area sponsor ~45.5, -122.7 (~130 km away)
-        // far:  Florida sponsor ~27.9, -82.5 (~3900 km away)
+      it('returns the closest sponsor (DB-ordered by ST_Distance)', async () => {
+        // PostGIS returns rows already sorted by distance — nearest first.
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
-          {
-            id: 'sp-far',
-            placeId: 'place-fl',
-            title: 'Florida Resort',
-            description: 'Sun and sand',
-            imageUrl: null,
-            url: null,
-            active: true,
-            lat: 27.9,
-            lng: -82.5,
-          },
+        prismaMock.$queryRaw.mockResolvedValue([
+          // nearest (Oregon coast ~2 km from stop)
           {
             id: 'sp-near',
             placeId: 'place-or',
@@ -1352,9 +1363,19 @@ describe('HTTP server', () => {
             description: 'Right on the Oregon coast',
             imageUrl: null,
             url: null,
-            active: true,
             lat: 45.99,
             lng: -123.93,
+          },
+          // farther (Florida)
+          {
+            id: 'sp-far',
+            placeId: 'place-fl',
+            title: 'Florida Resort',
+            description: 'Sun and sand',
+            imageUrl: null,
+            url: null,
+            lat: 27.9,
+            lng: -82.5,
           },
         ]);
 
@@ -1367,9 +1388,46 @@ describe('HTTP server', () => {
         expect(response.body.id).toBe('sp-near');
       });
 
-      it('falls back to any active sponsor when none have lat/lng', async () => {
+      it('skips a sponsor whose placeId is already a trip stop and returns the next', async () => {
+        // mockTrip has stop with placeId 'p1'
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+        prismaMock.$queryRaw.mockResolvedValue([
+          // nearest — but already in trip
+          {
+            id: 'sp-in-trip',
+            placeId: 'p1',
+            title: 'Cannon Beach Lodge',
+            description: 'Already a stop',
+            imageUrl: null,
+            url: null,
+            lat: 45.88,
+            lng: -123.96,
+          },
+          // second nearest — not in trip
+          {
+            id: 'sp-other',
+            placeId: 'place-other',
+            title: 'Astoria Inn',
+            description: 'Good alternative',
+            imageUrl: null,
+            url: null,
+            lat: 46.18,
+            lng: -123.83,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('sp-other');
+      });
+
+      it('falls back to a sponsor without lat/lng when it is the only result', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.$queryRaw.mockResolvedValue([
           {
             id: 'sp-untagged',
             placeId: 'place-u',
@@ -1377,7 +1435,6 @@ describe('HTTP server', () => {
             description: 'No location set',
             imageUrl: null,
             url: null,
-            active: true,
             lat: null,
             lng: null,
           },
@@ -1390,6 +1447,94 @@ describe('HTTP server', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.id).toBe('sp-untagged');
+      });
+    });
+
+    describe('GET /sponsored-stop/nearby', () => {
+      it('returns the nearest sponsored place within radius', async () => {
+        prismaMock.$queryRaw.mockResolvedValue([
+          {
+            id: 'sp-close',
+            placeId: 'place-close',
+            title: 'Nearby Lodge',
+            description: 'Close by',
+            imageUrl: null,
+            url: null,
+            lat: 45.52,
+            lng: -122.68,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby?lat=45.52&lng=-122.68')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ id: 'sp-close', title: 'Nearby Lodge' });
+        expect(prismaMock.$queryRaw).toHaveBeenCalled();
+      });
+
+      it('returns null when no sponsors are within radius', async () => {
+        prismaMock.$queryRaw.mockResolvedValue([]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby?lat=45.52&lng=-122.68')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toBeNull();
+      });
+
+      it('returns the closer of two sponsors (nearest first from DB)', async () => {
+        // DB returns rows already ordered by ST_Distance
+        prismaMock.$queryRaw.mockResolvedValue([
+          {
+            id: 'sp-near',
+            placeId: 'place-near',
+            title: 'Close Spot',
+            description: '10 km away',
+            imageUrl: null,
+            url: null,
+            lat: 45.6,
+            lng: -122.7,
+          },
+          {
+            id: 'sp-far',
+            placeId: 'place-far',
+            title: 'Distant Spot',
+            description: '150 km away',
+            imageUrl: null,
+            url: null,
+            lat: 44.0,
+            lng: -121.0,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby?lat=45.52&lng=-122.68')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('sp-near');
+      });
+
+      it('returns 400 for missing coordinates', async () => {
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby')
+          .set('authorization', 'Bearer user-1');
+        expect(response.status).toBe(400);
+      });
+
+      it('returns 401 for unauthenticated request', async () => {
+        const app = createApp();
+        const response = await request(app).get(
+          '/sponsored-stop/nearby?lat=45.52&lng=-122.68',
+        );
+        expect(response.status).toBe(401);
       });
     });
 
@@ -1573,6 +1718,140 @@ describe('HTTP server', () => {
       const response = await request(app).post('/trips/save-plan').send(savePlanBody);
       expect(response.status).toBe(401);
       expect(generateDescriptions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /trips/refine-plan', () => {
+    const refinePlanBody = {
+      location: 'Big Sur, CA',
+      themes: ['scenic', 'foodie'],
+      instruction: 'swap the brewery for a coffee shop',
+      planOption: {
+        title: 'Coastal Loop',
+        rationale: 'Scenic coastal drive.',
+        stops: [{ name: 'Bixby Bridge' }, { name: 'Nepenthe Restaurant' }],
+      },
+    };
+
+    const rawRefined = {
+      title: 'Coastal Loop',
+      rationale: 'Scenic coastal drive with coffee.',
+      stops: [
+        { name: 'Bixby Bridge', stopType: 'attraction' },
+        { name: 'Henry Miller Library', stopType: 'attraction' },
+      ],
+    };
+
+    const resolvedStops = [
+      {
+        query: 'Bixby Bridge',
+        suggestion: {
+          id: 'p1',
+          placeId: 'place-1',
+          title: 'Bixby Bridge',
+          description: 'Iconic arch bridge.',
+          distanceKm: 20,
+          lat: 36.37,
+          lng: -121.9,
+        },
+      },
+      {
+        query: 'Henry Miller Library',
+        suggestion: {
+          id: 'p2',
+          placeId: 'place-2',
+          title: 'Henry Miller Memorial Library',
+          description: 'Quirky arts gathering spot.',
+          distanceKm: 30,
+          lat: 36.16,
+          lng: -121.67,
+        },
+      },
+    ];
+
+    it('returns 200 with refined option on success', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockResolvedValue(rawRefined);
+      resolvePlannedStops.mockResolvedValue(resolvedStops);
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        title: 'Coastal Loop',
+        stops: expect.arrayContaining([expect.objectContaining({ status: 'resolved' })]),
+      });
+      expect(refinePlan).toHaveBeenCalledWith(
+        expect.objectContaining({ instruction: 'swap the brewery for a coffee shop' }),
+      );
+    });
+
+    it('returns 400 for missing instruction', async () => {
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send({ ...refinePlanBody, instruction: '' });
+
+      expect(response.status).toBe(400);
+      expect(refinePlan).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for instruction over 200 chars', async () => {
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send({ ...refinePlanBody, instruction: 'x'.repeat(201) });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 502 when AI service throws', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockRejectedValue(new Error('AI_REQUEST_FAILED'));
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(502);
+      expect(response.body).toMatchObject({ error: 'AI_PLANNER_ERROR' });
+    });
+
+    it('returns 200 with unresolved stops when Places API fails', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockResolvedValue(rawRefined);
+      resolvePlannedStops.mockRejectedValue(new Error('PLACES_ERROR'));
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('authorization', 'Bearer user-1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(200);
+      expect(response.body.stops[0]).toMatchObject({ status: 'unresolved' });
+    });
+
+    it('allows unauthenticated requests within the anonymous limit', async () => {
+      geocodeLocation.mockResolvedValue({ lat: 36.27, lng: -121.81 });
+      refinePlan.mockResolvedValue(rawRefined);
+      resolvePlannedStops.mockResolvedValue(resolvedStops);
+
+      const app = createApp();
+      const response = await request(app)
+        .post('/trips/refine-plan')
+        .set('x-forwarded-for', '10.0.0.1')
+        .send(refinePlanBody);
+
+      expect(response.status).toBe(200);
     });
   });
 

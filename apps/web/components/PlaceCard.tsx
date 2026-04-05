@@ -1,4 +1,7 @@
+'use client';
+
 import type { DiscoverStop } from '../lib/api-client';
+import { recordEvent } from '../lib/analytics';
 
 const GRADIENTS = [
   'from-[#1a3a2a] to-[#2d6a4f]',
@@ -54,7 +57,17 @@ const PlaceCard = ({ stop, gradientIndex }: Props) => {
 
   if (stop.sponsored && stop.url) {
     return (
-      <a href={stop.url} target="_blank" rel="noopener noreferrer">
+      <a
+        href={stop.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() =>
+          recordEvent('sponsored_click', {
+            placeId: stop.placeId,
+            position: String(gradientIndex),
+          })
+        }
+      >
         {inner}
       </a>
     );

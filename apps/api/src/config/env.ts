@@ -12,6 +12,7 @@ const schema = z.object({
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
   AI_GATEWAY_API_KEY: z.string().min(1).optional(),
   GOOGLE_AI_MODEL: z.string().min(1).default('gemini-3-flash'),
+  GOOGLE_AI_MODEL_FAST: z.string().min(1).default('gemini-2.0-flash'),
   GOOGLE_PLACES_RESULT_LIMIT: z.coerce.number().int().min(1).max(20).default(6),
   GOOGLE_PLACES_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(3600).default(300),
   GOOGLE_PLACES_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
@@ -45,6 +46,15 @@ const schema = z.object({
   // Affiliate partner IDs for hotel monetization
   EXPEDIA_AFFILIATE_ID: z.string().min(1).optional(),
   BOOKING_AFFILIATE_ID: z.string().min(1).optional(),
+  // Redis (Upstash REST) — optional; used for distributed rate limiting when both are provided
+  REDIS_URL: z.string().url().optional(),
+  REDIS_TOKEN: z.string().min(1).optional(),
+  // Cron job auth
+  CRON_SECRET: z.string().min(1).optional(),
+  // Cache pre-warming config
+  PREWARM_MAX_LOCATIONS: z.coerce.number().int().min(1).max(100).default(10),
+  PREWARM_MAX_THEME_COMBOS: z.coerce.number().int().min(1).max(10).default(2),
+  PREWARM_MAX_GENERATIONS: z.coerce.number().int().min(1).max(100).default(30),
 });
 
 export const env = schema.parse(process.env);

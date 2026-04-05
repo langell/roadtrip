@@ -59,17 +59,22 @@ model TripStop {
 }
 
 model SponsoredPlace {
-  id          String   @id @default(uuid())
-  placeId     String   @unique
+  id          String                                    @id @default(uuid())
+  placeId     String                                    @unique
   title       String
   description String
   imageUrl    String?
   url         String?
-  active      Boolean  @default(true)
+  active      Boolean                                   @default(true)
   lat         Float?
   lng         Float?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  /// PostGIS geography point — requires `CREATE EXTENSION IF NOT EXISTS postgis`.
+  /// Backfill: UPDATE "SponsoredPlace" SET location = ST_SetSRID(ST_MakePoint(lng, lat), 4326)
+  /// GiST index (not expressible in Prisma schema):
+  ///   CREATE INDEX "SponsoredPlace_location_gist_idx" ON "SponsoredPlace" USING gist (location);
+  location    Unsupported("geography(Point, 4326)")?
+  createdAt   DateTime                                  @default(now())
+  updatedAt   DateTime                                  @updatedAt
 
   @@index([active])
   @@index([title])
@@ -109,4 +114,16 @@ model TripPlanCache {
   @@index([centerLat, centerLng])
   @@index([engagementScore, updatedAt])
   @@index([locationKey])
+}
+
+model PlanPreview {
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())
+  planData  Json
+  location  String
+  themes    String[]
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }

@@ -8,20 +8,23 @@ export type TripIdea = {
 
 export type StopType = 'attraction' | 'pit_stop' | 'photo_op' | null;
 
+export type PlannedSuggestion = {
+  id: string;
+  placeId: string;
+  title: string;
+  description: string;
+  distanceKm: number;
+  lat: number;
+  lng: number;
+  imageUrl?: string;
+};
+
 export type PlannedStopResolved = {
   query: string;
   status: 'resolved';
   stopType: StopType;
-  suggestion: {
-    id: string;
-    placeId: string;
-    title: string;
-    description: string;
-    distanceKm: number;
-    lat: number;
-    lng: number;
-    imageUrl?: string;
-  };
+  suggestion: PlannedSuggestion;
+  alternatives?: PlannedSuggestion[];
 };
 
 export type PlannedStopUnresolved = {
@@ -238,6 +241,29 @@ export const deleteTrip = async (tripId: string): Promise<boolean> => {
     return response.status === 204;
   } catch {
     return false;
+  }
+};
+
+export const refinePlan = async (params: {
+  location: string;
+  themes: string[];
+  instruction: string;
+  planOption: { title: string; rationale: string; stops: { name: string }[] };
+}): Promise<TripPlanOption | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/refine-plan`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(await buildAuthHeaders()),
+      },
+      body: JSON.stringify(params),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as TripPlanOption;
+  } catch {
+    return null;
   }
 };
 
@@ -538,5 +564,45 @@ export const streamTripPlans = async (
     }
   } catch {
     callbacks.onError();
+  }
+};
+
+export type PlanPreview = {
+  token: string;
+  location: string;
+  themes: string[];
+  planOption: TripPlanOption;
+  expiresAt: string;
+};
+
+export const sharePlanPreview = async (params: {
+  location: string;
+  themes: string[];
+  planOption: TripPlanOption;
+}): Promise<{ previewUrl: string } | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/share-preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(params),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as { previewUrl: string };
+  } catch {
+    return null;
+  }
+};
+
+export const getPlanPreview = async (token: string): Promise<PlanPreview | null> => {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/trips/preview/${encodeURIComponent(token)}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as PlanPreview;
+  } catch {
+    return null;
   }
 };

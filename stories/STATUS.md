@@ -9,6 +9,25 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-047 `2026-04-postgis-geo-queries.md` — location GEOGRAPHY column on SponsoredPlace; $queryRaw ST_Distance/ST_DWithin queries replace in-memory haversine sort; 6 new tests (GET /trips/:id/sponsored-stop + GET /sponsored-stop/nearby).
+- 2026-04-05 — RT-046 `2026-04-distributed-rate-limiting.md` — @upstash/redis + @upstash/ratelimit sliding-window; in-memory fallback when Redis not configured; REDIS_URL + REDIS_TOKEN env vars; fail-open on Redis errors.
+- 2026-04-05 — RT-021 `2026-03-performance-and-scalability.md` — docs/performance.md with API/web targets, optimization inventory, monitoring hooks, alerting recommendations.
+- 2026-04-05 — RT-019 `2026-03-architecture-boundaries.md` — docs/architecture.md (service diagram, design decisions, tech debt register, feature checklist); ADRs 001–003.
+- 2026-04-05 — RT-005 `2026-03-sponsored-places-ranking.md` — sponsored injection at positions 1+5 in discover grid; max-2 frequency cap; PlaceCard Sponsored badge; sponsored_click analytics on badge click; active/inactive DB filter.
+- 2026-04-05 — RT-006 `2026-03-analytics-funnel-events.md` — POST /analytics/events (public, fire-and-forget); GET /analytics/events (admin); trip_generate + trip_save in planner; trip_open on map page; sponsored_click/impression migrated to shared recordEvent() helper; 8 tests.
+- 2026-04-05 — RT-042 `2026-04-share-plan-before-saving.md` — POST /trips/share-preview + GET /trips/preview/:token; PlanPreview DB model (48h TTL); ↗ Share button on each plan card; /preview/[token] public page with stop cards and Save CTA.
+- 2026-04-05 — RT-041 `2026-04-stop-preview-sheet.md` — StopPreviewSheet component (bottom sheet mobile / centered modal desktop); tap any resolved stop in planner to preview photo, description, distance, Maps link without leaving page.
+- 2026-04-05 — RT-040 `2026-04-swappable-alternative-stops.md` — AI returns 2 alt stop names per stop; parallel Places resolution; ⇄ swap button cycles through alternatives in-place; active selection baked into saved plan.
+- 2026-04-05 — RT-039 `2026-04-plan-refinement.md` — POST /trips/refine-plan; refinePlan() AI service method (tier 1); inline refine UI with undo on each plan card.
+- 2026-04-05 — RT-038 `2026-04-personalization-from-saved-trips.md` — getUserPreferences() builds theme/stop/radius hint from saved trips; injected into AI prompt for authenticated users.
+
+- 2026-04-05 — RT-037 `2026-04-two-tier-model-routing.md` — Tier 1 (fast model) for initial <3-theme requests; Tier 2 (full model) for 3-theme + retries. GOOGLE_AI_MODEL_FAST env var.
+- 2026-04-05 — RT-036 `2026-04-cache-prewarming.md` — nightly GET /jobs/prewarm-cache; top-N trending locations × theme combos; CRON_SECRET auth; bounded to PREWARM_MAX_GENERATIONS.
+- 2026-04-05 — RT-035 `2026-04-fuzzy-cache-matching.md` — locationKey OR condition in cache lookup; normalizeLocationKey fast path + lat/lng bounding box fallback.
+- 2026-04-05 — RT-034 `2026-04-streaming-plan-generation.md` — true AI token streaming via streamGenerateContent + SSE; first option appears within ~1s.
+- 2026-04-05 — RT-043 `2026-04-hotel-affiliate-cards.md` — passive hotel affiliate cards on stop detail pages.
+- 2026-04-05 — RT-045 `2026-04-legal-and-support-pages.md` — Terms, Privacy, Support (contact form), FAQ pages with Resend email delivery.
+
 - 2026-03-31 — RT-033 `2026-03-route-map-view.md` — /trips/[id]/map, numbered markers, stop list panel, sponsored stop card, drive-time legs.
 - 2026-03-31 — RT-032 `2026-03-discovery-feed.md` — /discover page, trending routes, nearby stops, sponsored injection, home redirect.
 - 2026-03-31 — RT-020 `2026-03-security-best-practices.md` — photo endpoint rate limiting, security checklist doc, auth/logging audit.

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Logo from './Logo';
 import ProfileDropdown from './ProfileDropdown';
 import type { TripDetail, SponsoredStop, TripDetailStop } from '../lib/api-client';
+import { recordEvent } from '../lib/analytics';
 
 const getApiToken = async (): Promise<string | undefined> => {
   try {
@@ -510,21 +511,6 @@ export default function TripMapView({ trip, sponsored }: Props) {
 
 // ── Sponsored card ──────────────────────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
-
-const recordAnalytics = (type: string, payload: Record<string, string>) => {
-  void getApiToken().then((token) => {
-    void fetch(`${API_BASE}/trpc/analytics.record`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ type, payload }),
-    });
-  });
-};
-
 function SponsoredCard({
   sponsored,
   tripId,
@@ -533,11 +519,11 @@ function SponsoredCard({
   tripId: string;
 }) {
   useEffect(() => {
-    recordAnalytics('sponsored_impression', { placeId: sponsored.placeId, tripId });
+    recordEvent('sponsored_impression', { placeId: sponsored.placeId, tripId });
   }, [sponsored.placeId, tripId]);
 
   const handleClick = () => {
-    recordAnalytics('sponsored_click', { placeId: sponsored.placeId, tripId });
+    recordEvent('sponsored_click', { placeId: sponsored.placeId, tripId });
     if (sponsored.url) window.open(sponsored.url, '_blank', 'noopener,noreferrer');
   };
 
