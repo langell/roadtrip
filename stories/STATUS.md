@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-037 `2026-04-two-tier-model-routing.md` — Tier 1 (fast model) for initial <3-theme requests; Tier 2 (full model) for 3-theme + retries. GOOGLE_AI_MODEL_FAST env var.
 - 2026-04-05 — RT-036 `2026-04-cache-prewarming.md` — nightly GET /jobs/prewarm-cache; top-N trending locations × theme combos; CRON_SECRET auth; bounded to PREWARM_MAX_GENERATIONS.
 - 2026-04-05 — RT-035 `2026-04-fuzzy-cache-matching.md` — locationKey OR condition in cache lookup; normalizeLocationKey fast path + lat/lng bounding box fallback.
 - 2026-04-05 — RT-034 `2026-04-streaming-plan-generation.md` — true AI token streaming via streamGenerateContent + SSE; first option appears within ~1s.

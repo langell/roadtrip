@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { env } from '../config/env.js';
+import { logger } from '../lib/logger.js';
 
 const StopTypeSchema = z.enum(['attraction', 'pit_stop', 'photo_op']).nullable();
 
@@ -647,7 +648,13 @@ export class AiTripPlannerService {
       throw new AiTripPlannerError('AI_KEY_NOT_CONFIGURED', 'config');
     }
 
-    const model = env.GOOGLE_AI_MODEL;
+    // Tier 1 (fast/cheap) for initial attempt on simple requests (< 3 themes).
+    // Tier 2 (full) for complex requests (>= 3 themes) and all retries.
+    const isComplex = input.themes.length >= 3;
+    const tier1Model = env.GOOGLE_AI_MODEL_FAST;
+    const tier2Model = env.GOOGLE_AI_MODEL;
+    const primaryModel = isComplex ? tier2Model : tier1Model;
+    const primaryTier = isComplex ? 2 : 1;
     const fallbackModel = 'gemini-2.5-flash';
 
     const prompt = this.buildPlanPrompt(input);
@@ -655,10 +662,15 @@ export class AiTripPlannerService {
     let responseBodyText = '';
     let attemptLabel = '';
     try {
+      logger.info(
+        { tier: primaryTier, model: primaryModel, themes: input.themes.length },
+        'ai.plan.tier-selected',
+      );
+
       const primaryAttempt = await this.requestWithModelFallback({
         prompt,
         apiKey,
-        model,
+        model: primaryModel,
         fallbackModel,
       });
       responseBodyText = primaryAttempt.responseBodyText;
@@ -670,8 +682,9 @@ export class AiTripPlannerService {
         return primaryPlans;
       }
 
-      // If all requested options are accounted for and only some fail coverage,
-      // retry only when we'd lose too many — otherwise proceed to retry for a better result.
+      // Coverage failed — escalate to tier 2 for retry regardless of initial tier.
+      logger.info({ tier: 2, model: tier2Model, attemptLabel }, 'ai.plan.tier-escalate');
+
       const retryPrompt = [
         prompt,
         '',
@@ -683,7 +696,7 @@ export class AiTripPlannerService {
       const retryAttempt = await this.requestWithModelFallback({
         prompt: retryPrompt,
         apiKey,
-        model,
+        model: tier2Model,
         fallbackModel,
       });
       responseBodyText = retryAttempt.responseBodyText;

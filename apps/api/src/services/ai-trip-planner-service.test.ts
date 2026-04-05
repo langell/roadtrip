@@ -6,9 +6,11 @@ import { AiTripPlannerService, AiTripPlannerError } from './ai-trip-planner-serv
 // ---------------------------------------------------------------------------
 const { mockEnv } = vi.hoisted(() => {
   const mockEnv = {
+    LOG_LEVEL: 'silent' as string,
     GOOGLE_AI_API_KEY: 'test-api-key' as string | undefined,
     AI_GATEWAY_API_KEY: undefined as string | undefined,
     GOOGLE_AI_MODEL: 'gemini-2.5-pro',
+    GOOGLE_AI_MODEL_FAST: 'gemini-2.0-flash',
   };
   return { mockEnv };
 });
@@ -619,6 +621,87 @@ describe('AiTripPlannerService', () => {
     it('is instanceof Error', () => {
       const err = new AiTripPlannerError('X', 'parse');
       expect(err).toBeInstanceOf(Error);
+    });
+  });
+
+  describe('two-tier model routing', () => {
+    const getCallUrl = (fetch: ReturnType<typeof mockFetch>, callIdx: number) => {
+      const urlArg = (fetch.mock.calls[callIdx] as [URL | string])[0];
+      return urlArg instanceof URL ? urlArg.href : String(urlArg);
+    };
+
+    it('uses fast model (tier 1) for single-theme requests', async () => {
+      const plans = validPlans(2);
+      const fetch = mockFetch(ok(geminiBody(JSON.stringify(plans))));
+      const service = new AiTripPlannerService(fetch);
+
+      await service.generatePlans({
+        location: 'Portland, OR',
+        radiusKm: 100,
+        themes: ['scenic'],
+        maxOptions: 2,
+      });
+
+      expect(getCallUrl(fetch, 0)).toContain('gemini-2.0-flash');
+    });
+
+    it('uses full model (tier 2) directly for 3-theme requests', async () => {
+      // Plan with stops/rationale that cover all 3 themes (scenic, foodie, culture)
+      const allThemePlans = {
+        options: Array.from({ length: 2 }, (_, i) => ({
+          title: `Route ${i + 1}`,
+          rationale: `Covers scenic viewpoints, local restaurants, and historic museums.`,
+          stops: [makeStop(`Viewpoint ${i + 1}`), makeStop(`Restaurant Row ${i + 1}`)],
+        })),
+      };
+      const fetch = mockFetch(ok(geminiBody(JSON.stringify(allThemePlans))));
+      const service = new AiTripPlannerService(fetch);
+
+      await service.generatePlans({
+        location: 'Portland, OR',
+        radiusKm: 100,
+        themes: ['scenic', 'foodie', 'culture'],
+        maxOptions: 2,
+      });
+
+      expect(getCallUrl(fetch, 0)).toContain('gemini-2.5-pro');
+    });
+
+    it('escalates to full model (tier 2) on retry after coverage failure', async () => {
+      // First call: tier 1, returns plan missing theme coverage
+      const badPlan = {
+        options: [
+          {
+            title: 'Route A',
+            rationale: 'Scenic only',
+            stops: [makeStop('Park'), makeStop('Lake')],
+          },
+          {
+            title: 'Route B',
+            rationale: 'Scenic only',
+            stops: [makeStop('Hill'), makeStop('Creek')],
+          },
+        ],
+      };
+      const goodPlans = validPlans(2);
+      const fetch = mockFetch(
+        ok(geminiBody(JSON.stringify(badPlan))),
+        ok(geminiBody(JSON.stringify(goodPlans))),
+      );
+      const service = new AiTripPlannerService(fetch);
+
+      await service.generatePlans({
+        location: 'Portland, OR',
+        radiusKm: 100,
+        themes: ['scenic', 'foodie'],
+        maxOptions: 2,
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+      // Initial: tier 1 (fast) since themes.length < 3
+      expect(getCallUrl(fetch, 0)).toContain('gemini-2.0-flash');
+      // Retry: tier 2 (full)
+      expect(getCallUrl(fetch, 1)).toContain('gemini-2.5-pro');
     });
   });
 });
