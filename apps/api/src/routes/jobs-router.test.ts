@@ -123,9 +123,9 @@ describe('GET /jobs/prewarm-cache', () => {
       .mockResolvedValueOnce([{ locationKey: 'key west', _sum: { engagementScore: 50 } }])
       .mockResolvedValueOnce([{ themesKey: 'scenic|nature', _count: { id: 5 } }]);
     prismaMock.tripPlanCache.count.mockResolvedValue(0); // no existing entry
-    generatePlans.mockResolvedValue([
-      { title: 'Scenic Route', rationale: 'Great views', stops: [] },
-    ]);
+    generatePlans.mockResolvedValue({
+      options: [{ title: 'Scenic Route', rationale: 'Great views', stops: [] }],
+    });
     prismaMock.tripPlanCache.create.mockResolvedValue({ id: 'cache-1' });
     prismaMock.analyticsEvent.create.mockResolvedValue({ id: 'evt-1' });
 
