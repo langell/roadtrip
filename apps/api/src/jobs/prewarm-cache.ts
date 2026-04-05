@@ -114,7 +114,7 @@ export async function runPrewarmCache(): Promise<PrewarmResult> {
           maxOptions: DEFAULT_MAX_OPTIONS,
         });
 
-        if (rawOptions.length > 0) {
+        if (rawOptions.options.length > 0) {
           await prisma.tripPlanCache.create({
             data: {
               location: locationKey,
@@ -124,8 +124,8 @@ export async function runPrewarmCache(): Promise<PrewarmResult> {
               radiusKm: DEFAULT_RADIUS_KM,
               themesKey,
               maxOptions: DEFAULT_MAX_OPTIONS,
-              options: rawOptions as Prisma.InputJsonValue,
-              validOptions: rawOptions.length,
+              options: rawOptions.options as Prisma.InputJsonValue,
+              validOptions: rawOptions.options.length,
               engagementScore: 0,
               lastServedAt: null,
               expiresAt: new Date(
@@ -135,7 +135,7 @@ export async function runPrewarmCache(): Promise<PrewarmResult> {
           });
           result.generated++;
           logger.info(
-            { locationKey, themesKey, count: rawOptions.length },
+            { locationKey, themesKey, count: rawOptions.options.length },
             'cache.prewarm.generated',
           );
         }
