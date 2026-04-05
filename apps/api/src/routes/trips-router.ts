@@ -1024,3 +1024,50 @@ tripsRouter.post(
     res.status(201).json(trip);
   }),
 );
+
+// ── Share plan preview (no auth required) ────────────────────────────────────
+
+const PREVIEW_TTL_MS = 48 * 60 * 60 * 1000;
+
+const sharePlanPreviewSchema = z.object({
+  location: z.string().min(1),
+  themes: z.array(TripThemeSchema).min(1),
+  planOption: PlannedOptionsSchema.element,
+});
+
+tripsRouter.post(
+  '/share-preview',
+  withAsyncHandler(async (req, res) => {
+    const parsed = sharePlanPreviewSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'INVALID_BODY' });
+      return;
+    }
+    const { location, themes, planOption } = parsed.data;
+    const expiresAt = new Date(Date.now() + PREVIEW_TTL_MS);
+    const preview = await prisma.planPreview.create({
+      data: { planData: planOption as object, location, themes, expiresAt },
+    });
+    const previewUrl = `${env.PUBLIC_SITE_URL ?? 'http://localhost:3000'}/preview/${preview.token}`;
+    res.status(201).json({ previewUrl });
+  }),
+);
+
+tripsRouter.get(
+  '/preview/:token',
+  withAsyncHandler(async (req, res) => {
+    const { token } = req.params;
+    const preview = await prisma.planPreview.findUnique({ where: { token } });
+    if (!preview || preview.expiresAt < new Date()) {
+      res.status(404).json({ error: 'NOT_FOUND' });
+      return;
+    }
+    res.json({
+      token: preview.token,
+      location: preview.location,
+      themes: preview.themes,
+      planOption: preview.planData,
+      expiresAt: preview.expiresAt,
+    });
+  }),
+);

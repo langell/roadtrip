@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-042 `2026-04-share-plan-before-saving.md` — POST /trips/share-preview + GET /trips/preview/:token; PlanPreview DB model (48h TTL); ↗ Share button on each plan card; /preview/[token] public page with stop cards and Save CTA.
 - 2026-04-05 — RT-041 `2026-04-stop-preview-sheet.md` — StopPreviewSheet component (bottom sheet mobile / centered modal desktop); tap any resolved stop in planner to preview photo, description, distance, Maps link without leaving page.
 - 2026-04-05 — RT-040 `2026-04-swappable-alternative-stops.md` — AI returns 2 alt stop names per stop; parallel Places resolution; ⇄ swap button cycles through alternatives in-place; active selection baked into saved plan.
 - 2026-04-05 — RT-039 `2026-04-plan-refinement.md` — POST /trips/refine-plan; refinePlan() AI service method (tier 1); inline refine UI with undo on each plan card.

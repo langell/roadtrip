@@ -110,3 +110,15 @@ model TripPlanCache {
   @@index([engagementScore, updatedAt])
   @@index([locationKey])
 }
+
+model PlanPreview {
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())
+  planData  Json
+  location  String
+  themes    String[]
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}

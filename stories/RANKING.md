@@ -5,8 +5,7 @@ Stories marked **In Progress** are actively being worked on.
 
 | Rank | ID     | Story                                         | Status  | File                                                                                             |
 | ---- | ------ | --------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| 1    | RT-042 | Share a Plan Before Saving                    | Backlog | [Backlog/2026-04-share-plan-before-saving.md](Backlog/2026-04-share-plan-before-saving.md)       |
-| 6    | RT-032 | Discovery & Inspiration Feed                  | Backlog | [Backlog/2026-03-discovery-feed.md](Backlog/2026-03-discovery-feed.md)                           |
+| 1    | RT-032 | Discovery & Inspiration Feed                  | Backlog | [Backlog/2026-03-discovery-feed.md](Backlog/2026-03-discovery-feed.md)                           |
 | 7    | RT-033 | Route Map View                                | Backlog | [Backlog/2026-03-route-map-view.md](Backlog/2026-03-route-map-view.md)                           |
 | 8    | RT-006 | Analytics Funnel Events                       | Backlog | [Backlog/2026-03-analytics-funnel-events.md](Backlog/2026-03-analytics-funnel-events.md)         |
 | 9    | RT-005 | Sponsored Places Ranking and Labeling         | Backlog | [Backlog/2026-03-sponsored-places-ranking.md](Backlog/2026-03-sponsored-places-ranking.md)       |

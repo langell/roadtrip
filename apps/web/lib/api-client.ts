@@ -566,3 +566,43 @@ export const streamTripPlans = async (
     callbacks.onError();
   }
 };
+
+export type PlanPreview = {
+  token: string;
+  location: string;
+  themes: string[];
+  planOption: TripPlanOption;
+  expiresAt: string;
+};
+
+export const sharePlanPreview = async (params: {
+  location: string;
+  themes: string[];
+  planOption: TripPlanOption;
+}): Promise<{ previewUrl: string } | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/share-preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(params),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as { previewUrl: string };
+  } catch {
+    return null;
+  }
+};
+
+export const getPlanPreview = async (token: string): Promise<PlanPreview | null> => {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/trips/preview/${encodeURIComponent(token)}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as PlanPreview;
+  } catch {
+    return null;
+  }
+};

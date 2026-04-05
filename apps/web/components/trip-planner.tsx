@@ -9,6 +9,7 @@ import {
   streamTripPlans,
   getNearbySponsored,
   refinePlan,
+  sharePlanPreview,
   type TripPlanOption,
   type PlannedStopResolved,
   type SponsoredStop,
@@ -307,6 +308,9 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
   };
 
   const [previewStop, setPreviewStop] = useState<PreviewStop | null>(null);
+  const [shareStates, setShareStates] = useState<
+    Record<number, 'idle' | 'sharing' | 'copied'>
+  >({});
 
   const [refineStates, setRefineStates] = useState<
     Record<
@@ -669,6 +673,26 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
       ...s,
       [index]: { open: false, instruction: '', loading: false, prev: null },
     }));
+  };
+
+  const handleShare = async (option: TripPlanOption, index: number) => {
+    setShareStates((s) => ({ ...s, [index]: 'sharing' }));
+    const result = await sharePlanPreview({
+      location,
+      themes: selectedThemes,
+      planOption: option,
+    });
+    if (result?.previewUrl) {
+      try {
+        await navigator.share({ url: result.previewUrl, title: option.title });
+      } catch {
+        await navigator.clipboard.writeText(result.previewUrl);
+      }
+      setShareStates((s) => ({ ...s, [index]: 'copied' }));
+      setTimeout(() => setShareStates((s) => ({ ...s, [index]: 'idle' })), 2000);
+    } else {
+      setShareStates((s) => ({ ...s, [index]: 'idle' }));
+    }
   };
 
   const handleSelectPlan = async (option: TripPlanOption, optionIdx: number) => {
@@ -1142,6 +1166,19 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                         Undo
                       </button>
                     )}
+                    <button
+                      type="button"
+                      disabled={shareStates[index] === 'sharing'}
+                      onClick={() => void handleShare(option, index)}
+                      title="Share this plan"
+                      className="rounded-lg border border-wayfarer-surface px-2 py-1 font-body text-[11px] text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary disabled:opacity-50"
+                    >
+                      {shareStates[index] === 'copied'
+                        ? 'Copied!'
+                        : shareStates[index] === 'sharing'
+                          ? '…'
+                          : '↗ Share'}
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
