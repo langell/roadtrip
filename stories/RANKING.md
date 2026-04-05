@@ -23,6 +23,8 @@ Stories marked **In Progress** are actively being worked on.
 | 16   | RT-021 | Performance and Scalability                        | Backlog | [Backlog/2026-03-performance-and-scalability.md](Backlog/2026-03-performance-and-scalability.md)           |
 | 17   | RT-044 | Hotel Active Search (Date-Based Availability)      | Backlog | [Backlog/2026-04-hotel-active-search.md](Backlog/2026-04-hotel-active-search.md)                           |
 | 18   | RT-045 | Legal & Support Pages (ToS, Privacy, Support, FAQ) | Backlog | [Backlog/2026-04-legal-and-support-pages.md](Backlog/2026-04-legal-and-support-pages.md)                   |
+| 19   | RT-046 | Distributed Rate Limiting (Redis)                  | Backlog | [Backlog/2026-04-distributed-rate-limiting.md](Backlog/2026-04-distributed-rate-limiting.md)               |
+| 20   | RT-047 | PostGIS Geo-Distance Queries                       | Backlog | [Backlog/2026-04-postgis-geo-queries.md](Backlog/2026-04-postgis-geo-queries.md)                           |
 
 ## How to use
 
