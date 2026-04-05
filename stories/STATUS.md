@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-036 `2026-04-cache-prewarming.md` — nightly GET /jobs/prewarm-cache; top-N trending locations × theme combos; CRON_SECRET auth; bounded to PREWARM_MAX_GENERATIONS.
 - 2026-04-05 — RT-035 `2026-04-fuzzy-cache-matching.md` — locationKey OR condition in cache lookup; normalizeLocationKey fast path + lat/lng bounding box fallback.
 - 2026-04-05 — RT-034 `2026-04-streaming-plan-generation.md` — true AI token streaming via streamGenerateContent + SSE; first option appears within ~1s.
 - 2026-04-05 — RT-043 `2026-04-hotel-affiliate-cards.md` — passive hotel affiliate cards on stop detail pages.

@@ -14,3 +14,7 @@ process.env.ANON_SUGGESTIONS_RATE_LIMIT_WINDOW_MS ??= '300000';
 process.env.ANON_SUGGESTIONS_RATE_LIMIT_MAX ??= '60';
 process.env.ANON_PHOTO_RATE_LIMIT_WINDOW_MS ??= '300000';
 process.env.ANON_PHOTO_RATE_LIMIT_MAX ??= '200';
+process.env.CRON_SECRET ??= 'test-cron-secret';
+process.env.PREWARM_MAX_LOCATIONS ??= '10';
+process.env.PREWARM_MAX_THEME_COMBOS ??= '2';
+process.env.PREWARM_MAX_GENERATIONS ??= '30';

@@ -19,6 +19,7 @@ import { usersRouter } from './routes/users-router.js';
 import { sponsoredRouter } from './routes/sponsored-router.js';
 import { hotelsRouter } from './routes/hotels-router.js';
 import { adminRouter } from './routes/admin-router.js';
+import { jobsRouter } from './routes/jobs-router.js';
 import { withAsyncHandler } from './lib/async-handler.js';
 
 export const createApp = () => {
@@ -74,6 +75,7 @@ export const createApp = () => {
   app.use('/', sponsoredRouter); // handles /trips/:id/sponsored-stop and /sponsored-stop/nearby
   app.use('/hotels', hotelsRouter);
   app.use('/admin', adminRouter);
+  app.use('/jobs', jobsRouter);
 
   // ── tRPC ─────────────────────────────────────────────────────────────────
   app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }));

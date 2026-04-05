@@ -45,6 +45,12 @@ const schema = z.object({
   // Affiliate partner IDs for hotel monetization
   EXPEDIA_AFFILIATE_ID: z.string().min(1).optional(),
   BOOKING_AFFILIATE_ID: z.string().min(1).optional(),
+  // Cron job auth
+  CRON_SECRET: z.string().min(1).optional(),
+  // Cache pre-warming config
+  PREWARM_MAX_LOCATIONS: z.coerce.number().int().min(1).max(100).default(10),
+  PREWARM_MAX_THEME_COMBOS: z.coerce.number().int().min(1).max(10).default(2),
+  PREWARM_MAX_GENERATIONS: z.coerce.number().int().min(1).max(100).default(30),
 });
 
 export const env = schema.parse(process.env);
