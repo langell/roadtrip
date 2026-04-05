@@ -563,35 +563,42 @@ export class AiTripPlannerService {
 
     const prompt = this.buildPlanPrompt(input);
     const model = env.GOOGLE_AI_MODEL;
+    const fallbackModel = 'gemini-2.5-flash';
     const payload = JSON.stringify(this.buildRequestPayload(prompt));
 
-    // Try v1beta first (broader model support), fall back to v1.
-    const buildStreamUrl = (apiVersion: 'v1beta' | 'v1') => {
+    const buildStreamUrl = (m: string, apiVersion: 'v1beta' | 'v1') => {
       const url = new URL(
-        `https://generativelanguage.googleapis.com/${apiVersion}/models/${encodeURIComponent(model)}:streamGenerateContent`,
+        `https://generativelanguage.googleapis.com/${apiVersion}/models/${encodeURIComponent(m)}:streamGenerateContent`,
       );
       url.searchParams.set('key', apiKey);
       url.searchParams.set('alt', 'sse');
       return url;
     };
 
-    let response = await this.fetchFn(buildStreamUrl('v1beta'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-    });
+    // Try primary model (v1beta then v1), then fallback model (v1beta then v1).
+    // Mirrors the same resilience as the non-streaming requestWithModelFallback.
+    const streamAttempts: Array<{ m: string; apiVersion: 'v1beta' | 'v1' }> = [
+      { m: model, apiVersion: 'v1beta' },
+      { m: model, apiVersion: 'v1' },
+    ];
+    if (model !== fallbackModel) {
+      streamAttempts.push({ m: fallbackModel, apiVersion: 'v1beta' });
+      streamAttempts.push({ m: fallbackModel, apiVersion: 'v1' });
+    }
 
-    if (response.status === 404) {
-      response = await this.fetchFn(buildStreamUrl('v1'), {
+    let response: Response | null = null;
+    for (const attempt of streamAttempts) {
+      response = await this.fetchFn(buildStreamUrl(attempt.m, attempt.apiVersion), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: payload,
       });
+      if (response.status !== 404) break;
     }
 
-    if (!response.ok || !response.body) {
+    if (!response || !response.ok || !response.body) {
       throw new AiTripPlannerError('AI_REQUEST_FAILED', 'request', {
-        status: response.status,
+        status: response?.status,
       });
     }
 
