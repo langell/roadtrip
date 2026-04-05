@@ -5,23 +5,22 @@ Stories marked **In Progress** are actively being worked on.
 
 | Rank | ID     | Story                                         | Status  | File                                                                                                       |
 | ---- | ------ | --------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
-| 1    | RT-035 | Fuzzy Cache Matching                          | Backlog | [Backlog/2026-04-fuzzy-cache-matching.md](Backlog/2026-04-fuzzy-cache-matching.md)                         |
-| 2    | RT-036 | Cache Pre-Warming for Trending Destinations   | Backlog | [Backlog/2026-04-cache-prewarming.md](Backlog/2026-04-cache-prewarming.md)                                 |
-| 3    | RT-037 | Two-Tier Model Routing                        | Backlog | [Backlog/2026-04-two-tier-model-routing.md](Backlog/2026-04-two-tier-model-routing.md)                     |
-| 4    | RT-038 | Personalization from Saved Trips              | Backlog | [Backlog/2026-04-personalization-from-saved-trips.md](Backlog/2026-04-personalization-from-saved-trips.md) |
-| 5    | RT-039 | "Refine This Plan" Flow                       | Backlog | [Backlog/2026-04-plan-refinement.md](Backlog/2026-04-plan-refinement.md)                                   |
-| 6    | RT-040 | Swappable Alternative Stops                   | Backlog | [Backlog/2026-04-swappable-alternative-stops.md](Backlog/2026-04-swappable-alternative-stops.md)           |
-| 7    | RT-041 | Stop Detail Preview Sheet                     | Backlog | [Backlog/2026-04-stop-preview-sheet.md](Backlog/2026-04-stop-preview-sheet.md)                             |
-| 8    | RT-042 | Share a Plan Before Saving                    | Backlog | [Backlog/2026-04-share-plan-before-saving.md](Backlog/2026-04-share-plan-before-saving.md)                 |
-| 9    | RT-032 | Discovery & Inspiration Feed                  | Backlog | [Backlog/2026-03-discovery-feed.md](Backlog/2026-03-discovery-feed.md)                                     |
-| 10   | RT-033 | Route Map View                                | Backlog | [Backlog/2026-03-route-map-view.md](Backlog/2026-03-route-map-view.md)                                     |
-| 11   | RT-006 | Analytics Funnel Events                       | Backlog | [Backlog/2026-03-analytics-funnel-events.md](Backlog/2026-03-analytics-funnel-events.md)                   |
-| 12   | RT-005 | Sponsored Places Ranking and Labeling         | Backlog | [Backlog/2026-03-sponsored-places-ranking.md](Backlog/2026-03-sponsored-places-ranking.md)                 |
-| 13   | RT-019 | Architecture Boundaries and Tech Debt         | Backlog | [Backlog/2026-03-architecture-boundaries.md](Backlog/2026-03-architecture-boundaries.md)                   |
-| 14   | RT-021 | Performance and Scalability                   | Backlog | [Backlog/2026-03-performance-and-scalability.md](Backlog/2026-03-performance-and-scalability.md)           |
-| 15   | RT-044 | Hotel Active Search (Date-Based Availability) | Backlog | [Backlog/2026-04-hotel-active-search.md](Backlog/2026-04-hotel-active-search.md)                           |
-| 16   | RT-046 | Distributed Rate Limiting (Redis)             | Backlog | [Backlog/2026-04-distributed-rate-limiting.md](Backlog/2026-04-distributed-rate-limiting.md)               |
-| 17   | RT-047 | PostGIS Geo-Distance Queries                  | Backlog | [Backlog/2026-04-postgis-geo-queries.md](Backlog/2026-04-postgis-geo-queries.md)                           |
+| 1    | RT-036 | Cache Pre-Warming for Trending Destinations   | Backlog | [Backlog/2026-04-cache-prewarming.md](Backlog/2026-04-cache-prewarming.md)                                 |
+| 2    | RT-037 | Two-Tier Model Routing                        | Backlog | [Backlog/2026-04-two-tier-model-routing.md](Backlog/2026-04-two-tier-model-routing.md)                     |
+| 3    | RT-038 | Personalization from Saved Trips              | Backlog | [Backlog/2026-04-personalization-from-saved-trips.md](Backlog/2026-04-personalization-from-saved-trips.md) |
+| 4    | RT-039 | "Refine This Plan" Flow                       | Backlog | [Backlog/2026-04-plan-refinement.md](Backlog/2026-04-plan-refinement.md)                                   |
+| 5    | RT-040 | Swappable Alternative Stops                   | Backlog | [Backlog/2026-04-swappable-alternative-stops.md](Backlog/2026-04-swappable-alternative-stops.md)           |
+| 6    | RT-041 | Stop Detail Preview Sheet                     | Backlog | [Backlog/2026-04-stop-preview-sheet.md](Backlog/2026-04-stop-preview-sheet.md)                             |
+| 7    | RT-042 | Share a Plan Before Saving                    | Backlog | [Backlog/2026-04-share-plan-before-saving.md](Backlog/2026-04-share-plan-before-saving.md)                 |
+| 8    | RT-032 | Discovery & Inspiration Feed                  | Backlog | [Backlog/2026-03-discovery-feed.md](Backlog/2026-03-discovery-feed.md)                                     |
+| 9    | RT-033 | Route Map View                                | Backlog | [Backlog/2026-03-route-map-view.md](Backlog/2026-03-route-map-view.md)                                     |
+| 10   | RT-006 | Analytics Funnel Events                       | Backlog | [Backlog/2026-03-analytics-funnel-events.md](Backlog/2026-03-analytics-funnel-events.md)                   |
+| 11   | RT-005 | Sponsored Places Ranking and Labeling         | Backlog | [Backlog/2026-03-sponsored-places-ranking.md](Backlog/2026-03-sponsored-places-ranking.md)                 |
+| 12   | RT-019 | Architecture Boundaries and Tech Debt         | Backlog | [Backlog/2026-03-architecture-boundaries.md](Backlog/2026-03-architecture-boundaries.md)                   |
+| 13   | RT-021 | Performance and Scalability                   | Backlog | [Backlog/2026-03-performance-and-scalability.md](Backlog/2026-03-performance-and-scalability.md)           |
+| 14   | RT-044 | Hotel Active Search (Date-Based Availability) | Backlog | [Backlog/2026-04-hotel-active-search.md](Backlog/2026-04-hotel-active-search.md)                           |
+| 15   | RT-046 | Distributed Rate Limiting (Redis)             | Backlog | [Backlog/2026-04-distributed-rate-limiting.md](Backlog/2026-04-distributed-rate-limiting.md)               |
+| 16   | RT-047 | PostGIS Geo-Distance Queries                  | Backlog | [Backlog/2026-04-postgis-geo-queries.md](Backlog/2026-04-postgis-geo-queries.md)                           |
 
 ## How to use
 

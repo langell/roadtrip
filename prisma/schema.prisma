@@ -86,6 +86,7 @@ model TripPlanCache {
   maxOptions      Int
   options         Json
   validOptions    Int
+  locationKey     String?
   engagementScore Int      @default(0)
   lastServedAt    DateTime?
   expiresAt       DateTime
@@ -95,5 +96,6 @@ model TripPlanCache {
   @@index([expiresAt])
   @@index([themesKey, radiusKm, maxOptions, expiresAt])
   @@index([centerLat, centerLng])
+  @@index([locationKey])
   @@index([engagementScore, updatedAt])
 }

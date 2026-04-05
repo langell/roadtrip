@@ -302,6 +302,7 @@ tripsRouter.post(
     const cosLatitude = Math.max(Math.cos(toRadians(origin.lat)), 0.2);
     const lngDelta = cacheRadiusKm / (111.32 * cosLatitude);
 
+    const locationKey = normalizeLocationKey(input.location);
     const cacheCandidates = await prisma.tripPlanCache.findMany({
       where: {
         themesKey,
@@ -309,8 +310,17 @@ tripsRouter.post(
         maxOptions: input.maxOptions,
         expiresAt: { gt: now },
         validOptions: { gt: 0 },
-        centerLat: { gte: origin.lat - latDelta, lte: origin.lat + latDelta },
-        centerLng: { gte: origin.lng - lngDelta, lte: origin.lng + lngDelta },
+        // Match by normalized location key (fast index path) OR by geographic
+        // bounding box (covers legacy entries without locationKey and handles
+        // cases where the same city name appears in multiple regions).
+        // Haversine filtering below further disambiguates geographic false-positives.
+        OR: [
+          { locationKey },
+          {
+            centerLat: { gte: origin.lat - latDelta, lte: origin.lat + latDelta },
+            centerLng: { gte: origin.lng - lngDelta, lte: origin.lng + lngDelta },
+          },
+        ],
       },
       orderBy: [{ engagementScore: 'desc' }, { updatedAt: 'desc' }],
       take: 25,
