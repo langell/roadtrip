@@ -9,6 +9,9 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-046 `2026-04-distributed-rate-limiting.md` — @upstash/redis + @upstash/ratelimit sliding-window; in-memory fallback when Redis not configured; REDIS_URL + REDIS_TOKEN env vars; fail-open on Redis errors.
+- 2026-04-05 — RT-021 `2026-03-performance-and-scalability.md` — docs/performance.md with API/web targets, optimization inventory, monitoring hooks, alerting recommendations.
+- 2026-04-05 — RT-019 `2026-03-architecture-boundaries.md` — docs/architecture.md (service diagram, design decisions, tech debt register, feature checklist); ADRs 001–003.
 - 2026-04-05 — RT-005 `2026-03-sponsored-places-ranking.md` — sponsored injection at positions 1+5 in discover grid; max-2 frequency cap; PlaceCard Sponsored badge; sponsored_click analytics on badge click; active/inactive DB filter.
 - 2026-04-05 — RT-006 `2026-03-analytics-funnel-events.md` — POST /analytics/events (public, fire-and-forget); GET /analytics/events (admin); trip_generate + trip_save in planner; trip_open on map page; sponsored_click/impression migrated to shared recordEvent() helper; 8 tests.
 - 2026-04-05 — RT-042 `2026-04-share-plan-before-saving.md` — POST /trips/share-preview + GET /trips/preview/:token; PlanPreview DB model (48h TTL); ↗ Share button on each plan card; /preview/[token] public page with stop cards and Save CTA.

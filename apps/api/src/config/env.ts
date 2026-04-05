@@ -46,6 +46,9 @@ const schema = z.object({
   // Affiliate partner IDs for hotel monetization
   EXPEDIA_AFFILIATE_ID: z.string().min(1).optional(),
   BOOKING_AFFILIATE_ID: z.string().min(1).optional(),
+  // Redis (Upstash REST) — optional; used for distributed rate limiting when both are provided
+  REDIS_URL: z.string().url().optional(),
+  REDIS_TOKEN: z.string().min(1).optional(),
   // Cron job auth
   CRON_SECRET: z.string().min(1).optional(),
   // Cache pre-warming config
