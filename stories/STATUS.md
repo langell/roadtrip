@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-005 `2026-03-sponsored-places-ranking.md` — sponsored injection at positions 1+5 in discover grid; max-2 frequency cap; PlaceCard Sponsored badge; sponsored_click analytics on badge click; active/inactive DB filter.
 - 2026-04-05 — RT-006 `2026-03-analytics-funnel-events.md` — POST /analytics/events (public, fire-and-forget); GET /analytics/events (admin); trip_generate + trip_save in planner; trip_open on map page; sponsored_click/impression migrated to shared recordEvent() helper; 8 tests.
 - 2026-04-05 — RT-042 `2026-04-share-plan-before-saving.md` — POST /trips/share-preview + GET /trips/preview/:token; PlanPreview DB model (48h TTL); ↗ Share button on each plan card; /preview/[token] public page with stop cards and Save CTA.
 - 2026-04-05 — RT-041 `2026-04-stop-preview-sheet.md` — StopPreviewSheet component (bottom sheet mobile / centered modal desktop); tap any resolved stop in planner to preview photo, description, distance, Maps link without leaving page.

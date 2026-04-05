@@ -5,8 +5,7 @@ Stories marked **In Progress** are actively being worked on.
 
 | Rank | ID     | Story                                         | Status  | File                                                                                             |
 | ---- | ------ | --------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| 1    | RT-005 | Sponsored Places Ranking and Labeling         | Backlog | [Backlog/2026-03-sponsored-places-ranking.md](Backlog/2026-03-sponsored-places-ranking.md)       |
-| 10   | RT-019 | Architecture Boundaries and Tech Debt         | Backlog | [Backlog/2026-03-architecture-boundaries.md](Backlog/2026-03-architecture-boundaries.md)         |
+| 1    | RT-019 | Architecture Boundaries and Tech Debt         | Backlog | [Backlog/2026-03-architecture-boundaries.md](Backlog/2026-03-architecture-boundaries.md)         |
 | 11   | RT-021 | Performance and Scalability                   | Backlog | [Backlog/2026-03-performance-and-scalability.md](Backlog/2026-03-performance-and-scalability.md) |
 | 14   | RT-044 | Hotel Active Search (Date-Based Availability) | Backlog | [Backlog/2026-04-hotel-active-search.md](Backlog/2026-04-hotel-active-search.md)                 |
 | 15   | RT-046 | Distributed Rate Limiting (Redis)             | Backlog | [Backlog/2026-04-distributed-rate-limiting.md](Backlog/2026-04-distributed-rate-limiting.md)     |
