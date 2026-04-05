@@ -9,6 +9,7 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-047 `2026-04-postgis-geo-queries.md` — location GEOGRAPHY column on SponsoredPlace; $queryRaw ST_Distance/ST_DWithin queries replace in-memory haversine sort; 6 new tests (GET /trips/:id/sponsored-stop + GET /sponsored-stop/nearby).
 - 2026-04-05 — RT-046 `2026-04-distributed-rate-limiting.md` — @upstash/redis + @upstash/ratelimit sliding-window; in-memory fallback when Redis not configured; REDIS_URL + REDIS_TOKEN env vars; fail-open on Redis errors.
 - 2026-04-05 — RT-021 `2026-03-performance-and-scalability.md` — docs/performance.md with API/web targets, optimization inventory, monitoring hooks, alerting recommendations.
 - 2026-04-05 — RT-019 `2026-03-architecture-boundaries.md` — docs/architecture.md (service diagram, design decisions, tech debt register, feature checklist); ADRs 001–003.

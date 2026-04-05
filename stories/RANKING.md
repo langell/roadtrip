@@ -6,7 +6,6 @@ Stories marked **In Progress** are actively being worked on.
 | Rank | ID     | Story                                         | Status  | File                                                                             |
 | ---- | ------ | --------------------------------------------- | ------- | -------------------------------------------------------------------------------- |
 | 1    | RT-044 | Hotel Active Search (Date-Based Availability) | Backlog | [Backlog/2026-04-hotel-active-search.md](Backlog/2026-04-hotel-active-search.md) |
-| 15   | RT-047 | PostGIS Geo-Distance Queries                  | Backlog | [Backlog/2026-04-postgis-geo-queries.md](Backlog/2026-04-postgis-geo-queries.md) |
 
 ## How to use
 

@@ -2,9 +2,19 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { withAsyncHandler } from '../lib/async-handler.js';
 import { requireAuth } from '../lib/require-auth.js';
-import { haversineKm } from '../lib/haversine.js';
 
 export const sponsoredRouter = Router();
+
+type SponsoredRow = {
+  id: string;
+  placeId: string;
+  title: string;
+  description: string;
+  imageUrl: string | null;
+  url: string | null;
+  lat: number | null;
+  lng: number | null;
+};
 
 // Sponsored stop for a saved trip — geo-closest to midpoint
 sponsoredRouter.get(
@@ -24,38 +34,37 @@ sponsoredRouter.get(
       return;
     }
 
-    const sponsored = await prisma.sponsoredPlace.findMany({ where: { active: true } });
-    if (sponsored.length === 0) {
-      res.json(null);
-      return;
-    }
-
     const midStop = trip.stops[Math.floor(trip.stops.length / 2)];
     const refLat = midStop?.lat ?? trip.originLat;
     const refLng = midStop?.lng ?? trip.originLng;
 
-    const sorted = [...sponsored].sort((a, b) => {
-      const distA =
-        a.lat != null && a.lng != null
-          ? haversineKm(refLat, refLng, a.lat, a.lng)
-          : Infinity;
-      const distB =
-        b.lat != null && b.lng != null
-          ? haversineKm(refLat, refLng, b.lat, b.lng)
-          : Infinity;
-      return distA - distB;
-    });
+    // PostGIS: order geo-tagged sponsors by distance; untagged sponsors sort last.
+    const rows = await prisma.$queryRaw<SponsoredRow[]>`
+      SELECT id, "placeId", title, description, "imageUrl", url, lat, lng
+      FROM "SponsoredPlace"
+      WHERE active = true
+      ORDER BY
+        CASE WHEN location IS NOT NULL
+          THEN ST_Distance(
+            location,
+            ST_SetSRID(ST_MakePoint(${refLng}::float, ${refLat}::float), 4326)::geography
+          )
+          ELSE 999999999
+        END ASC
+      LIMIT 20
+    `;
 
-    const best = sorted[0];
-    if (!best) {
+    if (rows.length === 0) {
       res.json(null);
       return;
     }
 
+    // Skip the closest if its placeId is already a stop in this trip.
     const tripPlaceIds = new Set(trip.stops.map((s) => s.placeId));
+    const best = rows[0];
     const picked =
       best.placeId && tripPlaceIds.has(best.placeId)
-        ? (sorted.find((s) => !tripPlaceIds.has(s.placeId)) ?? best)
+        ? (rows.find((s) => !tripPlaceIds.has(s.placeId)) ?? best)
         : best;
 
     res.json({
@@ -71,7 +80,9 @@ sponsoredRouter.get(
   }),
 );
 
-// Sponsored stop for the planner (no trip yet) — query by lat/lng
+const MAX_SPONSOR_RADIUS_KM = 200;
+
+// Sponsored stop for the planner (no trip yet) — query by lat/lng within radius
 sponsoredRouter.get(
   '/sponsored-stop/nearby',
   requireAuth,
@@ -86,27 +97,38 @@ sponsoredRouter.get(
       return;
     }
 
-    const MAX_SPONSOR_RADIUS_KM = 200;
-    const sponsored = await prisma.sponsoredPlace.findMany({ where: { active: true } });
-    if (sponsored.length === 0) {
+    const radiusM = MAX_SPONSOR_RADIUS_KM * 1000;
+
+    // PostGIS: filter by radius for geo-tagged sponsors; include untagged as fallback.
+    const rows = await prisma.$queryRaw<SponsoredRow[]>`
+      SELECT id, "placeId", title, description, "imageUrl", url, lat, lng
+      FROM "SponsoredPlace"
+      WHERE active = true
+        AND (
+          location IS NULL
+          OR ST_DWithin(
+            location,
+            ST_SetSRID(ST_MakePoint(${lng}::float, ${lat}::float), 4326)::geography,
+            ${radiusM}::float
+          )
+        )
+      ORDER BY
+        CASE WHEN location IS NOT NULL
+          THEN ST_Distance(
+            location,
+            ST_SetSRID(ST_MakePoint(${lng}::float, ${lat}::float), 4326)::geography
+          )
+          ELSE 999999999
+        END ASC
+      LIMIT 20
+    `;
+
+    if (rows.length === 0) {
       res.json(null);
       return;
     }
 
-    const best = sponsored
-      .map((s) => ({
-        sponsor: s,
-        distKm:
-          s.lat != null && s.lng != null ? haversineKm(lat, lng, s.lat, s.lng) : Infinity,
-      }))
-      .filter(({ distKm }) => distKm <= MAX_SPONSOR_RADIUS_KM)
-      .sort((a, b) => a.distKm - b.distKm)[0]?.sponsor;
-
-    if (!best) {
-      res.json(null);
-      return;
-    }
-
+    const best = rows[0];
     res.json({
       id: best.id,
       placeId: best.placeId,

@@ -22,6 +22,7 @@ vi.mock('./types/context.js', () => ({
 }));
 
 const prismaMock = {
+  $queryRaw: vi.fn(),
   trip: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -142,6 +143,7 @@ describe('HTTP server', () => {
     prismaMock.tripPlanCache.findUnique.mockReset();
     prismaMock.tripPlanCache.create.mockReset();
     prismaMock.tripPlanCache.update.mockReset();
+    prismaMock.$queryRaw.mockReset();
     prismaMock.sponsoredPlace.findMany.mockReset();
     prismaMock.sponsoredPlace.findUnique.mockReset();
     prismaMock.sponsoredPlace.create.mockReset();
@@ -1288,9 +1290,9 @@ describe('HTTP server', () => {
         ],
       };
 
-      it('returns the first active sponsored place', async () => {
+      it('returns the nearest active sponsored place via geo query', async () => {
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+        prismaMock.$queryRaw.mockResolvedValue([
           {
             id: 'sp-1',
             placeId: 'place-x',
@@ -1298,7 +1300,8 @@ describe('HTTP server', () => {
             description: 'Nice',
             imageUrl: null,
             url: 'https://lodge.example.com',
-            active: true,
+            lat: 45.88,
+            lng: -123.96,
           },
         ]);
 
@@ -1313,11 +1316,12 @@ describe('HTTP server', () => {
           title: 'Crater Lodge',
           placeId: 'place-x',
         });
+        expect(prismaMock.$queryRaw).toHaveBeenCalled();
       });
 
       it('returns null when no sponsored places are active', async () => {
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([]);
+        prismaMock.$queryRaw.mockResolvedValue([]);
 
         const app = createApp();
         const response = await request(app)
@@ -1347,23 +1351,11 @@ describe('HTTP server', () => {
         expect(response.status).toBe(404);
       });
 
-      it('picks the sponsor closest to the trip midpoint when multiple are active', async () => {
-        // mockTrip has one stop at lat 45.88, lng -123.96 (Oregon coast)
-        // near: Portland area sponsor ~45.5, -122.7 (~130 km away)
-        // far:  Florida sponsor ~27.9, -82.5 (~3900 km away)
+      it('returns the closest sponsor (DB-ordered by ST_Distance)', async () => {
+        // PostGIS returns rows already sorted by distance — nearest first.
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
-          {
-            id: 'sp-far',
-            placeId: 'place-fl',
-            title: 'Florida Resort',
-            description: 'Sun and sand',
-            imageUrl: null,
-            url: null,
-            active: true,
-            lat: 27.9,
-            lng: -82.5,
-          },
+        prismaMock.$queryRaw.mockResolvedValue([
+          // nearest (Oregon coast ~2 km from stop)
           {
             id: 'sp-near',
             placeId: 'place-or',
@@ -1371,9 +1363,19 @@ describe('HTTP server', () => {
             description: 'Right on the Oregon coast',
             imageUrl: null,
             url: null,
-            active: true,
             lat: 45.99,
             lng: -123.93,
+          },
+          // farther (Florida)
+          {
+            id: 'sp-far',
+            placeId: 'place-fl',
+            title: 'Florida Resort',
+            description: 'Sun and sand',
+            imageUrl: null,
+            url: null,
+            lat: 27.9,
+            lng: -82.5,
           },
         ]);
 
@@ -1386,9 +1388,46 @@ describe('HTTP server', () => {
         expect(response.body.id).toBe('sp-near');
       });
 
-      it('falls back to any active sponsor when none have lat/lng', async () => {
+      it('skips a sponsor whose placeId is already a trip stop and returns the next', async () => {
+        // mockTrip has stop with placeId 'p1'
         prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
-        prismaMock.sponsoredPlace.findMany.mockResolvedValue([
+        prismaMock.$queryRaw.mockResolvedValue([
+          // nearest — but already in trip
+          {
+            id: 'sp-in-trip',
+            placeId: 'p1',
+            title: 'Cannon Beach Lodge',
+            description: 'Already a stop',
+            imageUrl: null,
+            url: null,
+            lat: 45.88,
+            lng: -123.96,
+          },
+          // second nearest — not in trip
+          {
+            id: 'sp-other',
+            placeId: 'place-other',
+            title: 'Astoria Inn',
+            description: 'Good alternative',
+            imageUrl: null,
+            url: null,
+            lat: 46.18,
+            lng: -123.83,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/trips/trip-abc/sponsored-stop')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('sp-other');
+      });
+
+      it('falls back to a sponsor without lat/lng when it is the only result', async () => {
+        prismaMock.trip.findUnique.mockResolvedValue(mockTrip);
+        prismaMock.$queryRaw.mockResolvedValue([
           {
             id: 'sp-untagged',
             placeId: 'place-u',
@@ -1396,7 +1435,6 @@ describe('HTTP server', () => {
             description: 'No location set',
             imageUrl: null,
             url: null,
-            active: true,
             lat: null,
             lng: null,
           },
@@ -1409,6 +1447,94 @@ describe('HTTP server', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.id).toBe('sp-untagged');
+      });
+    });
+
+    describe('GET /sponsored-stop/nearby', () => {
+      it('returns the nearest sponsored place within radius', async () => {
+        prismaMock.$queryRaw.mockResolvedValue([
+          {
+            id: 'sp-close',
+            placeId: 'place-close',
+            title: 'Nearby Lodge',
+            description: 'Close by',
+            imageUrl: null,
+            url: null,
+            lat: 45.52,
+            lng: -122.68,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby?lat=45.52&lng=-122.68')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ id: 'sp-close', title: 'Nearby Lodge' });
+        expect(prismaMock.$queryRaw).toHaveBeenCalled();
+      });
+
+      it('returns null when no sponsors are within radius', async () => {
+        prismaMock.$queryRaw.mockResolvedValue([]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby?lat=45.52&lng=-122.68')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toBeNull();
+      });
+
+      it('returns the closer of two sponsors (nearest first from DB)', async () => {
+        // DB returns rows already ordered by ST_Distance
+        prismaMock.$queryRaw.mockResolvedValue([
+          {
+            id: 'sp-near',
+            placeId: 'place-near',
+            title: 'Close Spot',
+            description: '10 km away',
+            imageUrl: null,
+            url: null,
+            lat: 45.6,
+            lng: -122.7,
+          },
+          {
+            id: 'sp-far',
+            placeId: 'place-far',
+            title: 'Distant Spot',
+            description: '150 km away',
+            imageUrl: null,
+            url: null,
+            lat: 44.0,
+            lng: -121.0,
+          },
+        ]);
+
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby?lat=45.52&lng=-122.68')
+          .set('authorization', 'Bearer user-1');
+
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('sp-near');
+      });
+
+      it('returns 400 for missing coordinates', async () => {
+        const app = createApp();
+        const response = await request(app)
+          .get('/sponsored-stop/nearby')
+          .set('authorization', 'Bearer user-1');
+        expect(response.status).toBe(400);
+      });
+
+      it('returns 401 for unauthenticated request', async () => {
+        const app = createApp();
+        const response = await request(app).get(
+          '/sponsored-stop/nearby?lat=45.52&lng=-122.68',
+        );
+        expect(response.status).toBe(401);
       });
     });
 
