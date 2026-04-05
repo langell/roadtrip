@@ -52,7 +52,6 @@ placesRouter.get(
       'https://places.googleapis.com',
     );
     photoUrl.searchParams.set('maxWidthPx', String(maxWidthPx));
-    photoUrl.searchParams.set('skipHttpRedirect', 'true');
 
     try {
       const requestLogger = getRequestLogger(res);
