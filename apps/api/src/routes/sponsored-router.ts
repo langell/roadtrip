@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { withAsyncHandler } from '../lib/async-handler.js';
 import { requireAuth } from '../lib/require-auth.js';
+import { haversineKm } from '../lib/haversine.js';
 
 export const sponsoredRouter = Router();
 
@@ -14,6 +15,84 @@ type SponsoredRow = {
   url: string | null;
   lat: number | null;
   lng: number | null;
+};
+
+// Fetch active sponsored places sorted by distance from (refLat, refLng).
+// Uses PostGIS ST_Distance when the location column exists; falls back to
+// fetching all rows and sorting in-memory with haversine when it doesn't.
+const fetchSortedByDistance = async (
+  refLat: number,
+  refLng: number,
+  maxKm?: number,
+): Promise<SponsoredRow[]> => {
+  try {
+    if (maxKm != null) {
+      const radiusM = maxKm * 1000;
+      return await prisma.$queryRaw<SponsoredRow[]>`
+        SELECT id, "placeId", title, description, "imageUrl", url, lat, lng
+        FROM "SponsoredPlace"
+        WHERE active = true
+          AND (
+            location IS NULL
+            OR ST_DWithin(
+              location,
+              ST_SetSRID(ST_MakePoint(${refLng}::float, ${refLat}::float), 4326)::geography,
+              ${radiusM}::float
+            )
+          )
+        ORDER BY
+          CASE WHEN location IS NOT NULL
+            THEN ST_Distance(
+              location,
+              ST_SetSRID(ST_MakePoint(${refLng}::float, ${refLat}::float), 4326)::geography
+            )
+            ELSE 999999999
+          END ASC
+        LIMIT 20
+      `;
+    }
+
+    return await prisma.$queryRaw<SponsoredRow[]>`
+      SELECT id, "placeId", title, description, "imageUrl", url, lat, lng
+      FROM "SponsoredPlace"
+      WHERE active = true
+      ORDER BY
+        CASE WHEN location IS NOT NULL
+          THEN ST_Distance(
+            location,
+            ST_SetSRID(ST_MakePoint(${refLng}::float, ${refLat}::float), 4326)::geography
+          )
+          ELSE 999999999
+        END ASC
+      LIMIT 20
+    `;
+  } catch {
+    // PostGIS unavailable or location column not yet migrated — fall back to
+    // fetching all active rows and sorting in-memory with haversine.
+    const all = await prisma.sponsoredPlace.findMany({ where: { active: true } });
+
+    const withDist = all.map((s) => ({
+      row: {
+        id: s.id,
+        placeId: s.placeId,
+        title: s.title,
+        description: s.description,
+        imageUrl: s.imageUrl,
+        url: s.url,
+        lat: s.lat,
+        lng: s.lng,
+      } satisfies SponsoredRow,
+      distKm:
+        s.lat != null && s.lng != null
+          ? haversineKm(refLat, refLng, s.lat, s.lng)
+          : Infinity,
+    }));
+
+    withDist.sort((a, b) => a.distKm - b.distKm);
+
+    const filtered = maxKm != null ? withDist.filter((x) => x.distKm <= maxKm) : withDist;
+    return filtered.map((x) => x.row);
+  }
 };
 
 // Sponsored stop for a saved trip — geo-closest to midpoint
@@ -38,21 +117,7 @@ sponsoredRouter.get(
     const refLat = midStop?.lat ?? trip.originLat;
     const refLng = midStop?.lng ?? trip.originLng;
 
-    // PostGIS: order geo-tagged sponsors by distance; untagged sponsors sort last.
-    const rows = await prisma.$queryRaw<SponsoredRow[]>`
-      SELECT id, "placeId", title, description, "imageUrl", url, lat, lng
-      FROM "SponsoredPlace"
-      WHERE active = true
-      ORDER BY
-        CASE WHEN location IS NOT NULL
-          THEN ST_Distance(
-            location,
-            ST_SetSRID(ST_MakePoint(${refLng}::float, ${refLat}::float), 4326)::geography
-          )
-          ELSE 999999999
-        END ASC
-      LIMIT 20
-    `;
+    const rows = await fetchSortedByDistance(refLat, refLng);
 
     if (rows.length === 0) {
       res.json(null);
@@ -97,31 +162,7 @@ sponsoredRouter.get(
       return;
     }
 
-    const radiusM = MAX_SPONSOR_RADIUS_KM * 1000;
-
-    // PostGIS: filter by radius for geo-tagged sponsors; include untagged as fallback.
-    const rows = await prisma.$queryRaw<SponsoredRow[]>`
-      SELECT id, "placeId", title, description, "imageUrl", url, lat, lng
-      FROM "SponsoredPlace"
-      WHERE active = true
-        AND (
-          location IS NULL
-          OR ST_DWithin(
-            location,
-            ST_SetSRID(ST_MakePoint(${lng}::float, ${lat}::float), 4326)::geography,
-            ${radiusM}::float
-          )
-        )
-      ORDER BY
-        CASE WHEN location IS NOT NULL
-          THEN ST_Distance(
-            location,
-            ST_SetSRID(ST_MakePoint(${lng}::float, ${lat}::float), 4326)::geography
-          )
-          ELSE 999999999
-        END ASC
-      LIMIT 20
-    `;
+    const rows = await fetchSortedByDistance(lat, lng, MAX_SPONSOR_RADIUS_KM);
 
     if (rows.length === 0) {
       res.json(null);
