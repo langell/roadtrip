@@ -563,17 +563,31 @@ export class AiTripPlannerService {
 
     const prompt = this.buildPlanPrompt(input);
     const model = env.GOOGLE_AI_MODEL;
-    const requestUrl = new URL(
-      `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:streamGenerateContent`,
-    );
-    requestUrl.searchParams.set('key', apiKey);
-    requestUrl.searchParams.set('alt', 'sse');
+    const payload = JSON.stringify(this.buildRequestPayload(prompt));
 
-    const response = await this.fetchFn(requestUrl, {
+    // Try v1beta first (broader model support), fall back to v1.
+    const buildStreamUrl = (apiVersion: 'v1beta' | 'v1') => {
+      const url = new URL(
+        `https://generativelanguage.googleapis.com/${apiVersion}/models/${encodeURIComponent(model)}:streamGenerateContent`,
+      );
+      url.searchParams.set('key', apiKey);
+      url.searchParams.set('alt', 'sse');
+      return url;
+    };
+
+    let response = await this.fetchFn(buildStreamUrl('v1beta'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(this.buildRequestPayload(prompt)),
+      body: payload,
     });
+
+    if (response.status === 404) {
+      response = await this.fetchFn(buildStreamUrl('v1'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      });
+    }
 
     if (!response.ok || !response.body) {
       throw new AiTripPlannerError('AI_REQUEST_FAILED', 'request', {
