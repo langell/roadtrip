@@ -13,6 +13,7 @@ import {
   type PlannedStopResolved,
   type SponsoredStop,
 } from '../lib/api-client';
+import StopPreviewSheet, { type PreviewStop } from './StopPreviewSheet';
 
 const AUTO_LOCATION_DENIED_STORAGE_KEY = 'hiptrip:auto-location-denied';
 const LOCATION_STORAGE_KEY = 'hiptrip:location';
@@ -304,6 +305,8 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
       [key]: ((prev[key] ?? 0) + 1) % (totalAlts + 1),
     }));
   };
+
+  const [previewStop, setPreviewStop] = useState<PreviewStop | null>(null);
 
   const [refineStates, setRefineStates] = useState<
     Record<
@@ -1236,56 +1239,66 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                           const isSwapped = swapIdx > 0;
                           return (
                             <div className="space-y-1">
-                              {activeSuggestion.imageUrl ? (
-                                <img
-                                  src={activeSuggestion.imageUrl}
-                                  alt={activeSuggestion.title}
-                                  className="mb-2 h-28 w-full rounded-lg object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
-                                  No image available
-                                </div>
-                              )}
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <p
-                                    className={`font-body text-sm font-semibold ${isSwapped ? 'text-wayfarer-secondary' : 'text-wayfarer-primary'}`}
-                                  >
-                                    {activeSuggestion.title}
-                                    {isSwapped && (
-                                      <span className="ml-1 text-[10px] font-normal opacity-70">
-                                        alt
-                                      </span>
-                                    )}
-                                  </p>
-                                  <p className="font-body text-sm text-wayfarer-text-muted">
-                                    {activeSuggestion.description}
-                                  </p>
-                                  <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
-                                    {Math.max(
-                                      1,
-                                      Math.round(
-                                        activeSuggestion.distanceKm / KM_PER_MILE,
-                                      ),
-                                    )}
-                                    mi away
-                                  </p>
-                                </div>
-                                {altCount > 0 && (
-                                  <button
-                                    type="button"
-                                    title="Try an alternative stop"
-                                    onClick={() =>
-                                      cycleStopAlternative(index, stopIndex, altCount)
-                                    }
-                                    className="mt-0.5 shrink-0 rounded-lg border border-wayfarer-surface p-1.5 text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary"
-                                  >
-                                    ⇄
-                                  </button>
+                              <button
+                                type="button"
+                                className="w-full text-left"
+                                onClick={() =>
+                                  setPreviewStop({
+                                    title: activeSuggestion.title,
+                                    description: activeSuggestion.description,
+                                    imageUrl: activeSuggestion.imageUrl,
+                                    distanceKm: activeSuggestion.distanceKm,
+                                    lat: activeSuggestion.lat,
+                                    lng: activeSuggestion.lng,
+                                    placeId: activeSuggestion.placeId,
+                                  })
+                                }
+                              >
+                                {activeSuggestion.imageUrl ? (
+                                  <img
+                                    src={activeSuggestion.imageUrl}
+                                    alt={activeSuggestion.title}
+                                    className="mb-2 h-28 w-full rounded-lg object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
+                                    No image available
+                                  </div>
                                 )}
-                              </div>
+                                <p
+                                  className={`font-body text-sm font-semibold ${isSwapped ? 'text-wayfarer-secondary' : 'text-wayfarer-primary'}`}
+                                >
+                                  {activeSuggestion.title}
+                                  {isSwapped && (
+                                    <span className="ml-1 text-[10px] font-normal opacity-70">
+                                      alt
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="font-body text-sm text-wayfarer-text-muted">
+                                  {activeSuggestion.description}
+                                </p>
+                                <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
+                                  {Math.max(
+                                    1,
+                                    Math.round(activeSuggestion.distanceKm / KM_PER_MILE),
+                                  )}
+                                  mi away
+                                </p>
+                              </button>
+                              {altCount > 0 && (
+                                <button
+                                  type="button"
+                                  title="Try an alternative stop"
+                                  onClick={() =>
+                                    cycleStopAlternative(index, stopIndex, altCount)
+                                  }
+                                  className="mt-1 rounded-lg border border-wayfarer-surface p-1.5 text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary"
+                                >
+                                  ⇄
+                                </button>
+                              )}
                             </div>
                           );
                         })()
@@ -1335,6 +1348,8 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
           )}
         </div>
       </section>
+
+      <StopPreviewSheet stop={previewStop} onClose={() => setPreviewStop(null)} />
     </div>
   );
 };
