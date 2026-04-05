@@ -9,6 +9,10 @@ _(none)_
 
 ## Completed
 
+- 2026-04-05 — RT-034 `2026-04-streaming-plan-generation.md` — true AI token streaming via streamGenerateContent + SSE; first option appears within ~1s.
+- 2026-04-05 — RT-043 `2026-04-hotel-affiliate-cards.md` — passive hotel affiliate cards on stop detail pages.
+- 2026-04-05 — RT-045 `2026-04-legal-and-support-pages.md` — Terms, Privacy, Support (contact form), FAQ pages with Resend email delivery.
+
 - 2026-03-31 — RT-033 `2026-03-route-map-view.md` — /trips/[id]/map, numbered markers, stop list panel, sponsored stop card, drive-time legs.
 - 2026-03-31 — RT-032 `2026-03-discovery-feed.md` — /discover page, trending routes, nearby stops, sponsored injection, home redirect.
 - 2026-03-31 — RT-020 `2026-03-security-best-practices.md` — photo endpoint rate limiting, security checklist doc, auth/logging audit.

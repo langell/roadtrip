@@ -427,24 +427,16 @@ export class AiTripPlannerService {
     return lines.join('\n');
   }
 
-  async generatePlans(input: {
+  private buildPlanPrompt(input: {
     location: string;
     radiusKm: number;
     themes: string[];
     maxOptions: 2 | 3;
     modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
-  }): Promise<AiTripPlans> {
-    const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      throw new AiTripPlannerError('AI_KEY_NOT_CONFIGURED', 'config');
-    }
-
-    const model = env.GOOGLE_AI_MODEL;
-    const fallbackModel = 'gemini-2.5-flash';
-
+  }): string {
     const themePrompt = this.buildThemePrompt(input.themes);
     const modifierPrompt = this.buildModifierPrompt(input.modifiers);
-    const prompt = [
+    return [
       'You are an expert regional road-trip designer.',
       'Create distinctly lovable itinerary options that feel surprising, local, and memorable.',
       '',
@@ -478,6 +470,187 @@ export class AiTripPlannerService {
       '- Use stopType="attraction" for standard themed stops. Only use "pit_stop" or "photo_op" when those modifiers are active.',
       '- All other fields are required and must be non-empty strings.',
     ].join('\n');
+  }
+
+  // Extracts newly complete option objects from accumulated streaming text.
+  // Uses brace-depth counting (string-aware) to find complete JSON objects
+  // within the "options":[...] array, returning only items beyond alreadyExtracted.
+  private extractNewOptions(text: string, alreadyExtracted: number): unknown[] {
+    const optionsIdx = text.indexOf('"options"');
+    if (optionsIdx === -1) return [];
+
+    const bracketIdx = text.indexOf('[', optionsIdx);
+    if (bracketIdx === -1) return [];
+
+    const allOptions: unknown[] = [];
+    let pos = bracketIdx + 1;
+
+    while (pos < text.length) {
+      while (
+        pos < text.length &&
+        (text[pos] === ',' ||
+          text[pos] === ' ' ||
+          text[pos] === '\n' ||
+          text[pos] === '\r' ||
+          text[pos] === '\t')
+      )
+        pos++;
+
+      if (pos >= text.length || text[pos] === ']') break;
+      if (text[pos] !== '{') break;
+
+      let depth = 0;
+      let inString = false;
+      let end = -1;
+      for (let i = pos; i < text.length; i++) {
+        const ch = text[i];
+        if (inString) {
+          if (ch === '\\') {
+            i++;
+            continue;
+          }
+          if (ch === '"') inString = false;
+        } else {
+          if (ch === '"') inString = true;
+          else if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+              end = i + 1;
+              break;
+            }
+          }
+        }
+      }
+
+      if (end === -1) break;
+
+      try {
+        allOptions.push(JSON.parse(text.slice(pos, end)));
+        pos = end;
+      } catch {
+        break;
+      }
+    }
+
+    return allOptions.slice(alreadyExtracted);
+  }
+
+  // Streams plan options from Gemini as they are parsed from the token stream.
+  // Yields validated AiTripOption objects one by one without waiting for the
+  // full response — enabling the route to resolve Places API and emit SSE
+  // events for each option independently.
+  async *generatePlansStream(input: {
+    location: string;
+    radiusKm: number;
+    themes: string[];
+    maxOptions: 2 | 3;
+    modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
+  }): AsyncGenerator<z.infer<typeof AiTripOptionSchema>> {
+    const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
+    if (!apiKey) throw new AiTripPlannerError('AI_KEY_NOT_CONFIGURED', 'config');
+
+    const prompt = this.buildPlanPrompt(input);
+    const model = env.GOOGLE_AI_MODEL;
+    const requestUrl = new URL(
+      `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:streamGenerateContent`,
+    );
+    requestUrl.searchParams.set('key', apiKey);
+    requestUrl.searchParams.set('alt', 'sse');
+
+    const response = await this.fetchFn(requestUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this.buildRequestPayload(prompt)),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new AiTripPlannerError('AI_REQUEST_FAILED', 'request', {
+        status: response.status,
+      });
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = '';
+    let accumulatedText = '';
+    let extractedCount = 0;
+
+    type GeminiChunk = {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        sseBuffer += decoder.decode(value, { stream: true });
+        const events = sseBuffer.split('\n\n');
+        sseBuffer = events.pop() ?? '';
+
+        for (const event of events) {
+          const dataLine = event.split('\n').find((l) => l.startsWith('data: '));
+          if (!dataLine) continue;
+          const jsonStr = dataLine.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+
+          let chunk: GeminiChunk;
+          try {
+            chunk = JSON.parse(jsonStr) as GeminiChunk;
+          } catch {
+            continue;
+          }
+
+          const textDelta = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          accumulatedText += textDelta;
+
+          const rawOptions = this.extractNewOptions(accumulatedText, extractedCount);
+          for (const rawOption of rawOptions) {
+            const normalized =
+              typeof rawOption === 'object' && rawOption !== null
+                ? {
+                    ...(rawOption as Record<string, unknown>),
+                    rationale:
+                      typeof (rawOption as Record<string, unknown>).rationale ===
+                        'string' &&
+                      ((rawOption as Record<string, unknown>).rationale as string).trim()
+                        ? (rawOption as Record<string, unknown>).rationale
+                        : 'A balanced route aligned to your selected themes.',
+                  }
+                : rawOption;
+
+            const parsed = AiTripOptionSchema.safeParse(normalized);
+            if (parsed.success) {
+              yield parsed.data;
+              extractedCount++;
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  async generatePlans(input: {
+    location: string;
+    radiusKm: number;
+    themes: string[];
+    maxOptions: 2 | 3;
+    modifiers?: { smartPitstops?: boolean; photoOps?: boolean };
+  }): Promise<AiTripPlans> {
+    const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
+    if (!apiKey) {
+      throw new AiTripPlannerError('AI_KEY_NOT_CONFIGURED', 'config');
+    }
+
+    const model = env.GOOGLE_AI_MODEL;
+    const fallbackModel = 'gemini-2.5-flash';
+
+    const prompt = this.buildPlanPrompt(input);
 
     let responseBodyText = '';
     let attemptLabel = '';

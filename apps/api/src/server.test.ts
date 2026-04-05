@@ -79,6 +79,7 @@ vi.mock('./services/google-places-service.js', () => ({
 }));
 
 const generatePlans = vi.fn();
+const generatePlansStream = vi.fn();
 vi.mock('./services/ai-trip-planner-service.js', () => ({
   AiTripPlannerError: class AiTripPlannerError extends Error {
     constructor(
@@ -92,6 +93,7 @@ vi.mock('./services/ai-trip-planner-service.js', () => ({
   },
   aiTripPlannerService: {
     generatePlans,
+    generatePlansStream,
   },
 }));
 
@@ -126,6 +128,7 @@ describe('HTTP server', () => {
     mockEnv.ADMIN_USER_IDS = undefined;
     prismaMock.user.findUnique.mockReset();
     generatePlans.mockReset();
+    generatePlansStream.mockReset();
     generateDescriptions.mockReset();
     prismaMock.trip.findMany.mockReset();
     prismaMock.trip.findFirst.mockReset();
@@ -893,19 +896,17 @@ describe('HTTP server', () => {
     it('streams AI generation as SSE header + options + done events', async () => {
       geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
       prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
-      generatePlans.mockResolvedValue({
-        options: [
-          {
-            title: 'SSE Route A',
-            rationale: 'First streamed option.',
-            stops: [{ name: 'Stop One', stopType: 'attraction' }],
-          },
-          {
-            title: 'SSE Route B',
-            rationale: 'Second streamed option.',
-            stops: [{ name: 'Stop Two', stopType: 'attraction' }],
-          },
-        ],
+      generatePlansStream.mockImplementation(async function* () {
+        yield {
+          title: 'SSE Route A',
+          rationale: 'First streamed option.',
+          stops: [{ name: 'Stop One', stopType: 'attraction' }],
+        };
+        yield {
+          title: 'SSE Route B',
+          rationale: 'Second streamed option.',
+          stops: [{ name: 'Stop Two', stopType: 'attraction' }],
+        };
       });
       resolvePlannedStops
         .mockResolvedValueOnce([
@@ -962,7 +963,10 @@ describe('HTTP server', () => {
     it('streams error event when AI generation fails', async () => {
       geocodeLocation.mockResolvedValue({ lat: 36.5552, lng: -121.9233 });
       prismaMock.tripPlanCache.findMany.mockResolvedValue([]);
-      generatePlans.mockRejectedValue(new Error('AI unavailable'));
+      generatePlansStream.mockImplementation(async function* () {
+        yield* []; // satisfy require-yield; throws before yielding anything
+        throw new Error('AI unavailable');
+      });
 
       const app = createApp();
       const response = await request(app)

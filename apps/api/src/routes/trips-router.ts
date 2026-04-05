@@ -442,53 +442,7 @@ tripsRouter.post(
       'trip.plan.cache_miss',
     );
 
-    if (useSse) {
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'X-Accel-Buffering': 'no',
-      });
-      sendSse('header', {
-        location: input.location,
-        radiusKm: input.radiusKm,
-        themes: input.themes,
-        source: 'ai',
-      });
-    }
-
-    let plans: Awaited<ReturnType<typeof aiTripPlannerService.generatePlans>>;
-    try {
-      plans = await aiTripPlannerService.generatePlans({
-        location: input.location,
-        radiusKm: input.radiusKm,
-        themes: input.themes,
-        maxOptions: input.maxOptions,
-        modifiers: input.modifiers,
-      });
-    } catch (error) {
-      const aiError = toAiPlannerErrorMeta(error);
-      logError(requestLogger, 'ai.trip-planner failure', error, {
-        ...aiError,
-        input: {
-          location: input.location,
-          radiusKm: input.radiusKm,
-          themes: input.themes,
-        },
-      });
-      if (useSse) {
-        sendSse('error', { code: 'AI_PLANNER_ERROR' });
-        res.end();
-      } else {
-        res.status(502).json({
-          error: 'AI_PLANNER_ERROR',
-          ...(process.env.NODE_ENV !== 'production'
-            ? { diagnosticCode: aiError.code, diagnosticStage: aiError.stage }
-            : {}),
-        });
-      }
-      return;
-    }
-
+    // Helper: resolve a raw AI option to a PlannedOption with Places API enrichment
     const resolveOption = async (option: {
       title: string;
       rationale: string;
@@ -556,20 +510,9 @@ tripsRouter.post(
       } satisfies PlannedOption;
     };
 
-    const options = await Promise.all(
-      plans.options.map(async (option) => {
-        const resolved = await resolveOption(option);
-        if (useSse) sendSse('option', resolved);
-        return resolved;
-      }),
-    );
-
-    const validOptions = options.filter(
-      (option) =>
-        option.stops.length > 0 && option.stops.every((s) => s.status === 'resolved'),
-    );
-
-    if (validOptions.length > 0) {
+    // Helper: write resolved options to the plan cache
+    const writePlanCache = async (validOptions: PlannedOption[]) => {
+      if (validOptions.length === 0) return;
       await prisma.tripPlanCache.create({
         data: {
           location: input.location,
@@ -588,13 +531,123 @@ tripsRouter.post(
           ),
         },
       });
-    }
+    };
 
+    // ── SSE path: stream from Gemini, resolve + emit each option as it arrives ──
     if (useSse) {
-      sendSse('done', { degraded: plans.degraded ?? false });
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
+      });
+      sendSse('header', {
+        location: input.location,
+        radiusKm: input.radiusKm,
+        themes: input.themes,
+        source: 'ai',
+      });
+
+      const resolvedOptions: PlannedOption[] = [];
+      const pending: Promise<void>[] = [];
+      let streamFailed = false;
+
+      try {
+        for await (const rawOption of aiTripPlannerService.generatePlansStream({
+          location: input.location,
+          radiusKm: input.radiusKm,
+          themes: input.themes,
+          maxOptions: input.maxOptions,
+          modifiers: input.modifiers,
+        })) {
+          const p = resolveOption(rawOption)
+            .then((resolved) => {
+              sendSse('option', resolved);
+              resolvedOptions.push(resolved);
+            })
+            .catch((err: unknown) => {
+              const placesError = toPlacesErrorMeta(err);
+              logError(
+                requestLogger,
+                'places.trip-planner enrich failure (stream)',
+                err,
+                {
+                  ...placesError,
+                  optionTitle: rawOption.title,
+                },
+              );
+            });
+          pending.push(p);
+        }
+      } catch (error) {
+        const aiError = toAiPlannerErrorMeta(error);
+        logError(requestLogger, 'ai.trip-planner stream failure', error, {
+          ...aiError,
+          input: {
+            location: input.location,
+            radiusKm: input.radiusKm,
+            themes: input.themes,
+          },
+        });
+        streamFailed = true;
+      }
+
+      await Promise.allSettled(pending);
+
+      if (streamFailed && resolvedOptions.length === 0) {
+        sendSse('error', { code: 'AI_PLANNER_ERROR' });
+        res.end();
+        return;
+      }
+
+      const validStreamOptions = resolvedOptions.filter(
+        (option) =>
+          option.stops.length > 0 && option.stops.every((s) => s.status === 'resolved'),
+      );
+      await writePlanCache(validStreamOptions);
+
+      sendSse('done', { degraded: resolvedOptions.length < input.maxOptions });
       res.end();
       return;
     }
+
+    // ── JSON path: blocking generate + all options at once ────────────────────
+    let plans: Awaited<ReturnType<typeof aiTripPlannerService.generatePlans>>;
+    try {
+      plans = await aiTripPlannerService.generatePlans({
+        location: input.location,
+        radiusKm: input.radiusKm,
+        themes: input.themes,
+        maxOptions: input.maxOptions,
+        modifiers: input.modifiers,
+      });
+    } catch (error) {
+      const aiError = toAiPlannerErrorMeta(error);
+      logError(requestLogger, 'ai.trip-planner failure', error, {
+        ...aiError,
+        input: {
+          location: input.location,
+          radiusKm: input.radiusKm,
+          themes: input.themes,
+        },
+      });
+      res.status(502).json({
+        error: 'AI_PLANNER_ERROR',
+        ...(process.env.NODE_ENV !== 'production'
+          ? { diagnosticCode: aiError.code, diagnosticStage: aiError.stage }
+          : {}),
+      });
+      return;
+    }
+
+    const options = await Promise.all(
+      plans.options.map((option) => resolveOption(option)),
+    );
+
+    const validOptions = options.filter(
+      (option) =>
+        option.stops.length > 0 && option.stops.every((s) => s.status === 'resolved'),
+    );
+    await writePlanCache(validOptions);
 
     res.status(200).json({
       location: input.location,
