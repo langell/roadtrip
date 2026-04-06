@@ -29,8 +29,13 @@ export const POST = async (req: NextRequest) => {
 
   const resend = new Resend(apiKey);
 
+  const fromDomainVerified = process.env.RESEND_FROM_DOMAIN_VERIFIED === 'true';
+  const from = fromDomainVerified
+    ? 'HipTrip Support <noreply@hiptrip.net>'
+    : 'HipTrip Support <onboarding@resend.dev>';
+
   const { error } = await resend.emails.send({
-    from: 'HipTrip Support <noreply@hiptrip.net>',
+    from,
     to: 'support@hiptrip.net',
     replyTo: email,
     subject: `[Support] ${subject}`,
