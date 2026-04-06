@@ -9,7 +9,7 @@ import {
   streamTripPlans,
   getNearbySponsored,
   refinePlan,
-  sharePlanPreview,
+  fetchStopDescriptions,
   type TripPlanOption,
   type PlannedStopResolved,
   type SponsoredStop,
@@ -282,37 +282,12 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     smartPitstops: boolean;
     photoOps: boolean;
   } | null>(null);
-  // stopSwapIndex[`${optionIdx}-${stopIdx}`] = which suggestion is shown (0 = primary)
-  const [stopSwapIndex, setStopSwapIndex] = useState<Record<string, number>>({});
-
-  const getActiveStopSuggestion = (
-    stop: PlannedStopResolved,
-    optionIdx: number,
-    stopIdx: number,
-  ) => {
-    const key = `${optionIdx}-${stopIdx}`;
-    const swapIdx = stopSwapIndex[key] ?? 0;
-    if (swapIdx === 0) return stop.suggestion;
-    return stop.alternatives?.[swapIdx - 1] ?? stop.suggestion;
-  };
-
-  const cycleStopAlternative = (
-    optionIdx: number,
-    stopIdx: number,
-    totalAlts: number,
-  ) => {
-    const key = `${optionIdx}-${stopIdx}`;
-    setStopSwapIndex((prev) => ({
-      ...prev,
-      [key]: ((prev[key] ?? 0) + 1) % (totalAlts + 1),
-    }));
-  };
-
-  const [previewStop, setPreviewStop] = useState<PreviewStop | null>(null);
-  const [shareStates, setShareStates] = useState<
-    Record<number, 'idle' | 'sharing' | 'copied'>
+  // stopDescriptions[optionIdx][stopName] = AI-generated description text
+  const [stopDescriptions, setStopDescriptions] = useState<
+    Record<number, Record<string, string>>
   >({});
 
+  const [previewStop, setPreviewStop] = useState<PreviewStop | null>(null);
   const [refineStates, setRefineStates] = useState<
     Record<
       number,
@@ -437,6 +412,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     setPlanSource(null);
     setPlanDegraded(false);
     setPlanOptions([]);
+    setStopDescriptions({});
     setSponsored(null);
     localStorage.removeItem(PLAN_RESULTS_STORAGE_KEY);
     setLastUsedModifiers({
@@ -472,9 +448,24 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
             setIsStreaming(true);
           },
           onOption: (option) => {
+            const optionIdx = collectedOptions.length;
             collectedOptions.push(option);
             setLoading(false);
             setPlanOptions((prev) => [...prev, option]);
+            // Fire-and-forget: fetch AI descriptions for this option's stops
+            const stopNames = option.stops
+              .filter((s): s is PlannedStopResolved => s.status === 'resolved')
+              .map((s) => s.suggestion.title);
+            if (stopNames.length > 0) {
+              void fetchStopDescriptions({
+                stops: stopNames,
+                location,
+                themes: selectedThemes,
+              }).then((descs) => {
+                if (!descs) return;
+                setStopDescriptions((prev) => ({ ...prev, [optionIdx]: descs }));
+              });
+            }
           },
           onDone: ({ degraded }) => {
             setIsStreaming(false);
@@ -681,40 +672,17 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     }));
   };
 
-  const handleShare = async (option: TripPlanOption, index: number) => {
-    setShareStates((s) => ({ ...s, [index]: 'sharing' }));
-    const result = await sharePlanPreview({
-      location,
-      themes: selectedThemes,
-      planOption: option,
-    });
-    if (result?.previewUrl) {
-      try {
-        await navigator.share({ url: result.previewUrl, title: option.title });
-      } catch {
-        await navigator.clipboard.writeText(result.previewUrl);
-      }
-      setShareStates((s) => ({ ...s, [index]: 'copied' }));
-      setTimeout(() => setShareStates((s) => ({ ...s, [index]: 'idle' })), 2000);
-    } else {
-      setShareStates((s) => ({ ...s, [index]: 'idle' }));
-    }
-  };
-
-  const handleSelectPlan = async (option: TripPlanOption, optionIdx: number) => {
+  const handleSelectPlan = async (option: TripPlanOption) => {
     let coords = originCoords;
     if (!coords) {
       coords = await forwardGeocode(location);
     }
 
-    // Apply any active stop swaps before saving
     const resolvedOption: TripPlanOption = {
       ...option,
-      stops: option.stops.map((stop, stopIdx) => {
+      stops: option.stops.map((stop) => {
         if (stop.status !== 'resolved') return stop;
-        const activeSuggestion = getActiveStopSuggestion(stop, optionIdx, stopIdx);
-        if (activeSuggestion === stop.suggestion) return stop;
-        return { ...stop, suggestion: activeSuggestion };
+        return stop;
       }),
     };
 
@@ -1174,32 +1142,6 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                         Undo
                       </button>
                     )}
-                    <button
-                      type="button"
-                      disabled={shareStates[index] === 'sharing'}
-                      onClick={() => void handleShare(option, index)}
-                      title="Share this plan"
-                      className="rounded-lg border border-wayfarer-surface px-2 py-1 font-body text-[11px] text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary disabled:opacity-50"
-                    >
-                      {shareStates[index] === 'copied'
-                        ? 'Copied!'
-                        : shareStates[index] === 'sharing'
-                          ? '…'
-                          : '↗ Share'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRefineStates((s) => ({
-                          ...s,
-                          [index]: { ...rs, open: !rs.open },
-                        }))
-                      }
-                      title="Refine this plan"
-                      className="rounded-lg border border-wayfarer-surface px-2 py-1 font-body text-[11px] text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary"
-                    >
-                      ✏️ Refine
-                    </button>
                   </div>
                 </div>
                 <h3 className="font-display text-lg font-semibold text-wayfarer-primary">
@@ -1273,78 +1215,50 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
 
                       {stop.status === 'resolved' ? (
                         (() => {
-                          const activeSuggestion = getActiveStopSuggestion(
-                            stop,
-                            index,
-                            stopIndex,
-                          );
-                          const altCount = stop.alternatives?.length ?? 0;
-                          const swapKey = `${index}-${stopIndex}`;
-                          const swapIdx = stopSwapIndex[swapKey] ?? 0;
-                          const isSwapped = swapIdx > 0;
+                          const activeSuggestion = stop.suggestion;
                           return (
-                            <div className="space-y-1">
-                              <button
-                                type="button"
-                                className="w-full text-left"
-                                onClick={() =>
-                                  setPreviewStop({
-                                    title: activeSuggestion.title,
-                                    description: activeSuggestion.description,
-                                    imageUrl: activeSuggestion.imageUrl,
-                                    distanceKm: activeSuggestion.distanceKm,
-                                    lat: activeSuggestion.lat,
-                                    lng: activeSuggestion.lng,
-                                    placeId: activeSuggestion.placeId,
-                                  })
-                                }
-                              >
-                                {activeSuggestion.imageUrl ? (
-                                  <img
-                                    src={activeSuggestion.imageUrl}
-                                    alt={activeSuggestion.title}
-                                    className="mb-2 h-28 w-full rounded-lg object-cover"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-wayfarer-surface font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
-                                    No image available
-                                  </div>
-                                )}
-                                <p
-                                  className={`font-body text-sm font-semibold ${isSwapped ? 'text-wayfarer-secondary' : 'text-wayfarer-primary'}`}
-                                >
-                                  {activeSuggestion.title}
-                                  {isSwapped && (
-                                    <span className="ml-1 text-[10px] font-normal opacity-70">
-                                      alt
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="font-body text-sm text-wayfarer-text-muted">
-                                  {activeSuggestion.description}
-                                </p>
-                                <p className="font-body text-xs uppercase tracking-[0.12em] text-wayfarer-secondary">
-                                  {Math.max(
-                                    1,
-                                    Math.round(activeSuggestion.distanceKm / KM_PER_MILE),
-                                  )}
-                                  mi away
-                                </p>
-                              </button>
-                              {altCount > 0 && (
-                                <button
-                                  type="button"
-                                  title="Try an alternative stop"
-                                  onClick={() =>
-                                    cycleStopAlternative(index, stopIndex, altCount)
-                                  }
-                                  className="mt-1 rounded-lg border border-wayfarer-surface p-1.5 text-wayfarer-text-muted transition hover:border-wayfarer-primary hover:text-wayfarer-primary"
-                                >
-                                  ⇄
-                                </button>
+                            <button
+                              type="button"
+                              className="w-full text-left"
+                              onClick={() =>
+                                setPreviewStop({
+                                  title: activeSuggestion.title,
+                                  description: activeSuggestion.description,
+                                  imageUrl: activeSuggestion.imageUrl,
+                                  distanceKm: activeSuggestion.distanceKm,
+                                  lat: activeSuggestion.lat,
+                                  lng: activeSuggestion.lng,
+                                  placeId: activeSuggestion.placeId,
+                                })
+                              }
+                            >
+                              {activeSuggestion.imageUrl ? (
+                                <img
+                                  src={activeSuggestion.imageUrl}
+                                  alt={activeSuggestion.title}
+                                  className="mb-3 h-36 w-full rounded-xl object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="mb-3 flex h-36 w-full items-center justify-center rounded-xl bg-wayfarer-surface-deep font-body text-xs uppercase tracking-[0.12em] text-wayfarer-text-muted">
+                                  No image
+                                </div>
                               )}
-                            </div>
+                              <p className="font-display text-sm font-bold text-wayfarer-primary">
+                                {activeSuggestion.title}
+                              </p>
+                              <p className="mt-1 font-body text-xs leading-relaxed text-wayfarer-text-muted">
+                                {stopDescriptions[index]?.[activeSuggestion.title] ??
+                                  activeSuggestion.description}
+                              </p>
+                              <p className="mt-2 font-body text-[10px] font-semibold uppercase tracking-[0.12em] text-wayfarer-secondary">
+                                {Math.max(
+                                  1,
+                                  Math.round(activeSuggestion.distanceKm / KM_PER_MILE),
+                                )}{' '}
+                                mi away
+                              </p>
+                            </button>
                           );
                         })()
                       ) : (
@@ -1368,7 +1282,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                   <button
                     type="button"
                     className="w-full rounded-xl bg-wayfarer-primary px-4 py-3 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
-                    onClick={() => void handleSelectPlan(option, index)}
+                    onClick={() => void handleSelectPlan(option)}
                   >
                     Select this trip →
                   </button>

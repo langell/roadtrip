@@ -1649,25 +1649,39 @@ describe('HTTP server', () => {
       ],
     };
 
-    it('writes AI-generated descriptions to stop notes on save', async () => {
-      generateDescriptions.mockResolvedValue({
-        'Bixby Bridge': 'A soaring arch over a rugged canyon.',
-        'Point Lobos': 'Twisted cypress trees frame the Pacific.',
-      });
+    it('persists client-supplied notes on save', async () => {
       prismaMock.trip.create.mockResolvedValue({ id: 'trip-new', stops: [] });
+
+      const bodyWithNotes = {
+        ...savePlanBody,
+        stops: [
+          {
+            placeId: 'p1',
+            name: 'Bixby Bridge',
+            lat: 36.37,
+            lng: -121.9,
+            order: 0,
+            notes: 'A soaring arch over a rugged canyon.',
+          },
+          {
+            placeId: 'p2',
+            name: 'Point Lobos',
+            lat: 36.51,
+            lng: -121.94,
+            order: 1,
+            notes: 'Twisted cypress trees frame the Pacific.',
+          },
+        ],
+      };
 
       const app = createApp();
       const response = await request(app)
         .post('/trips/save-plan')
         .set('authorization', 'Bearer user-1')
-        .send(savePlanBody);
+        .send(bodyWithNotes);
 
       expect(response.status).toBe(201);
-      expect(generateDescriptions).toHaveBeenCalledWith({
-        stops: ['Bixby Bridge', 'Point Lobos'],
-        location: 'Carmel, CA',
-        themes: ['scenic', 'nature'],
-      });
+      expect(generateDescriptions).not.toHaveBeenCalled();
       expect(prismaMock.trip.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -1688,8 +1702,7 @@ describe('HTTP server', () => {
       );
     });
 
-    it('saves trip successfully even when AI description service throws', async () => {
-      generateDescriptions.mockRejectedValue(new Error('AI_REQUEST_FAILED'));
+    it('saves trip with no notes when client sends none', async () => {
       prismaMock.trip.create.mockResolvedValue({ id: 'trip-new', stops: [] });
 
       const app = createApp();
@@ -1699,6 +1712,7 @@ describe('HTTP server', () => {
         .send(savePlanBody);
 
       expect(response.status).toBe(201);
+      expect(generateDescriptions).not.toHaveBeenCalled();
       expect(prismaMock.trip.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

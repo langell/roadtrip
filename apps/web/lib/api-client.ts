@@ -244,6 +244,28 @@ export const deleteTrip = async (tripId: string): Promise<boolean> => {
   }
 };
 
+export const fetchStopDescriptions = async (params: {
+  stops: string[];
+  location: string;
+  themes: string[];
+}): Promise<Record<string, string> | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/trips/stop-descriptions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(await buildAuthHeaders()),
+      },
+      body: JSON.stringify(params),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as Record<string, string>;
+  } catch {
+    return null;
+  }
+};
+
 export const refinePlan = async (params: {
   location: string;
   themes: string[];
