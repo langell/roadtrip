@@ -255,13 +255,20 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
   return (
     <div className="flex h-screen flex-col bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
       {/* Header */}
-      <header className="fixed top-0 z-50 flex w-full items-center justify-between bg-wayfarer-bg/90 backdrop-blur-md px-6 py-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+      <header className="fixed top-0 z-50 flex w-full items-center justify-between bg-wayfarer-bg/90 backdrop-blur-md px-3 py-3 shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:px-6 sm:py-4">
         <Logo />
         <div className="flex items-center gap-2">
           {/* Save button — outlined secondary pill */}
           <button
             onClick={() => void handleSave()}
-            className={`flex h-9 shrink-0 items-center gap-2 rounded-full border px-4 font-display text-sm font-bold whitespace-nowrap transition-all active:scale-95 ${
+            aria-label={
+              saveState === 'saved'
+                ? 'Saved'
+                : saveState === 'error'
+                  ? 'Save failed'
+                  : 'Save trip'
+            }
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 font-display text-sm font-bold transition-all active:scale-95 sm:gap-2 sm:px-4 ${
               saveState === 'saved'
                 ? 'border-wayfarer-primary bg-wayfarer-primary text-white'
                 : saveState === 'error'
@@ -297,15 +304,22 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
               </svg>
             )}
-            {saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Failed' : 'Save'}
+            <span className="hidden sm:inline">
+              {saveState === 'saved'
+                ? 'Saved'
+                : saveState === 'error'
+                  ? 'Failed'
+                  : 'Save'}
+            </span>
           </button>
 
           {/* Plan your own button — filled primary pill */}
           <Link
             href="/"
-            className="flex h-9 shrink-0 items-center rounded-full bg-wayfarer-primary px-5 font-display text-sm font-bold text-white whitespace-nowrap transition-opacity hover:opacity-90 active:scale-95"
+            className="flex h-9 shrink-0 items-center rounded-full bg-wayfarer-primary px-3 font-display text-sm font-bold text-white transition-opacity hover:opacity-90 active:scale-95 sm:px-5"
           >
-            Plan your own
+            <span className="sm:hidden">Plan</span>
+            <span className="hidden sm:inline">Plan your own</span>
           </Link>
         </div>
       </header>
