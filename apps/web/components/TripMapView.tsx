@@ -535,9 +535,9 @@ export default function TripMapView({ trip, sponsored }: Props) {
                 href={buildGoogleMapsUrl(trip)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-3 rounded-2xl bg-wayfarer-primary py-4 font-display font-bold text-white shadow-wayfarer-ambient transition-opacity hover:opacity-95"
+                className="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-wayfarer-primary px-4 py-4 font-display font-bold text-white shadow-wayfarer-ambient transition-opacity hover:opacity-95"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M8 5v14l11-7z" />
                 </svg>
                 Start Trip
@@ -545,7 +545,7 @@ export default function TripMapView({ trip, sponsored }: Props) {
               <button
                 type="button"
                 onClick={handleEditPlan}
-                className="flex items-center gap-2 rounded-2xl px-5 py-4 font-display font-bold text-wayfarer-primary transition-colors hover:bg-wayfarer-surface-deep"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-2xl px-4 py-4 font-display font-bold text-wayfarer-primary transition-colors hover:bg-wayfarer-surface-deep"
               >
                 <svg
                   className="h-4 w-4"
