@@ -78,11 +78,23 @@ export class AiStopDescriptionService {
     try {
       const raw = JSON.parse(responseBodyText) as {
         candidates?: Array<{
-          content?: { parts?: Array<{ text?: string }> };
+          content?: { parts?: Array<{ text?: string; thought?: boolean }> };
         }>;
       };
-      const text = raw.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      parsed = JSON.parse(text);
+      // Concatenate all non-thinking parts (thinking models emit thought:true parts
+      // for internal reasoning that must be excluded from the actual response text).
+      const parts = raw.candidates?.[0]?.content?.parts ?? [];
+      const rawText = parts
+        .filter((p) => !p.thought)
+        .map((p) => p.text ?? '')
+        .join('');
+      // Strip optional markdown code fences before parsing JSON
+      const jsonText = rawText
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+      parsed = JSON.parse(jsonText);
     } catch {
       throw new AiStopDescriptionError('AI_INVALID_RESPONSE', 'parse');
     }

@@ -8,8 +8,13 @@ export type StopType = z.infer<typeof StopTypeSchema>;
 
 const AiStopSchema = z.object({
   name: z.string().min(1),
-  alternatives: z.array(z.string()).max(2).default([]),
-  stopType: StopTypeSchema,
+  // Truncate rather than reject if model returns >2 alternatives
+  alternatives: z
+    .array(z.string())
+    .default([])
+    .transform((arr) => arr.slice(0, 2)),
+  // Coerce missing/invalid stopType to null rather than failing the whole option
+  stopType: StopTypeSchema.catch(null),
 });
 
 const AiTripOptionSchema = z.object({
@@ -227,6 +232,19 @@ export class AiTripPlannerService {
     };
   }
 
+  // Concatenates text from non-thinking parts only.
+  // Thinking models (e.g. gemini-2.5-flash) emit parts with thought:true before
+  // the actual response — those must be excluded or the JSON extraction fails.
+  private extractResponseText(
+    parts: Array<{ text?: string; thought?: boolean }> | undefined,
+  ): string {
+    if (!parts?.length) return '';
+    return parts
+      .filter((p) => !p.thought)
+      .map((p) => p.text ?? '')
+      .join('');
+  }
+
   private extractJsonText(rawText: string) {
     const trimmed = rawText.trim();
 
@@ -248,30 +266,20 @@ export class AiTripPlannerService {
     let payload: {
       candidates?: Array<{
         content?: {
-          parts?: Array<{
-            text?: string;
-          }>;
+          parts?: Array<{ text?: string; thought?: boolean }>;
         };
       }>;
     };
 
     try {
-      payload = JSON.parse(responseBodyText) as {
-        candidates?: Array<{
-          content?: {
-            parts?: Array<{
-              text?: string;
-            }>;
-          };
-        }>;
-      };
+      payload = JSON.parse(responseBodyText) as typeof payload;
     } catch (error) {
       throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
         reason: String(error),
       });
     }
 
-    const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = this.extractResponseText(payload.candidates?.[0]?.content?.parts);
     if (!rawText) {
       throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
         reason: 'missing_candidates',
@@ -610,17 +618,24 @@ export class AiTripPlannerService {
 
     type GeminiChunk = {
       candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
+        content?: { parts?: Array<{ text?: string; thought?: boolean }> };
       }>;
     };
 
+    let firstChunkLogged = false;
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        sseBuffer += decoder.decode(value, { stream: true });
-        const events = sseBuffer.split('\n\n');
+        const rawChunk = decoder.decode(value, { stream: true });
+        if (!firstChunkLogged) {
+          logger.info({ rawChunk: rawChunk.slice(0, 500) }, 'ai.stream first-chunk');
+          firstChunkLogged = true;
+        }
+        sseBuffer += rawChunk;
+        // Gemini uses \r\n\r\n (CRLF) as the SSE event separator
+        const events = sseBuffer.split(/\r?\n\r?\n/);
         sseBuffer = events.pop() ?? '';
 
         for (const event of events) {
@@ -636,7 +651,12 @@ export class AiTripPlannerService {
             continue;
           }
 
-          const textDelta = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          // Collect text from all parts. For thinking models (gemini-2.5-flash),
+          // all streaming parts may carry thought:true — filtering them would
+          // discard the actual JSON output. extractNewOptions anchors on
+          // '"options"' so thinking prose before the JSON is harmless.
+          const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+          const textDelta = parts.map((p) => p.text ?? '').join('');
           accumulatedText += textDelta;
 
           const rawOptions = this.extractNewOptions(accumulatedText, extractedCount);
@@ -658,6 +678,11 @@ export class AiTripPlannerService {
             if (parsed.success) {
               yield parsed.data;
               extractedCount++;
+            } else {
+              logger.warn(
+                { issues: parsed.error.issues, optionIndex: extractedCount },
+                'ai.stream option schema validation failed',
+              );
             }
           }
         }
@@ -665,6 +690,14 @@ export class AiTripPlannerService {
     } finally {
       reader.releaseLock();
     }
+    logger.info(
+      {
+        extractedCount,
+        accumulatedLength: accumulatedText.length,
+        accumulatedPreview: accumulatedText.slice(0, 300),
+      },
+      'ai.stream finished',
+    );
   }
 
   private buildRefinePlanPrompt(input: {
@@ -731,7 +764,9 @@ export class AiTripPlannerService {
 
     // Parse a single option object (not wrapped in { options: [] })
     let payload: {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+      }>;
     };
     try {
       payload = JSON.parse(responseBodyText) as typeof payload;
@@ -741,7 +776,7 @@ export class AiTripPlannerService {
       });
     }
 
-    const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = this.extractResponseText(payload.candidates?.[0]?.content?.parts);
     if (!rawText) {
       throw new AiTripPlannerError('AI_INVALID_RESPONSE', 'parse', {
         reason: 'missing_candidates',

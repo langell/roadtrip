@@ -11,7 +11,7 @@ const schema = z.object({
   GOOGLE_MAPS_API_BASE_URL: z.string().url().default('https://maps.googleapis.com'),
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
   AI_GATEWAY_API_KEY: z.string().min(1).optional(),
-  GOOGLE_AI_MODEL: z.string().min(1).default('gemini-3-flash'),
+  GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.5-flash'),
   GOOGLE_AI_MODEL_FAST: z.string().min(1).default('gemini-2.0-flash'),
   GOOGLE_PLACES_RESULT_LIMIT: z.coerce.number().int().min(1).max(20).default(6),
   GOOGLE_PLACES_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(3600).default(300),

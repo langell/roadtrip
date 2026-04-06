@@ -787,6 +787,14 @@ tripsRouter.post(
       );
       await writePlanCache(validStreamOptions);
 
+      requestLogger.info(
+        {
+          resolvedCount: resolvedOptions.length,
+          maxOptions: input.maxOptions,
+          degraded: resolvedOptions.length < input.maxOptions,
+        },
+        'ai.stream.done',
+      );
       sendSse('done', { degraded: resolvedOptions.length < input.maxOptions });
       res.end();
       return;
@@ -978,21 +986,6 @@ tripsRouter.post(
     }
 
     const input = parsed.data;
-    const requestLogger = getRequestLogger(res);
-
-    let descriptions: Record<string, string> = {};
-    try {
-      descriptions = await aiStopDescriptionService.generateDescriptions({
-        stops: input.stops.map((s) => s.name),
-        location: input.location,
-        themes: input.themes,
-      });
-    } catch (error) {
-      logError(requestLogger, 'ai.stop-descriptions failure', error, {
-        location: input.location,
-        stopCount: input.stops.length,
-      });
-    }
 
     const trip = await prisma.trip.create({
       data: {
@@ -1013,7 +1006,7 @@ tripsRouter.post(
             order: stop.order,
             lat: stop.lat,
             lng: stop.lng,
-            notes: descriptions[stop.name] ?? stop.notes,
+            notes: stop.notes,
             imageUrl: stop.imageUrl,
           })),
         },
@@ -1022,6 +1015,42 @@ tripsRouter.post(
     });
 
     res.status(201).json(trip);
+  }),
+);
+
+// ── Stop descriptions ────────────────────────────────────────────────────────
+
+const stopDescriptionsSchema = z.object({
+  stops: z.array(z.string().min(1)).min(1).max(20),
+  location: z.string().min(1),
+  themes: z.array(z.string().min(1)).min(1),
+});
+
+tripsRouter.post(
+  '/stop-descriptions',
+  requireAuth,
+  withAsyncHandler(async (req, res) => {
+    const parsed = stopDescriptionsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'INVALID_BODY' });
+      return;
+    }
+    const { stops, location, themes } = parsed.data;
+    const requestLogger = getRequestLogger(res);
+    try {
+      const descriptions = await aiStopDescriptionService.generateDescriptions({
+        stops,
+        location,
+        themes,
+      });
+      res.json(descriptions);
+    } catch (error) {
+      logError(requestLogger, 'ai.stop-descriptions failure', error, {
+        location,
+        stopCount: stops.length,
+      });
+      res.status(502).json({ error: 'AI_DESCRIPTIONS_FAILED' });
+    }
   }),
 );
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import GooglePlacesAutocomplete from '../../components/GooglePlacesAutocomplete';
-import { savePlanOption, shareTrip } from '../../lib/api-client';
+import { savePlanOption, shareTrip, fetchStopDescriptions } from '../../lib/api-client';
 import type { PlannedStopResolved, TripPlanOption } from '../../lib/api-client';
 
 type TripDraft = {
@@ -153,15 +153,7 @@ const IconX = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
-const IconPin = () => (
-  <svg className="h-3 w-3 shrink-0" fill="currentColor" viewBox="0 0 24 24">
-    <path
-      fillRule="evenodd"
-      d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-2.006 3.699-4.92 3.699-8.327a8 8 0 10-16 0c0 3.407 1.755 6.321 3.7 8.327a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.144.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
+
 const IconPlus = () => (
   <svg
     className="h-4 w-4"
@@ -207,6 +199,7 @@ const IconMap = () => (
 const PlanDetail = ({ draftKey }: PlanDetailProps) => {
   const [draft, setDraft] = useState<TripDraft | null>(null);
   const [stops, setStops] = useState<EditableStop[]>([]);
+  const [stopDescriptions, setStopDescriptions] = useState<Record<string, string>>({});
   const [droppedCount, setDroppedCount] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -240,6 +233,17 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
           imageUrl: s.suggestion.imageUrl,
         })),
       );
+      // Fire-and-forget: fetch AI descriptions in the background
+      const stopNames = resolved.map((s) => s.suggestion.title);
+      if (stopNames.length > 0) {
+        void fetchStopDescriptions({
+          stops: stopNames,
+          location: parsed.location,
+          themes: parsed.themes,
+        }).then((descs) => {
+          if (descs) setStopDescriptions(descs);
+        });
+      }
     } catch {
       // localStorage unavailable or corrupt
     }
@@ -321,6 +325,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
         lat: s.lat,
         lng: s.lng,
         imageUrl: s.imageUrl,
+        notes: stopDescriptions[s.name] ?? s.description ?? undefined,
         order: i,
       })),
     }).then((result) => {
@@ -494,13 +499,10 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
                       <p className="font-display text-[15px] font-bold leading-snug text-wayfarer-text-main">
                         {stop.name}
                       </p>
-                      {stop.description && (
-                        <div className="mt-1 flex items-center gap-1 text-wayfarer-text-muted">
-                          <IconPin />
-                          <p className="truncate text-xs leading-relaxed">
-                            {stop.description}
-                          </p>
-                        </div>
+                      {(stopDescriptions[stop.name] ?? stop.description) && (
+                        <p className="mt-1.5 text-xs leading-relaxed text-wayfarer-text-muted">
+                          {stopDescriptions[stop.name] ?? stop.description}
+                        </p>
                       )}
                     </div>
 
