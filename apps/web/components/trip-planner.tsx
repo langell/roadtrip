@@ -672,7 +672,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
     }));
   };
 
-  const handleSelectPlan = async (option: TripPlanOption) => {
+  const handleSelectPlan = async (option: TripPlanOption, optionIdx: number) => {
     let coords = originCoords;
     if (!coords) {
       coords = await forwardGeocode(location);
@@ -693,6 +693,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
       themes: selectedThemes as string[],
       originLat: coords?.lat ?? 0,
       originLng: coords?.lng ?? 0,
+      stopDescriptions: stopDescriptions[optionIdx] ?? {},
     };
 
     recordEvent('trip_save', { location, themes: selectedThemes });
@@ -1282,7 +1283,7 @@ const TripPlanner = ({ initialLocation }: TripPlannerProps) => {
                   <button
                     type="button"
                     className="w-full rounded-xl bg-wayfarer-primary px-4 py-3 font-body text-sm font-bold text-white shadow-wayfarer-ambient transition hover:opacity-90"
-                    onClick={() => void handleSelectPlan(option)}
+                    onClick={() => void handleSelectPlan(option, index)}
                   >
                     Select this trip →
                   </button>

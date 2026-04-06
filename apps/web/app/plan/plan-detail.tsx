@@ -13,6 +13,7 @@ type TripDraft = {
   themes: string[];
   originLat: number;
   originLng: number;
+  stopDescriptions?: Record<string, string>;
 };
 
 type EditableStop = {
@@ -233,15 +234,20 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
           imageUrl: s.suggestion.imageUrl,
         })),
       );
-      // Fire-and-forget: fetch AI descriptions in the background
-      const stopNames = resolved.map((s) => s.suggestion.title);
-      if (stopNames.length > 0) {
+      // Use descriptions that were already fetched on the planner screen.
+      // Only fire a network request for stops that are still missing one.
+      const existing = parsed.stopDescriptions ?? {};
+      if (Object.keys(existing).length > 0) setStopDescriptions(existing);
+      const missing = resolved
+        .map((s) => s.suggestion.title)
+        .filter((name) => !existing[name]);
+      if (missing.length > 0) {
         void fetchStopDescriptions({
-          stops: stopNames,
+          stops: missing,
           location: parsed.location,
           themes: parsed.themes,
         }).then((descs) => {
-          if (descs) setStopDescriptions(descs);
+          if (descs) setStopDescriptions((prev) => ({ ...prev, ...descs }));
         });
       }
     } catch {

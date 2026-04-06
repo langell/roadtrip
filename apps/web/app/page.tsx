@@ -21,6 +21,91 @@ const AVATAR_URLS = [
   'https://lh3.googleusercontent.com/aida-public/AB6AXuB5PkvVC8dYTEvjBLQO7VJrLCerlPzvufI7yjdnWPREOfzrVCxozbggHTZb-zwoQxXA21Fe4Y0LTx_O4ckO4WvH8IYvuYDx_zWPvyKNZQNLN6Fg5T3LG1iq05QrRU6-bA5gxxs-F6PHpu2DuUZPnvtiOsrEbkyyKHqgsD9wW-StRxVty6Wv2tszoN5BvqbbDiqLMe0_yYgibf_ZnGxrcm5r8lSySE8vn5FH7soXm-glZuGwn7xyVLxvlNDYCj6LUlvrQoF4zKEXM2M',
 ];
 
+const SiteFooter = () => (
+  <footer className="border-t border-wayfarer-accent/20 bg-wayfarer-surface py-12">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 md:flex-row md:justify-between md:px-8">
+      <div>
+        <p className="font-display text-xl font-black uppercase tracking-[0.2em] text-wayfarer-primary">
+          HipTrip
+        </p>
+        <p className="mt-2 max-w-xs text-sm text-wayfarer-text-muted">
+          Built for the curious. Designed for the drive.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-10 text-sm">
+        <div className="space-y-2">
+          <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
+            Company
+          </p>
+          <Link
+            href="/about"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            About
+          </Link>
+          <Link
+            href="/journal"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            Journal
+          </Link>
+        </div>
+        <div className="space-y-2">
+          <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
+            Product
+          </p>
+          <Link
+            href="/product/route-planner"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            Route Planner
+          </Link>
+          <Link
+            href="/product/offline-maps"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            Offline Maps
+          </Link>
+        </div>
+        <div className="space-y-2">
+          <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
+            Support
+          </p>
+          <Link
+            href="/support"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            Contact Us
+          </Link>
+          <Link
+            href="/faq"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            FAQ
+          </Link>
+        </div>
+        <div className="space-y-2">
+          <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
+            Legal
+          </p>
+          <Link
+            href="/privacy"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
+          >
+            Terms
+          </Link>
+        </div>
+      </div>
+    </div>
+  </footer>
+);
+
 const injectSponsored = (
   organic: DiscoverStop[],
   sponsored: DiscoverStop[],
@@ -145,6 +230,7 @@ const DiscoverView = async ({ name }: { name: string | null | undefined }) => {
           )}
         </section>
       </main>
+      <SiteFooter />
     </div>
   );
 };
@@ -319,88 +405,7 @@ const LandingView = () => (
       </section>
     </main>
 
-    <footer className="border-t border-wayfarer-accent/20 bg-wayfarer-surface py-12">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 md:flex-row md:justify-between md:px-8">
-        <div>
-          <p className="font-display text-xl font-black uppercase tracking-[0.2em] text-wayfarer-primary">
-            HipTrip
-          </p>
-          <p className="mt-2 max-w-xs text-sm text-wayfarer-text-muted">
-            Built for the curious. Designed for the drive.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-10 text-sm">
-          <div className="space-y-2">
-            <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
-              Company
-            </p>
-            <Link
-              href="/about"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              About
-            </Link>
-            <Link
-              href="/journal"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              Journal
-            </Link>
-          </div>
-          <div className="space-y-2">
-            <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
-              Product
-            </p>
-            <Link
-              href="/product/route-planner"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              Route Planner
-            </Link>
-            <Link
-              href="/product/offline-maps"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              Offline Maps
-            </Link>
-          </div>
-          <div className="space-y-2">
-            <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
-              Support
-            </p>
-            <Link
-              href="/support"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              Contact Us
-            </Link>
-            <Link
-              href="/faq"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              FAQ
-            </Link>
-          </div>
-          <div className="space-y-2">
-            <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
-              Legal
-            </p>
-            <Link
-              href="/privacy"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              Privacy
-            </Link>
-            <Link
-              href="/terms"
-              className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-            >
-              Terms
-            </Link>
-          </div>
-        </div>
-      </div>
-    </footer>
+    <SiteFooter />
   </div>
 );
 
