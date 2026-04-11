@@ -74,10 +74,15 @@ const optimalInsertIndex = (
   return bestIndex;
 };
 
-/** Resolve lat/lng + photo URL from a placeId using the new Places JS API (importLibrary). */
+/** Resolve lat/lng + photo URL + address from a placeId using the new Places JS API (importLibrary). */
 const getPlaceDetails = async (
   placeId: string,
-): Promise<{ lat: number; lng: number; imageUrl?: string } | null> => {
+): Promise<{
+  lat: number;
+  lng: number;
+  description: string;
+  imageUrl?: string;
+} | null> => {
   if (typeof window === 'undefined' || !window.google?.maps?.importLibrary) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,14 +92,20 @@ const getPlaceDetails = async (
       fetchFields: (opts: { fields: string[] }) => Promise<void>;
       location: { lat: () => number; lng: () => number } | null;
       photos: { getURI: (opts: { maxWidth: number }) => string }[] | undefined;
+      shortFormattedAddress?: string;
+      formattedAddress?: string;
     };
-    await place.fetchFields({ fields: ['location', 'photos'] });
+    await place.fetchFields({
+      fields: ['location', 'photos', 'shortFormattedAddress', 'formattedAddress'],
+    });
     const loc = place.location;
     if (!loc) return null;
     const imageUrl = place.photos?.[0]?.getURI({ maxWidth: 800 });
+    const description = place.shortFormattedAddress ?? place.formattedAddress ?? '';
     return {
       lat: loc.lat(),
       lng: loc.lng(),
+      description,
       ...(imageUrl ? { imageUrl } : {}),
     };
   } catch {
@@ -295,7 +306,7 @@ const PlanDetail = ({ draftKey }: PlanDetailProps) => {
       id: `added-${addPlaceId}-${Date.now()}`,
       placeId: addPlaceId,
       name: addQuery,
-      description: '',
+      description: details.description,
       lat: details.lat,
       lng: details.lng,
       ...(details.imageUrl ? { imageUrl: details.imageUrl } : {}),
