@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 import './globals.css';
 import { getSession } from '../lib/session';
 import AuthSessionProvider from '../components/session-provider';
@@ -27,6 +28,13 @@ const RootLayout = async ({ children }: { children: ReactNode }) => {
         <meta name="theme-color" content="#1B4332" />
       </head>
       <body>
+        <Script
+          id="affiliate-tpembars"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var s=document.createElement("script");s.async=1;s.src='https://tpembars.com/NTE3NDMx.js?t=517431';document.head.appendChild(s);})();`,
+          }}
+        />
         <ServiceWorkerRegistration />
         <GoogleMapsScriptLoader />
         <AuthSessionProvider session={session}>
