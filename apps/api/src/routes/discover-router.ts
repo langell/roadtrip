@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { withAsyncHandler } from '../lib/async-handler.js';
 import { rewritePhotoProxyUrl } from '../lib/photo-url.js';
+import { aiStopDescriptionService } from '../services/ai-stop-description-service.js';
 
 type CachedStop = { status: string; suggestion?: { imageUrl?: string } };
 type CachedOption = { title?: string; stops?: CachedStop[] };
@@ -103,9 +104,9 @@ discoverRouter.get(
       }
     }
 
-    const nearbyStops: DiscoverStop[] = [...stopScores.entries()]
+    const topStops = [...stopScores.entries()]
       .sort((a, b) => b[1].score - a[1].score)
-      .slice(0, 9)
+      .slice(0, 5)
       .map(([, { stop }]) => ({
         id: stop.id,
         placeId: stop.placeId,
@@ -114,6 +115,25 @@ discoverRouter.get(
         imageUrl: rewritePhotoProxyUrl(req, stop.imageUrl),
         sponsored: false,
       }));
+
+    // Enrich with AI-generated descriptions (cached 24h per placeId; falls back to original)
+    let aiDescriptions: Record<string, string> = {};
+    try {
+      aiDescriptions = await aiStopDescriptionService.generateDiscoverDescriptions(
+        topStops.map((s) => ({
+          placeId: s.placeId,
+          title: s.title,
+          description: s.description,
+        })),
+      );
+    } catch {
+      // Non-fatal — original descriptions are used as fallback
+    }
+
+    const nearbyStops: DiscoverStop[] = topStops.map((s) => ({
+      ...s,
+      description: aiDescriptions[s.placeId] ?? s.description,
+    }));
 
     // 3. Sponsored stops
     const sponsored = await prisma.sponsoredPlace.findMany({

@@ -6,6 +6,7 @@ const { mockEnv } = vi.hoisted(() => {
     GOOGLE_AI_API_KEY: 'test-key' as string | undefined,
     AI_GATEWAY_API_KEY: undefined as string | undefined,
     GOOGLE_AI_MODEL: 'gemini-2.5-flash',
+    GOOGLE_AI_MODEL_FAST: 'gemini-2.0-flash' as string | undefined,
   };
   return { mockEnv };
 });
@@ -16,6 +17,7 @@ beforeEach(() => {
   mockEnv.GOOGLE_AI_API_KEY = 'test-key';
   mockEnv.AI_GATEWAY_API_KEY = undefined;
   mockEnv.GOOGLE_AI_MODEL = 'gemini-2.5-flash';
+  mockEnv.GOOGLE_AI_MODEL_FAST = 'gemini-2.0-flash';
 });
 
 const geminiBody = (innerText: string) =>
@@ -182,6 +184,111 @@ describe('AiStopDescriptionService', () => {
       expect(result['Stop']).toBe('Gateway description.');
       const url = fetch.mock.calls[0][0] as string;
       expect(url).toContain('gateway-key');
+    });
+  });
+
+  describe('generateDiscoverDescriptions', () => {
+    const stops = [
+      { placeId: 'p1', title: 'Bixby Bridge', description: 'A coastal bridge.' },
+      { placeId: 'p2', title: 'Point Lobos', description: 'A rocky headland.' },
+    ];
+
+    it('returns placeId→description map', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        ok(
+          validResponse([
+            { name: 'Bixby Bridge', description: 'A soaring arch over the sea.' },
+            { name: 'Point Lobos', description: 'Twisted cypress frames the Pacific.' },
+          ]),
+        ),
+      );
+      const service = new AiStopDescriptionService(fetch);
+
+      const result = await service.generateDiscoverDescriptions(stops);
+
+      expect(result['p1']).toBe('A soaring arch over the sea.');
+      expect(result['p2']).toBe('Twisted cypress frames the Pacific.');
+    });
+
+    it('serves cached results without calling the API again', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        ok(
+          validResponse([
+            { name: 'Bixby Bridge', description: 'Cached description.' },
+            { name: 'Point Lobos', description: 'Also cached.' },
+          ]),
+        ),
+      );
+      const service = new AiStopDescriptionService(fetch);
+
+      await service.generateDiscoverDescriptions(stops);
+      await service.generateDiscoverDescriptions(stops);
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-fetches after cache is cleared', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(
+          ok(validResponse([{ name: 'Bixby Bridge', description: 'Fresh.' }])),
+        );
+      const service = new AiStopDescriptionService(fetch);
+
+      await service.generateDiscoverDescriptions([stops[0]]);
+      service.clearDiscoverCache();
+      await service.generateDiscoverDescriptions([stops[0]]);
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses GOOGLE_AI_MODEL_FAST for the request', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(
+          ok(validResponse([{ name: 'Bixby Bridge', description: 'Fast model used.' }])),
+        );
+      const service = new AiStopDescriptionService(fetch);
+
+      await service.generateDiscoverDescriptions([stops[0]]);
+
+      const url = fetch.mock.calls[0][0] as string;
+      expect(url).toContain('gemini-2.0-flash');
+    });
+
+    it('throws AI_KEY_NOT_CONFIGURED when no API key is set', async () => {
+      mockEnv.GOOGLE_AI_API_KEY = undefined;
+      mockEnv.AI_GATEWAY_API_KEY = undefined;
+      const service = new AiStopDescriptionService(vi.fn());
+
+      await expect(service.generateDiscoverDescriptions(stops)).rejects.toMatchObject({
+        message: 'AI_KEY_NOT_CONFIGURED',
+        stage: 'config',
+      });
+    });
+
+    it('throws AI_INVALID_RESPONSE on malformed JSON', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(ok(geminiBody('not json')));
+      const service = new AiStopDescriptionService(fetch);
+
+      await expect(
+        service.generateDiscoverDescriptions([stops[0]]),
+      ).rejects.toMatchObject({
+        message: 'AI_INVALID_RESPONSE',
+        stage: 'parse',
+      });
+    });
+
+    it('returns empty object when input is empty', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const service = new AiStopDescriptionService(fetch);
+
+      const result = await service.generateDiscoverDescriptions([]);
+
+      expect(result).toEqual({});
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });
