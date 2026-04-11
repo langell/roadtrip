@@ -296,18 +296,6 @@ export default function TripMapView({ trip, sponsored }: Props) {
       <header className="fixed top-0 z-50 flex w-full items-center justify-between bg-wayfarer-bg/90 backdrop-blur-md px-6 py-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-8">
           <Logo />
-          <nav className="hidden items-center gap-6 md:flex">
-            <button className="font-display font-bold text-wayfarer-primary">Map</button>
-            <button className="font-display text-wayfarer-text-muted transition-colors hover:text-wayfarer-primary">
-              Stops
-            </button>
-            <button className="font-display text-wayfarer-text-muted transition-colors hover:text-wayfarer-primary">
-              Journal
-            </button>
-            <button className="font-display text-wayfarer-text-muted transition-colors hover:text-wayfarer-primary">
-              Profile
-            </button>
-          </nav>
         </div>
         <div className="flex items-center gap-4">
           <ShareButton tripId={trip.id} variant="header" />

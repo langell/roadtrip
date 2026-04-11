@@ -161,47 +161,52 @@ const AccordionItem = ({ item }: { item: FaqItem }) => {
   );
 };
 
-const FaqPage = () => (
-  <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
-    <div className="mx-auto w-full max-w-4xl space-y-10">
-      <div className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
-          Help
-        </p>
-        <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
-          Frequently Asked Questions
-        </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-wayfarer-text-muted">
-          Can&apos;t find an answer?{' '}
-          <Link
-            href="/support"
-            className="font-semibold text-wayfarer-primary hover:opacity-80"
-          >
-            Contact our support team
-          </Link>
-          .
-        </p>
-      </div>
+import SimpleHeader from '../../components/SimpleHeader';
 
-      <section className="space-y-6">
-        {FAQ.map((cat) => (
-          <article
-            key={cat.category}
-            className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft md:p-8"
-          >
-            <h2 className="mb-4 font-display text-lg font-bold text-wayfarer-primary">
-              {cat.category}
-            </h2>
-            <div>
-              {cat.items.map((item) => (
-                <AccordionItem key={item.q} item={item} />
-              ))}
-            </div>
-          </article>
-        ))}
-      </section>
-    </div>
-  </main>
+const FaqPage = () => (
+  <>
+    <SimpleHeader />
+    <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
+      <div className="mx-auto w-full max-w-4xl space-y-10">
+        <div className="space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
+            Help
+          </p>
+          <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
+            Frequently Asked Questions
+          </h1>
+          <p className="max-w-2xl text-lg leading-relaxed text-wayfarer-text-muted">
+            Can&apos;t find an answer?{' '}
+            <Link
+              href="/support"
+              className="font-semibold text-wayfarer-primary hover:opacity-80"
+            >
+              Contact our support team
+            </Link>
+            .
+          </p>
+        </div>
+
+        <section className="space-y-6">
+          {FAQ.map((cat) => (
+            <article
+              key={cat.category}
+              className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft md:p-8"
+            >
+              <h2 className="mb-4 font-display text-lg font-bold text-wayfarer-primary">
+                {cat.category}
+              </h2>
+              <div>
+                {cat.items.map((item) => (
+                  <AccordionItem key={item.q} item={item} />
+                ))}
+              </div>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
+  </>
 );
 
 export default FaqPage;

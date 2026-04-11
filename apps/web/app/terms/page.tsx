@@ -49,37 +49,42 @@ const SECTIONS = [
   },
 ];
 
-const TermsPage = () => (
-  <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
-    <div className="mx-auto w-full max-w-4xl space-y-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
-        Legal
-      </p>
-      <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
-        Terms of Service
-      </h1>
-      <p className="max-w-3xl text-sm leading-relaxed text-wayfarer-text-muted">
-        Last updated: April 5, 2026. Please read these terms carefully before using
-        HipTrip.
-      </p>
+import SimpleHeader from '../../components/SimpleHeader';
 
-      <section className="space-y-4">
-        {SECTIONS.map((section) => (
-          <article
-            key={section.title}
-            className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft"
-          >
-            <h2 className="mb-3 font-display text-lg font-semibold text-wayfarer-primary">
-              {section.title}
-            </h2>
-            <p className="text-sm leading-relaxed text-wayfarer-text-muted">
-              {section.body}
-            </p>
-          </article>
-        ))}
-      </section>
-    </div>
-  </main>
+const TermsPage = () => (
+  <>
+    <SimpleHeader />
+    <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
+      <div className="mx-auto w-full max-w-4xl space-y-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
+          Legal
+        </p>
+        <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
+          Terms of Service
+        </h1>
+        <p className="max-w-3xl text-sm leading-relaxed text-wayfarer-text-muted">
+          Last updated: April 5, 2026. Please read these terms carefully before using
+          HipTrip.
+        </p>
+
+        <section className="space-y-4">
+          {SECTIONS.map((section) => (
+            <article
+              key={section.title}
+              className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft"
+            >
+              <h2 className="mb-3 font-display text-lg font-semibold text-wayfarer-primary">
+                {section.title}
+              </h2>
+              <p className="text-sm leading-relaxed text-wayfarer-text-muted">
+                {section.body}
+              </p>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
+  </>
 );
 
 export default TermsPage;
