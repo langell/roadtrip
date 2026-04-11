@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { DiscoverStop } from '../lib/api-client';
 import { recordEvent } from '../lib/analytics';
 
@@ -73,7 +74,15 @@ const PlaceCard = ({ stop, gradientIndex }: Props) => {
     );
   }
 
-  return inner;
+  const params = new URLSearchParams({ title: stop.title });
+  if (stop.description) params.set('desc', stop.description);
+  if (stop.imageUrl) params.set('img', stop.imageUrl);
+
+  return (
+    <Link href={`/stops/${encodeURIComponent(stop.placeId)}?${params.toString()}`}>
+      {inner}
+    </Link>
+  );
 };
 
 export default PlaceCard;
