@@ -171,75 +171,80 @@ const ContactForm = () => {
   );
 };
 
+import SimpleHeader from '../../components/SimpleHeader';
+
 const SupportPage = () => (
-  <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
-    <div className="mx-auto w-full max-w-4xl space-y-10">
-      <div className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
-          Help
-        </p>
-        <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
-          Support
-        </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-wayfarer-text-muted">
-          We&apos;re here to help. Browse common questions in our{' '}
+  <>
+    <SimpleHeader />
+    <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
+      <div className="mx-auto w-full max-w-4xl space-y-10">
+        <div className="space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
+            Help
+          </p>
+          <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
+            Support
+          </h1>
+          <p className="max-w-2xl text-lg leading-relaxed text-wayfarer-text-muted">
+            We&apos;re here to help. Browse common questions in our{' '}
+            <Link
+              href="/faq"
+              className="font-semibold text-wayfarer-primary hover:opacity-80"
+            >
+              FAQ
+            </Link>{' '}
+            or send us a message below — we typically reply within 1–2 business days.
+          </p>
+        </div>
+
+        {/* Quick links */}
+        <div className="grid gap-4 sm:grid-cols-3">
           <Link
             href="/faq"
-            className="font-semibold text-wayfarer-primary hover:opacity-80"
+            className="flex items-start gap-3 rounded-2xl bg-wayfarer-surface p-5 shadow-wayfarer-soft transition-transform hover:-translate-y-0.5 hover:shadow-wayfarer-ambient"
           >
-            FAQ
-          </Link>{' '}
-          or send us a message below — we typically reply within 1–2 business days.
-        </p>
-      </div>
+            <span className="text-2xl">❓</span>
+            <div>
+              <p className="font-display text-sm font-bold text-wayfarer-primary">FAQ</p>
+              <p className="text-xs text-wayfarer-text-muted">Browse common questions</p>
+            </div>
+          </Link>
+          <a
+            href="mailto:support@hiptrip.net"
+            className="flex items-start gap-3 rounded-2xl bg-wayfarer-surface p-5 shadow-wayfarer-soft transition-transform hover:-translate-y-0.5 hover:shadow-wayfarer-ambient"
+          >
+            <span className="text-2xl">✉️</span>
+            <div>
+              <p className="font-display text-sm font-bold text-wayfarer-primary">
+                Email Us
+              </p>
+              <p className="text-xs text-wayfarer-text-muted">support@hiptrip.net</p>
+            </div>
+          </a>
+          <Link
+            href="/privacy"
+            className="flex items-start gap-3 rounded-2xl bg-wayfarer-surface p-5 shadow-wayfarer-soft transition-transform hover:-translate-y-0.5 hover:shadow-wayfarer-ambient"
+          >
+            <span className="text-2xl">🔒</span>
+            <div>
+              <p className="font-display text-sm font-bold text-wayfarer-primary">
+                Privacy Policy
+              </p>
+              <p className="text-xs text-wayfarer-text-muted">How we handle your data</p>
+            </div>
+          </Link>
+        </div>
 
-      {/* Quick links */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Link
-          href="/faq"
-          className="flex items-start gap-3 rounded-2xl bg-wayfarer-surface p-5 shadow-wayfarer-soft transition-transform hover:-translate-y-0.5 hover:shadow-wayfarer-ambient"
-        >
-          <span className="text-2xl">❓</span>
-          <div>
-            <p className="font-display text-sm font-bold text-wayfarer-primary">FAQ</p>
-            <p className="text-xs text-wayfarer-text-muted">Browse common questions</p>
-          </div>
-        </Link>
-        <a
-          href="mailto:support@hiptrip.net"
-          className="flex items-start gap-3 rounded-2xl bg-wayfarer-surface p-5 shadow-wayfarer-soft transition-transform hover:-translate-y-0.5 hover:shadow-wayfarer-ambient"
-        >
-          <span className="text-2xl">✉️</span>
-          <div>
-            <p className="font-display text-sm font-bold text-wayfarer-primary">
-              Email Us
-            </p>
-            <p className="text-xs text-wayfarer-text-muted">support@hiptrip.net</p>
-          </div>
-        </a>
-        <Link
-          href="/privacy"
-          className="flex items-start gap-3 rounded-2xl bg-wayfarer-surface p-5 shadow-wayfarer-soft transition-transform hover:-translate-y-0.5 hover:shadow-wayfarer-ambient"
-        >
-          <span className="text-2xl">🔒</span>
-          <div>
-            <p className="font-display text-sm font-bold text-wayfarer-primary">
-              Privacy Policy
-            </p>
-            <p className="text-xs text-wayfarer-text-muted">How we handle your data</p>
-          </div>
-        </Link>
+        {/* Contact form */}
+        <div className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft md:p-8">
+          <h2 className="mb-6 font-display text-xl font-bold text-wayfarer-primary">
+            Send us a message
+          </h2>
+          <ContactForm />
+        </div>
       </div>
-
-      {/* Contact form */}
-      <div className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft md:p-8">
-        <h2 className="mb-6 font-display text-xl font-bold text-wayfarer-primary">
-          Send us a message
-        </h2>
-        <ContactForm />
-      </div>
-    </div>
-  </main>
+    </main>
+  </>
 );
 
 export default SupportPage;

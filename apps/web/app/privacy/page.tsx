@@ -155,46 +155,51 @@ const SECTIONS = [
   },
 ];
 
-const PrivacyPage = () => (
-  <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
-    <div className="mx-auto w-full max-w-4xl space-y-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
-        Legal
-      </p>
-      <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
-        Privacy Policy
-      </h1>
-      <p className="max-w-3xl text-sm leading-relaxed text-wayfarer-text-muted">
-        Last updated: April 5, 2026. This policy explains how HipTrip collects, uses, and
-        protects your personal information.
-      </p>
+import SimpleHeader from '../../components/SimpleHeader';
 
-      <section className="space-y-4">
-        {SECTIONS.map((section) => (
-          <article
-            key={section.title}
-            className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft"
-          >
-            <h2 className="mb-4 font-display text-lg font-semibold text-wayfarer-primary">
-              {section.title}
-            </h2>
-            <div className="space-y-4">
-              {section.items.map((item) => (
-                <div key={item.subtitle}>
-                  <p className="mb-1 text-sm font-semibold text-wayfarer-text-main">
-                    {item.subtitle}
-                  </p>
-                  <p className="text-sm leading-relaxed text-wayfarer-text-muted">
-                    {item.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </section>
-    </div>
-  </main>
+const PrivacyPage = () => (
+  <>
+    <SimpleHeader />
+    <main className="min-h-screen bg-wayfarer-bg px-6 py-24 font-body text-wayfarer-text-main md:px-10">
+      <div className="mx-auto w-full max-w-4xl space-y-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wayfarer-text-muted">
+          Legal
+        </p>
+        <h1 className="font-display text-4xl font-bold text-wayfarer-primary md:text-5xl">
+          Privacy Policy
+        </h1>
+        <p className="max-w-3xl text-sm leading-relaxed text-wayfarer-text-muted">
+          Last updated: April 5, 2026. This policy explains how HipTrip collects, uses,
+          and protects your personal information.
+        </p>
+
+        <section className="space-y-4">
+          {SECTIONS.map((section) => (
+            <article
+              key={section.title}
+              className="rounded-2xl bg-wayfarer-surface p-6 shadow-wayfarer-soft"
+            >
+              <h2 className="mb-4 font-display text-lg font-semibold text-wayfarer-primary">
+                {section.title}
+              </h2>
+              <div className="space-y-4">
+                {section.items.map((item) => (
+                  <div key={item.subtitle}>
+                    <p className="mb-1 text-sm font-semibold text-wayfarer-text-main">
+                      {item.subtitle}
+                    </p>
+                    <p className="text-sm leading-relaxed text-wayfarer-text-muted">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
+  </>
 );
 
 export default PrivacyPage;

@@ -52,23 +52,6 @@ const SiteFooter = () => (
         </div>
         <div className="space-y-2">
           <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
-            Product
-          </p>
-          <Link
-            href="/product/route-planner"
-            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-          >
-            Route Planner
-          </Link>
-          <Link
-            href="/product/offline-maps"
-            className="block text-wayfarer-text-muted hover:text-wayfarer-primary"
-          >
-            Offline Maps
-          </Link>
-        </div>
-        <div className="space-y-2">
-          <p className="font-bold uppercase tracking-wider text-wayfarer-primary">
             Support
           </p>
           <Link
