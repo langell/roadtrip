@@ -6,6 +6,8 @@ const StopDescriptionSchema = z.object({
   description: z.string().min(1).describe('2-3 sentence travel narrative for this stop'),
 });
 
+const DISCOVER_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
 const StopDescriptionsSchema = z.object({
   stops: z.array(StopDescriptionSchema),
 });
@@ -27,6 +29,107 @@ export type { StopDescriptions };
 
 export class AiStopDescriptionService {
   constructor(private readonly fetchFn: typeof fetch = fetch) {}
+
+  private readonly discoverCache = new Map<string, { desc: string; expiresAt: number }>();
+
+  clearDiscoverCache(): void {
+    this.discoverCache.clear();
+  }
+
+  async generateDiscoverDescriptions(
+    stops: Array<{ placeId: string; title: string; description: string }>,
+  ): Promise<Record<string, string>> {
+    const now = Date.now();
+    const result: Record<string, string> = {};
+    const toGenerate: typeof stops = [];
+
+    for (const stop of stops) {
+      const cached = this.discoverCache.get(stop.placeId);
+      if (cached && cached.expiresAt > now) {
+        result[stop.placeId] = cached.desc;
+      } else {
+        toGenerate.push(stop);
+      }
+    }
+
+    if (toGenerate.length === 0) return result;
+
+    const apiKey = env.GOOGLE_AI_API_KEY ?? env.AI_GATEWAY_API_KEY;
+    if (!apiKey) throw new AiStopDescriptionError('AI_KEY_NOT_CONFIGURED', 'config');
+
+    const stopList = toGenerate
+      .map((s, i) => `${i + 1}. ${s.title}: ${s.description}`)
+      .join('\n');
+
+    const prompt = [
+      'You are a travel writer crafting short, enticing descriptions for a road trip discovery feed.',
+      '',
+      'Rewrite each stop description below as a vivid, inspiring 1-2 sentence hook.',
+      'Make it feel exciting and worth a detour. Be specific — mention what makes it unique.',
+      'Do NOT start with the stop name. Start with an evocative detail or sensory scene.',
+      '',
+      'Stops:',
+      stopList,
+      '',
+      'Output rules:',
+      '- Return JSON only (no markdown, no prose, no code fences).',
+      '- Use this exact schema:',
+      '{"stops":[{"name":"Stop Name","description":"..."}]}',
+      '- Include every stop in the same order as the input list.',
+      '- name must exactly match the input stop name.',
+      '- All fields required and non-empty.',
+    ].join('\n');
+
+    const model = env.GOOGLE_AI_MODEL_FAST ?? env.GOOGLE_AI_MODEL;
+    const fallbackModel = 'gemini-2.0-flash';
+
+    const { responseBodyText } = await this.requestWithFallback({
+      prompt,
+      apiKey,
+      model,
+      fallbackModel,
+    });
+
+    let parsed: unknown;
+    try {
+      const raw = JSON.parse(responseBodyText) as {
+        candidates?: Array<{
+          content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+        }>;
+      };
+      const parts = raw.candidates?.[0]?.content?.parts ?? [];
+      const rawText = parts
+        .filter((p) => !p.thought)
+        .map((p) => p.text ?? '')
+        .join('');
+      const jsonText = rawText
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+      parsed = JSON.parse(jsonText);
+    } catch {
+      throw new AiStopDescriptionError('AI_INVALID_RESPONSE', 'parse');
+    }
+
+    const validated = StopDescriptionsSchema.safeParse(parsed);
+    if (!validated.success) {
+      throw new AiStopDescriptionError('AI_INVALID_RESPONSE', 'parse');
+    }
+
+    const nameToPlaceId = new Map(toGenerate.map((s) => [s.title, s.placeId]));
+    const expiresAt = now + DISCOVER_CACHE_TTL_MS;
+
+    for (const stop of validated.data.stops) {
+      const placeId = nameToPlaceId.get(stop.name);
+      if (placeId) {
+        this.discoverCache.set(placeId, { desc: stop.description, expiresAt });
+        result[placeId] = stop.description;
+      }
+    }
+
+    return result;
+  }
 
   async generateDescriptions(input: {
     stops: string[];
