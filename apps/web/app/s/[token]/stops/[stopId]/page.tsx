@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getSharedTrip } from '../../../../../lib/api-client';
 import { reverseGeocode } from '../../../../../lib/geocode';
@@ -7,6 +8,43 @@ import { NearbyHotels } from '../../../../../components/NearbyHotels';
 type Props = {
   params: Promise<{ token: string; stopId: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { token, stopId } = await params;
+  const plan = await getSharedTrip(token);
+  if (!plan) return { title: 'Stop Not Found — HipTrip' };
+
+  const stop = plan.stops.find((s) => s.id === stopId);
+  if (!stop) return { title: 'Stop Not Found — HipTrip' };
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  const description =
+    stop.notes ||
+    `${stop.name} — a stop on the ${plan.name} road trip through ${plan.location}.`;
+  const ogImages = stop.imageUrl
+    ? [{ url: stop.imageUrl, width: 1200, height: 630, alt: stop.name }]
+    : [];
+
+  return {
+    title: `${stop.name} — ${plan.name} | HipTrip`,
+    description,
+    keywords: [stop.name, plan.location, 'road trip', 'travel', ...plan.themes],
+    openGraph: {
+      title: `${stop.name} — ${plan.name}`,
+      description,
+      siteName: 'HipTrip',
+      type: 'website',
+      url: siteUrl ? `${siteUrl}/s/${token}/stops/${stopId}` : undefined,
+      images: ogImages,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${stop.name} — ${plan.name}`,
+      description,
+      images: stop.imageUrl ? [stop.imageUrl] : [],
+    },
+  };
+}
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 
@@ -67,8 +105,29 @@ const SharedStopDetailPage = async ({ params }: Props) => {
       : `Stop ${waypointNum} of ${totalStops}`;
   const staticMapUrl = buildStaticMapUrl(stop.lat, stop.lng);
   const directionsUrl = buildDirectionsUrl(stop.lat, stop.lng, stop.name);
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristAttraction',
+    name: stop.name,
+    description: stop.notes || `${stop.name} on the ${plan.name} road trip.`,
+    image: stop.imageUrl ?? undefined,
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: stop.lat,
+      longitude: stop.lng,
+    },
+    containedInPlace: {
+      '@type': 'TouristTrip',
+      name: plan.name,
+    },
+  };
+
   return (
     <div className="min-h-screen bg-wayfarer-bg font-body text-wayfarer-text-main antialiased">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ── Header ───────────────────────────────────────────── */}
       <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between bg-wayfarer-bg/80 px-4 backdrop-blur-xl md:px-6">
         <div className="flex items-center gap-3">
