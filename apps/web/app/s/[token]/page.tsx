@@ -16,13 +16,38 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: 'Trip Not Found — HipTrip' };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  const description =
+    plan.rationale ||
+    `A curated road trip through ${plan.location} with ${plan.stops.length} stops.`;
+  const coverImage = plan.stops.find((s) => s.imageUrl)?.imageUrl;
+  const ogImages = coverImage
+    ? [{ url: coverImage, width: 1200, height: 630, alt: plan.name }]
+    : [];
+
   return {
     title: `${plan.name} — HipTrip`,
-    description: plan.rationale || `A road trip through ${plan.location}`,
+    description,
+    keywords: [
+      plan.location,
+      'road trip',
+      'travel itinerary',
+      'trip planner',
+      ...plan.themes,
+    ],
     openGraph: {
       title: plan.name,
-      description: plan.rationale || `A road trip through ${plan.location}`,
+      description,
       siteName: 'HipTrip',
+      type: 'website',
+      url: siteUrl ? `${siteUrl}/s/${token}` : undefined,
+      images: ogImages,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: plan.name,
+      description,
+      images: coverImage ? [coverImage] : [],
     },
   };
 }
@@ -52,5 +77,40 @@ export default async function SharedTripPage({ params }: Props) {
     );
   }
 
-  return <SharedTripView plan={plan} shareToken={token} isLoggedIn={isLoggedIn} />;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: plan.name,
+    description: plan.rationale || `A curated road trip through ${plan.location}.`,
+    numberOfItems: plan.stops.length,
+    itemListElement: plan.stops
+      .sort((a, b) => a.order - b.order)
+      .map((stop, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: stop.name,
+        url: siteUrl ? `${siteUrl}/s/${token}/stops/${stop.id}` : undefined,
+        item: {
+          '@type': 'TouristAttraction',
+          name: stop.name,
+          image: stop.imageUrl ?? undefined,
+          geo: {
+            '@type': 'GeoCoordinates',
+            latitude: stop.lat,
+            longitude: stop.lng,
+          },
+        },
+      })),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <SharedTripView plan={plan} shareToken={token} isLoggedIn={isLoggedIn} />
+    </>
+  );
 }
