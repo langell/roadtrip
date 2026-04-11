@@ -175,7 +175,12 @@ const TripsPage = async () => {
                           })}
                         </span>
                       </div>
-                      <TripCardActions tripId={trip.id} shareToken={trip.shareToken} />
+                      <TripCardActions
+                        tripId={trip.id}
+                        tripName={trip.name}
+                        stops={trip.stops}
+                        shareToken={trip.shareToken}
+                      />
                     </div>
                   </div>
                 </li>

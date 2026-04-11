@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { shareTrip } from '../lib/api-client';
+import { ShareModal, buildShareCaption } from './ShareModal';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 
@@ -37,15 +38,20 @@ async function deleteTripRequest(tripId: string): Promise<boolean> {
 
 type Props = {
   tripId: string;
+  tripName: string;
+  stops: Array<{ name: string; order: number }>;
   shareToken?: string | null;
 };
 
-export default function TripCardActions({ tripId }: Props) {
+export default function TripCardActions({ tripId, tripName, stops }: Props) {
   const router = useRouter();
   const [isSharing, setIsSharing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<'copied' | 'shared' | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [shareModal, setShareModal] = useState<{ url: string; caption: string } | null>(
+    null,
+  );
 
   const handleShare = async () => {
     setIsSharing(true);
@@ -54,19 +60,20 @@ export default function TripCardActions({ tripId }: Props) {
       if (!result) return;
 
       const url = result.shareUrl;
+      const caption = buildShareCaption(tripName, stops, url);
+
       if (navigator.share) {
         try {
-          await navigator.share({ title: 'Check out this trip', url });
+          await navigator.share({ title: tripName, text: caption, url });
           setShareFeedback('shared');
+          setTimeout(() => setShareFeedback(null), 2000);
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') return;
           throw err;
         }
       } else {
-        await navigator.clipboard.writeText(url);
-        setShareFeedback('copied');
+        setShareModal({ url, caption });
       }
-      setTimeout(() => setShareFeedback(null), 2000);
     } finally {
       setIsSharing(false);
     }
@@ -93,9 +100,7 @@ export default function TripCardActions({ tripId }: Props) {
           disabled={isSharing}
           className="flex items-center gap-1.5 rounded-lg border border-wayfarer-primary/20 px-3 py-1.5 text-xs font-semibold text-wayfarer-primary transition hover:border-wayfarer-primary hover:bg-wayfarer-primary hover:text-white disabled:opacity-50"
         >
-          {shareFeedback === 'copied' ? (
-            'Copied!'
-          ) : shareFeedback === 'shared' ? (
+          {shareFeedback === 'shared' ? (
             'Shared!'
           ) : (
             <>
@@ -156,6 +161,15 @@ export default function TripCardActions({ tripId }: Props) {
           )}
         </button>
       </div>
+
+      {/* Share modal */}
+      {shareModal && (
+        <ShareModal
+          caption={shareModal.caption}
+          url={shareModal.url}
+          onClose={() => setShareModal(null)}
+        />
+      )}
 
       {/* Inline confirm dialog */}
       {showConfirm && (

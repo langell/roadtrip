@@ -7,6 +7,7 @@ import Logo from './Logo';
 import { useRouter } from 'next/navigation';
 import type { SharedPlan } from '../lib/api-client';
 import { savePlanOption } from '../lib/api-client';
+import { ShareModal, buildShareCaption } from './ShareModal';
 
 type Props = {
   plan: SharedPlan;
@@ -57,6 +58,19 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [shareModal, setShareModal] = useState<{ url: string; caption: string } | null>(
+    null,
+  );
+
+  const handleShareClick = () => {
+    const url = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hiptrip.net'}/s/${shareToken}`;
+    const caption = buildShareCaption(plan.name, sorted, url);
+    if (navigator.share) {
+      void navigator.share({ title: plan.name, text: caption, url }).catch(() => {});
+    } else {
+      setShareModal({ url, caption });
+    }
+  };
   const stopCardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const sorted = [...plan.stops].sort((a, b) => a.order - b.order);
@@ -313,6 +327,30 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
             </span>
           </button>
 
+          {/* Share button */}
+          <button
+            type="button"
+            onClick={handleShareClick}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-wayfarer-primary/30 px-3 font-display text-sm font-bold text-wayfarer-primary transition hover:border-wayfarer-primary hover:bg-wayfarer-surface active:scale-95 sm:px-4"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            <span className="hidden sm:inline">Share</span>
+          </button>
+
           {/* Plan your own button — filled primary pill */}
           <Link
             href="/"
@@ -543,6 +581,14 @@ export default function SharedTripView({ plan, shareToken, isLoggedIn }: Props) 
           </div>
         </aside>
       </main>
+
+      {shareModal && (
+        <ShareModal
+          caption={shareModal.caption}
+          url={shareModal.url}
+          onClose={() => setShareModal(null)}
+        />
+      )}
     </div>
   );
 }
