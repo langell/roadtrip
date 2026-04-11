@@ -143,19 +143,40 @@ const TripsPage = async () => {
                     )}
 
                     {/* Stops */}
-                    <ol className="mb-auto space-y-1.5">
+                    <ol className="mb-auto space-y-2">
                       {visibleStops.map((stop) => (
-                        <li key={stop.id} className="flex items-center gap-2 text-sm">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-wayfarer-primary/15 text-[10px] font-bold text-wayfarer-primary">
-                            {stop.order + 1}
-                          </span>
-                          <span className="truncate text-wayfarer-text-main">
-                            {stop.name}
-                          </span>
+                        <li key={stop.id}>
+                          <Link
+                            href={`/trips/${trip.id}/stops/${stop.id}`}
+                            className="group flex items-center gap-3 rounded-xl p-1.5 transition-colors hover:bg-wayfarer-surface-deep"
+                          >
+                            {stop.imageUrl ? (
+                              <img
+                                src={stop.imageUrl}
+                                alt={stop.name}
+                                className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wayfarer-primary/10 text-xs font-bold text-wayfarer-primary">
+                                {stop.order + 1}
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-wayfarer-text-main">
+                                {stop.name}
+                              </p>
+                              {stop.notes && (
+                                <p className="truncate text-xs text-wayfarer-text-muted">
+                                  {stop.notes}
+                                </p>
+                              )}
+                            </div>
+                          </Link>
                         </li>
                       ))}
                       {hiddenCount > 0 && (
-                        <li className="pl-7 text-xs text-wayfarer-text-muted">
+                        <li className="px-1.5 text-xs text-wayfarer-text-muted">
                           +{hiddenCount} more stop{hiddenCount !== 1 ? 's' : ''}
                         </li>
                       )}

@@ -187,6 +187,7 @@ export type SavedTripStop = {
   lat: number;
   lng: number;
   notes?: string | null;
+  imageUrl?: string | null;
 };
 
 export type SavedTrip = {
